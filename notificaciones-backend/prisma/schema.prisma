@@ -1,0 +1,63 @@
+// schema.prisma — notificaciones-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
+model Notification {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  templateKey    String
+  payload        Json
+  idempotencyKey String              @unique
+  status         NotificationStatus  @default(PENDING)
+  attempts       Int                 @default(0)
+  sentAt         DateTime?
+  failureReason  String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([createdAt])
+}
+
+/// Preferencias de canal por contacto — se chequea antes de cada envio
+model ContactPreference {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  optedOut       Boolean             @default(false)
+  optedOutAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, contactId, channel])
+  @@index([organizationId, contactId])
+}

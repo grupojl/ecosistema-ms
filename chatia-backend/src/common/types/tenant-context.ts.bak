@@ -1,0 +1,34 @@
+// src/common/types/tenant-context.ts
+//
+// Contexto del tenant resuelto por TenantGuard en cada request autenticado.
+// Disponible via @Tenant() decorator en todos los controllers.
+//
+// BREAKING CHANGE (ADR-001 Sprint 0):
+//   - roles: string[]  →  role: string  (un solo rol por sesión, del claim Firebase)
+//   - ecosystemId agregado  (id del Ecosystem registrado en chat-ia-back)
+//
+// Todos los usos de tenant.roles deben migrar a tenant.role:
+//   tenant.roles.includes("admin")  →  tenant.role === "OWNER" || tenant.role === "ADMIN"
+import type { TenantRole } from '../schemas/tenant-claims.schema';
+
+export interface TenantContext {
+  // ── Plataforma ──────────────────────────────────────────────────────────────
+  ecosystemId: string;          // id del Ecosystem local (tabla Ecosystem de chat-ia-back)
+
+  // ── Organización ────────────────────────────────────────────────────────────
+  organizationId:   string;     // UUID del sass-back del ecosistema
+  organizationName: string;
+
+  // ── Usuario ─────────────────────────────────────────────────────────────────
+  firebaseUid: string;
+  email:       string;
+  name:        string;
+
+  // ── Autorización ─────────────────────────────────────────────────────────────
+  role:     TenantRole;         // rol dentro de la organización
+  canRead:  boolean;            // permissions.chat.canRead del token
+  canWrite: boolean;            // permissions.chat.canWrite del token
+
+  // agentId se mantiene opcional — lo upsertea el guard después de Sprint 1
+  agentId?: string;
+}

@@ -1,0 +1,22 @@
+syntax = "proto3";
+package analytics;
+// Puerto gRPC interno: 5004 | Usado por: chatia-backend (emite eventos), welver (consultas)
+service AnalyticsService {
+  rpc TrackEvent            (TrackEventRequest)    returns (TrackEventResponse);
+  rpc GetOverview           (OverviewRequest)      returns (OverviewResponse);
+  rpc GetConversationsByDay (ConvByDayRequest)     returns (ConvByDayResponse);
+  rpc GetAgentMetrics       (AgentMetricsRequest)  returns (AgentMetricsResponse);
+  rpc Ping                  (PingRequest)          returns (PingResponse);
+}
+message TrackEventRequest    { string ecosystem_id=1; string organization_id=2; string event_type=3; int64 occurred_at=4; bytes payload_json=5; }
+message TrackEventResponse   { bool accepted=1; string event_id=2; }
+message OverviewRequest      { string ecosystem_id=1; string organization_id=2; int64 from_unix=3; int64 to_unix=4; }
+message OverviewResponse     { int32 total_conversations=1; int32 resolved_conversations=2; int32 escalated_conversations=3; int32 total_messages=4; int32 new_contacts=5; float avg_first_response_min=6; }
+message ConvByDayRequest     { string ecosystem_id=1; string organization_id=2; int64 from_unix=3; int64 to_unix=4; }
+message ConvByDayResponse    { repeated DayBucket buckets=1; }
+message DayBucket            { string date=1; int32 total=2; int32 resolved=3; }
+message AgentMetricsRequest  { string ecosystem_id=1; string organization_id=2; int64 from_unix=3; int64 to_unix=4; int32 page=5; int32 page_size=6; }
+message AgentMetricsResponse { repeated AgentMetric agents=1; int32 total=2; }
+message AgentMetric          { string agent_id=1; string agent_name=2; int32 assigned_conversations=3; int32 resolved_conversations=4; float avg_response_min=5; }
+message PingRequest  { string from=1; }
+message PingResponse { string pong=1; int64 timestamp_unix=2; }

@@ -1,0 +1,22 @@
+syntax = "proto3";
+package notificaciones;
+// Puerto gRPC interno: 5003 | Usado por: chatia-backend, workers-backend, pasarelapagos-backend
+service NotificacionesService {
+  rpc SendNotification          (SendNotificationRequest)          returns (SendNotificationResponse);
+  rpc GetDeliveryStatus         (DeliveryStatusRequest)            returns (DeliveryStatusResponse);
+  rpc UpdateContactPreference   (UpdateContactPreferenceRequest)   returns (UpdateContactPreferenceResponse);
+  rpc Ping                      (PingRequest)                      returns (PingResponse);
+}
+enum NotificationChannel { CHANNEL_UNSPECIFIED=0; WHATSAPP=1; EMAIL=2; PUSH=3; }
+enum NotificationStatus  { STATUS_UNSPECIFIED=0;  PENDING=1;  SENT=2;  FAILED=3; SKIPPED=4; }
+message SendNotificationRequest {
+  string ecosystem_id=1; string organization_id=2; string contact_id=3;
+  NotificationChannel channel=4; string template_key=5; string idempotency_key=6; bytes payload_json=7;
+}
+message SendNotificationResponse   { string notification_id=1; NotificationStatus status=2; string message=3; }
+message DeliveryStatusRequest      { string notification_id=1; }
+message DeliveryStatusResponse     { string notification_id=1; NotificationStatus status=2; int32 attempts=3; string failure_reason=4; int64 sent_at_unix=5; }
+message UpdateContactPreferenceRequest  { string ecosystem_id=1; string organization_id=2; string contact_id=3; NotificationChannel channel=4; bool opted_out=5; }
+message UpdateContactPreferenceResponse { bool success=1; }
+message PingRequest  { string from=1; }
+message PingResponse { string pong=1; int64 timestamp_unix=2; }

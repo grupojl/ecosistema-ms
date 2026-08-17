@@ -1,0 +1,82 @@
+{
+  "$schema": "https://repomix.com/schemas/latest/schema.json",
+  "output": {
+    "filePath": "ecosistema-ms-infra.xml",
+    "style": "xml",
+    "compress": true,
+    "showLineNumbers": false,
+    "removeComments": false,
+    "removeEmptyLines": true,
+    "topFilesLength": 5,
+    "instructionFilePath": "repomix-instruccion.md"
+  },
+  "include": [
+    "package.json",
+    "pnpm-workspace.yaml",
+    "tsconfig.base.json",
+    "docker-compose.yml",
+    ".npmrc",
+    "Makefile",
+
+    "packages/proto/package.json",
+    "packages/proto/tsconfig.json",
+    "packages/auth-server/package.json",
+    "packages/auth-server/tsconfig.json",
+    "packages/grpc-client/package.json",
+    "packages/grpc-client/tsconfig.json",
+
+    "chatia-backend/package.json",
+    "chatia-backend/tsconfig.json",
+    "chatia-backend/tsconfig.build.json",
+    "chatia-backend/nest-cli.json",
+    "chatia-backend/Dockerfile",
+    "chatia-backend/prisma/schema.prisma",
+
+    "pasarelapagos-backend/package.json",
+    "pasarelapagos-backend/tsconfig.json",
+    "pasarelapagos-backend/tsconfig.build.json",
+    "pasarelapagos-backend/nest-cli.json",
+    "pasarelapagos-backend/Dockerfile",
+    "pasarelapagos-backend/prisma/schema.prisma",
+
+    "notificaciones-backend/package.json",
+    "notificaciones-backend/tsconfig.json",
+    "notificaciones-backend/tsconfig.build.json",
+    "notificaciones-backend/nest-cli.json",
+    "notificaciones-backend/Dockerfile",
+    "notificaciones-backend/prisma/schema.prisma",
+
+    "analytics-backend/package.json",
+    "analytics-backend/tsconfig.json",
+    "analytics-backend/tsconfig.build.json",
+    "analytics-backend/nest-cli.json",
+    "analytics-backend/Dockerfile",
+    "analytics-backend/prisma/schema.prisma",
+
+    "workers-backend/package.json",
+    "workers-backend/tsconfig.json",
+    "workers-backend/tsconfig.build.json",
+    "workers-backend/nest-cli.json",
+    "workers-backend/Dockerfile",
+    "workers-backend/prisma/schema.prisma"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "useDefaultPatterns": true,
+    "customPatterns": [
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/.git/**",
+      "**/*.log",
+      "**/*.xml",
+      "**/*.lock",
+      "**/prisma/client/**",
+      "**/prisma/migrations/**",
+      "**/.env",
+      "**/.env.*"
+    ]
+  },
+  "security": {
+    "enableSecurityCheck": true
+  }
+}

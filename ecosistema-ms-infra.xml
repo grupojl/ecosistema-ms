@@ -1,0 +1,2685 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files and files not matching ignore patterns, combined into a single document by Repomix.
+The content has been processed where empty lines have been removed, content has been compressed (code blocks are separated by ⋮---- delimiter).
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+
+- Pay special attention to the Repository Instruction. These contain important context and guidelines specific to this project.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: package.json, pnpm-workspace.yaml, tsconfig.base.json, docker-compose.yml, .npmrc, Makefile, packages/proto/package.json, packages/proto/tsconfig.json, packages/auth-server/package.json, packages/auth-server/tsconfig.json, packages/grpc-client/package.json, packages/grpc-client/tsconfig.json, chatia-backend/package.json, chatia-backend/tsconfig.json, chatia-backend/tsconfig.build.json, chatia-backend/nest-cli.json, chatia-backend/Dockerfile, chatia-backend/prisma/schema.prisma, pasarelapagos-backend/package.json, pasarelapagos-backend/tsconfig.json, pasarelapagos-backend/tsconfig.build.json, pasarelapagos-backend/nest-cli.json, pasarelapagos-backend/Dockerfile, pasarelapagos-backend/prisma/schema.prisma, notificaciones-backend/package.json, notificaciones-backend/tsconfig.json, notificaciones-backend/tsconfig.build.json, notificaciones-backend/nest-cli.json, notificaciones-backend/Dockerfile, notificaciones-backend/prisma/schema.prisma, analytics-backend/package.json, analytics-backend/tsconfig.json, analytics-backend/tsconfig.build.json, analytics-backend/nest-cli.json, analytics-backend/Dockerfile, analytics-backend/prisma/schema.prisma, workers-backend/package.json, workers-backend/tsconfig.json, workers-backend/tsconfig.build.json, workers-backend/nest-cli.json, workers-backend/Dockerfile, workers-backend/prisma/schema.prisma
+- Files matching these patterns are excluded: **/node_modules/**, **/dist/**, **/.git/**, **/*.log, **/*.xml, **/*.lock, **/prisma/client/**, **/prisma/migrations/**, **/.env, **/.env.*
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Empty lines have been removed from all files
+- Content has been compressed - code blocks are separated by ⋮---- delimiter
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+analytics-backend/
+  prisma/
+    schema.prisma
+  Dockerfile
+  nest-cli.json
+  package.json
+  tsconfig.build.json
+  tsconfig.json
+chatia-backend/
+  prisma/
+    schema.prisma
+  Dockerfile
+  nest-cli.json
+  package.json
+  tsconfig.build.json
+  tsconfig.json
+notificaciones-backend/
+  prisma/
+    schema.prisma
+  Dockerfile
+  nest-cli.json
+  package.json
+  tsconfig.build.json
+  tsconfig.json
+packages/
+  auth-server/
+    package.json
+    tsconfig.json
+  grpc-client/
+    package.json
+    tsconfig.json
+  proto/
+    package.json
+    tsconfig.json
+pasarelapagos-backend/
+  prisma/
+    schema.prisma
+  Dockerfile
+  nest-cli.json
+  package.json
+  tsconfig.build.json
+  tsconfig.json
+workers-backend/
+  prisma/
+    schema.prisma
+  Dockerfile
+  nest-cli.json
+  package.json
+  tsconfig.build.json
+  tsconfig.json
+.npmrc
+docker-compose.yml
+Makefile
+package.json
+pnpm-workspace.yaml
+tsconfig.base.json
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="analytics-backend/prisma/schema.prisma">
+// schema.prisma — analytics-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Evento operacional raw — append-only, nunca se actualiza
+model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  eventType      String
+  payload        Json
+  occurredAt     DateTime
+  processedAt    DateTime @default(now())
+
+  @@index([organizationId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@index([organizationId, occurredAt])
+}
+
+/// Proyeccion materializada — recalculada cada hora por ProjectionsService
+model DailyConversationSummary {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  date           DateTime @db.Date
+  channel        String
+  total          Int      @default(0)
+  resolved       Int      @default(0)
+  escalated      Int      @default(0)
+  avgResponseMin Float    @default(0)
+  calculatedAt   DateTime @default(now())
+
+  @@unique([organizationId, date, channel])
+  @@index([organizationId, date])
+}
+</file>
+
+<file path="analytics-backend/Dockerfile">
+# Dockerfile — analytics-backend
+# Railway: Root Directory = /  |  Dockerfile Path = analytics-backend/Dockerfile
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/proto/package.json        ./packages/proto/package.json
+COPY packages/auth-server/package.json  ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json  ./packages/grpc-client/package.json
+COPY analytics-backend/package.json     ./analytics-backend/package.json
+RUN pnpm install --frozen-lockfile
+FROM deps AS builder
+COPY tsconfig.base.json ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY analytics-backend/     ./analytics-backend/
+RUN pnpm --filter analytics-backend build
+RUN test -f analytics-backend/dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3003
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules                    ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/dist          ./analytics-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma        ./analytics-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json  ./analytics-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto             ./packages/proto/proto
+WORKDIR /app/analytics-backend
+USER nestjs
+EXPOSE 3003 5004
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="analytics-backend/nest-cli.json">
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "assets": [{ "include": "../packages/proto/proto/*.proto", "outDir": "./dist/proto", "watchAssets": true }]
+  }
+}
+</file>
+
+<file path="analytics-backend/package.json">
+{
+  "name": "analytics-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="analytics-backend/tsconfig.build.json">
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/**"]
+}
+</file>
+
+<file path="analytics-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext", "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true, "esModuleInterop": true,
+    "isolatedModules": true, "declaration": true, "removeComments": true,
+    "emitDecoratorMetadata": true, "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true, "target": "ES2023",
+    "sourceMap": true, "outDir": "./dist", "baseUrl": "./",
+    "incremental": true, "skipLibCheck": true, "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false, "strictBindCallApply": false, "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="chatia-backend/prisma/schema.prisma">
+// =============================================================================
+// prisma/schema.prisma
+// Chat IA — Sistema hoja del ecosistema SaaS multi-tenant
+//
+// CAMBIOS vs versión anterior:
+//   • Organization: @id sin @default(cuid()) — el ID lo asigna el owner-dashboard
+//   • Organization: se agrega slug + isActive para referencia local
+//   • Agent: se agrega roles String[] y email unique para upsert SSO
+//   • Todo lo demás sin cambios
+//
+// MIGRACIÓN: pnpm prisma migrate dev --name sso_ecosystem_contract
+// =============================================================================
+
+generator client {
+  provider   = "prisma-client-js"
+  output     = "../node_modules/.prisma/client"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum ChannelType {
+  WHATSAPP
+  INSTAGRAM
+  MESSENGER
+  TIKTOK
+}
+
+enum ConversationStatus {
+  OPEN
+  HUMAN_TAKEOVER
+  RESOLVED
+  EXPIRED
+}
+
+enum ConversationStage {
+  INITIAL
+  QUALIFYING
+  INFORMED
+  NEGOTIATING
+  CLOSING
+  FOLLOW_UP
+  HUMAN
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  TEMPLATE
+  SYSTEM
+}
+
+enum ContactStatus {
+  ACTIVE
+  BLOCKED
+  UNSUBSCRIBED
+}
+
+enum KbDocumentStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+enum KbSourceType {
+  TEXT
+  MARKDOWN
+  PDF
+  URL
+  JSON
+}
+
+enum NotificationType {
+  NEW_CONVERSATION
+  NEW_MESSAGE
+  ESCALATION
+}
+
+// ─────────────────────────────────────────────
+// ECOSYSTEM — plataforma multi-ecosistema (ADR-001)
+// ─────────────────────────────────────────────
+
+model Ecosystem {
+  id                String   @id @default(cuid())
+  firebaseProjectId String   @unique
+  name              String
+  isActive          Boolean  @default(true)
+  config            Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organizations Organization[]
+
+  @@index([firebaseProjectId])
+}
+
+// ─────────────────────────────────────────────
+// ORGANIZACIÓN
+// Referencia ligera — source of truth es el owner-dashboard.
+// El ID viene del dashboard (UUID externo), no se genera localmente.
+// Se crea/actualiza automáticamente en cada request via TenantGuard (upsert pasivo).
+// ─────────────────────────────────────────────
+
+model Organization {
+  id          String   @id
+  ecosystemId String                    // ← NUEVO
+  name        String
+  slug        String?  @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ecosystem       Ecosystem        @relation(fields: [ecosystemId], references: [id])  // ← NUEVO
+  channelAccounts ChannelAccount[]
+  contacts        Contact[]
+  agents          Agent[]
+  projects        Project[]
+
+  @@index([ecosystemId])  // ← NUEVO
+  @@index([slug])
+}
+
+// ─────────────────────────────────────────────
+// AGENTE (usuario del dashboard con acceso a Chat IA)
+// Se crea/actualiza via upsert en TenantGuard en cada login.
+// Los roles se cachean desde productPermissions del owner-dashboard.
+// ─────────────────────────────────────────────
+
+model Agent {
+  id             String   @id @default(cuid())
+  organizationId String
+  firebaseUid    String   @unique
+  name           String
+  email          String   @unique  // agregado para upsert por email
+  avatarUrl      String?
+  role   String   @default("MEMBER")  // cacheado desde owner-dashboard
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  conversations  Conversation[]
+  notifications  Notification[]
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// PROYECTO (agrupa configuraciones de IA)
+// ─────────────────────────────────────────────
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String
+  slug           String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  assistantConfigs AssistantConfig[]
+  knowledgeBases   KnowledgeBase[]
+  channelAccounts  ChannelAccount[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CANAL (multi-canal: WhatsApp, IG, Messenger, TikTok)
+// ─────────────────────────────────────────────
+
+model ChannelAccount {
+  id             String      @id @default(cuid())
+  organizationId String
+  channelType    ChannelType
+  name           String
+
+  externalId         String
+  accessToken        String
+  extraConfig        Json    @default("{}")
+  webhookVerifyToken String  @default(cuid())
+  isActive           Boolean @default(true)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  conversations Conversation[]
+  aiConfig      AiConfig?
+
+  @@unique([channelType, externalId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CONTACTO
+// ─────────────────────────────────────────────
+
+model Contact {
+  id             String        @id @default(cuid())
+  organizationId String
+  channelType    ChannelType
+  externalId     String
+
+  name       String?
+  avatarUrl  String?
+  email      String?
+  phone      String?
+  username   String?
+
+  status    ContactStatus @default(ACTIVE)
+  optedOut  Boolean       @default(false)
+  tags      String[]      @default([])
+  metadata  Json          @default("{}")
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  conversations Conversation[]
+
+  @@unique([organizationId, channelType, externalId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CONVERSACIÓN
+// ─────────────────────────────────────────────
+
+model Conversation {
+  id               String             @id @default(cuid())
+  channelAccountId String
+  contactId        String
+
+  status          ConversationStatus @default(OPEN)
+  stage           ConversationStage  @default(INITIAL)
+  isAiActive      Boolean            @default(true)
+  assignedAgentId String?
+
+  detectedIntent    String?
+  extractedEntities Json    @default("{}")
+  summary           String?
+  tags              String[] @default([])
+
+  lastMessageAt DateTime?
+  resolvedAt    DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
+  contact        Contact        @relation(fields: [contactId], references: [id])
+  assignedAgent  Agent?         @relation(fields: [assignedAgentId], references: [id])
+  messages       Message[]
+  agentState     AgentState?
+  notifications  Notification[]
+
+  @@index([channelAccountId])
+  @@index([contactId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// MENSAJE
+// ─────────────────────────────────────────────
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+
+  direction    MessageDirection
+  type         MessageType      @default(TEXT)
+  status       MessageStatus    @default(SENT)
+  content      String
+  mediaUrl     String?
+  mediaCaption String?
+
+  isAiGenerated Boolean @default(false)
+  tokensUsed    Int?
+  modelUsed     String?
+  externalId    String?
+  metadata      Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([conversationId, externalId])
+  @@index([conversationId])
+}
+
+// ─────────────────────────────────────────────
+// ESTADO LANGGRAPH
+// ─────────────────────────────────────────────
+
+model AgentState {
+  id             String       @id @default(cuid())
+  conversationId String       @unique
+  currentNode    String       @default("classify")
+  context        Json         @default("{}")
+  updatedAt      DateTime     @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// CONFIGURACIÓN DE IA (por canal)
+// ─────────────────────────────────────────────
+
+model AiConfig {
+  id               String @id @default(cuid())
+  channelAccountId String @unique
+
+  systemPrompt      String  @default("")
+  personaName       String  @default("Asistente")
+  groqModel         String  @default("llama-3.3-70b-versatile")
+  temperature       Float   @default(0.7)
+  maxTokens         Int     @default(1024)
+  contextWindowSize Int     @default(10)
+
+  humanTakeoverKeywords String[] @default([])
+  autoResolveAfterHours Int      @default(24)
+
+  welcomeMessage String?
+  offlineMessage String?
+  isEnabled      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICACIONES
+// ─────────────────────────────────────────────
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  agentId        String
+  conversationId String?
+  type           NotificationType
+  title          String
+  body           String
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([isRead])
+}
+
+// ─────────────────────────────────────────────
+// ASISTENTE — configuración por proyecto
+// ─────────────────────────────────────────────
+
+model AssistantConfig {
+  id             String @id @default(cuid())
+  projectId      String @unique
+  organizationId String
+
+  personaName     String  @default("Asistente")
+  systemPrompt    String  @default("")
+  groqModel       String  @default("llama-3.3-70b-versatile")
+  temperature     Float   @default(0.7)
+  maxTokens       Int     @default(1024)
+  contextWindow   Int     @default(10)
+  welcomeMessage  String?
+  fallbackMessage String?
+  allowedOrigins  String[] @default([])
+
+  useFaqFallback Boolean @default(false)
+  faqKbId        String?
+
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project            @relation(fields: [projectId], references: [id])
+  sessions AssistantSession[]
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// ASISTENTE — sesiones de usuario final
+// ─────────────────────────────────────────────
+
+model AssistantSession {
+  id                String @id @default(cuid())
+  assistantConfigId String
+  organizationId    String
+  externalUserId    String
+  channel           String @default("api")
+
+  history       Json      @default("[]")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime?
+
+  config AssistantConfig @relation(fields: [assistantConfigId], references: [id])
+
+  @@index([assistantConfigId])
+  @@index([organizationId, externalUserId])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — base de conocimiento por proyecto
+// ─────────────────────────────────────────────
+
+model KnowledgeBase {
+  id             String  @id @default(cuid())
+  projectId      String
+  organizationId String
+  name           String
+  description    String?
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project      @relation(fields: [projectId], references: [id])
+  documents KbDocument[]
+
+  @@index([projectId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — documentos indexables
+// ─────────────────────────────────────────────
+
+model KbDocument {
+  id              String           @id @default(cuid())
+  knowledgeBaseId String
+  organizationId  String
+
+  title        String
+  sourceType   KbSourceType     @default(TEXT)
+  sourceUrl    String?
+  rawContent   String?
+  status       KbDocumentStatus @default(PENDING)
+  errorMessage String?
+
+  tags       String[] @default([])
+  metadata   Json     @default("{}")
+  chunkCount Int      @default(0)
+
+  indexedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
+  chunks        KbChunk[]
+
+  @@index([knowledgeBaseId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — chunks con embeddings
+// MVP: JSON array de floats
+// Producción: migrar a Unsupported("vector(1536)") con pgvector
+// ─────────────────────────────────────────────
+
+model KbChunk {
+  id         String @id @default(cuid())
+  documentId String
+  content    String
+  chunkIndex Int
+
+  embedding Json?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  document KbDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+</file>
+
+<file path="chatia-backend/Dockerfile">
+# Dockerfile — chatia-backend
+# Railway: Root Directory = /  |  Dockerfile Path = chatia-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY chatia-backend/package.json       ./chatia-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY chatia-backend/        ./chatia-backend/
+RUN pnpm --filter chatia-backend build
+RUN test -f chatia-backend/dist/main.js || \
+    (echo "ERROR: dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules                ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/dist         ./chatia-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/prisma       ./chatia-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/package.json ./chatia-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto        ./packages/proto/proto
+
+WORKDIR /app/chatia-backend
+USER nestjs
+EXPOSE 3000 5001
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="chatia-backend/nest-cli.json">
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "../packages/proto/proto/*.proto",
+        "outDir": "./dist/proto",
+        "watchAssets": true
+      }
+    ]
+  }
+}
+</file>
+
+<file path="chatia-backend/package.json">
+{
+  "name": "chatia-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@nestjs/mapped-types": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="chatia-backend/tsconfig.build.json">
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/**"]
+}
+</file>
+
+<file path="chatia-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="notificaciones-backend/prisma/schema.prisma">
+// schema.prisma — notificaciones-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
+model Notification {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  templateKey    String
+  payload        Json
+  idempotencyKey String              @unique
+  status         NotificationStatus  @default(PENDING)
+  attempts       Int                 @default(0)
+  sentAt         DateTime?
+  failureReason  String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([createdAt])
+}
+
+/// Preferencias de canal por contacto — se chequea antes de cada envio
+model ContactPreference {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  optedOut       Boolean             @default(false)
+  optedOutAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, contactId, channel])
+  @@index([organizationId, contactId])
+}
+</file>
+
+<file path="notificaciones-backend/Dockerfile">
+# Dockerfile — notificaciones-backend
+# Railway: Root Directory = /  |  Dockerfile Path = notificaciones-backend/Dockerfile
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/proto/package.json        ./packages/proto/package.json
+COPY packages/auth-server/package.json  ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json  ./packages/grpc-client/package.json
+COPY notificaciones-backend/package.json ./notificaciones-backend/package.json
+RUN pnpm install --frozen-lockfile
+FROM deps AS builder
+COPY tsconfig.base.json ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY notificaciones-backend/ ./notificaciones-backend/
+RUN pnpm --filter notificaciones-backend build
+RUN test -f notificaciones-backend/dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3002
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules                        ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/dist         ./notificaciones-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/prisma       ./notificaciones-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/package.json ./notificaciones-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto                ./packages/proto/proto
+WORKDIR /app/notificaciones-backend
+USER nestjs
+EXPOSE 3002 5003
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="notificaciones-backend/nest-cli.json">
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "assets": [{ "include": "../packages/proto/proto/*.proto", "outDir": "./dist/proto", "watchAssets": true }]
+  }
+}
+</file>
+
+<file path="notificaciones-backend/package.json">
+{
+  "name": "notificaciones-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="notificaciones-backend/tsconfig.build.json">
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/**"]
+}
+</file>
+
+<file path="notificaciones-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext", "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true, "esModuleInterop": true,
+    "isolatedModules": true, "declaration": true, "removeComments": true,
+    "emitDecoratorMetadata": true, "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true, "target": "ES2023",
+    "sourceMap": true, "outDir": "./dist", "baseUrl": "./",
+    "incremental": true, "skipLibCheck": true, "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false, "strictBindCallApply": false, "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="packages/auth-server/package.json">
+{
+  "name": "@ecosistema-ms/auth-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Guards, decorators y FirebaseModule compartidos — NestJS backends del ecosistema-ms",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@ecosistema-ms/auth-server ok\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/core": "catalog:",
+    "firebase-admin": "catalog:",
+    "reflect-metadata": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:"
+  },
+  "peerDependencies": {
+    "@nestjs/common": ">=11.0.0",
+    "firebase-admin": ">=13.0.0"
+  }
+}
+</file>
+
+<file path="packages/auth-server/tsconfig.json">
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2023",
+    "strict": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "baseUrl": "."
+  },
+  "include": ["src/**/*"]
+}
+</file>
+
+<file path="packages/grpc-client/package.json">
+{
+  "name": "@ecosistema-ms/grpc-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Clientes gRPC tipados para comunicación inter-servicio del ecosistema-ms",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@ecosistema-ms/grpc-client ok\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@ecosistema-ms/proto": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:"
+  }
+}
+</file>
+
+<file path="packages/grpc-client/tsconfig.json">
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "ES2023",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "declaration": true,
+    "skipLibCheck": true,
+    "baseUrl": "."
+  },
+  "include": ["src/**/*"]
+}
+</file>
+
+<file path="packages/proto/package.json">
+{
+  "name": "@ecosistema-ms/proto",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contratos gRPC del ecosistema — .proto files + tipos generados",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@ecosistema-ms/proto ok\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "protobufjs": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:"
+  }
+}
+</file>
+
+<file path="packages/proto/tsconfig.json">
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "declaration": true,
+    "outDir": "./dist",
+    "baseUrl": "."
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+</file>
+
+<file path="pasarelapagos-backend/prisma/schema.prisma">
+// =============================================================================
+// prisma/schema.prisma — Sprint 8: organizationId SSO
+// =============================================================================
+// PASOS:
+//   1. Reemplazar este archivo en tu repo
+//   2. pnpm prisma migrate dev --name sprint8_organization_id
+//   3. pnpm prisma generate
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// TENANCY — se mantiene para compatibilidad B2B (x-api-key)
+// En el ecosistema SSO: id de Tenant === organizationId del owner-dashboard
+// ============================================================================
+
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  apiKeyHash String   @unique  // legacy sprint 1 — mantener para compatibilidad B2B
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  payments  Payment[]
+  customers Customer[]
+  apiKeys   TenantApiKey[]
+
+  // NOTA: El modelo User fue eliminado — el owner-dashboard gestiona los usuarios.
+  // Los sprints 7 (User local) quedan deprecados.
+
+  @@index([active])
+}
+
+// ============================================================================
+// API KEYS POR TENANT (Sprint 6) — se mantienen para flows B2B
+// ============================================================================
+
+model TenantApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  label      String
+  keyHash    String    // bcrypt — nunca la key cruda
+  prefix     String    // primeros 8 chars para búsqueda rápida
+  active     Boolean   @default(true)
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([prefix, active])
+  @@index([tenantId])
+}
+
+// ============================================================================
+// CUSTOMERS — ahora con organizationId para filtrado SSO
+// ============================================================================
+
+model Customer {
+  id             String   @id @default(cuid())
+  tenantId       String   // FK legacy → Tenant (mantenida para compatibilidad)
+  organizationId String   // UUID del org en owner-dashboard = tenantId en esta pasarela
+  externalId     String
+  email          String?  // cifrado at-rest (PII)
+  country        String?
+  createdAt      DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([tenantId, externalId])
+  @@index([email])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethodKind {
+  CARD
+  WALLET
+  BANK_TRANSFER
+  CASH_VOUCHER
+  PIX
+  QR
+}
+
+// ============================================================================
+// PAYMENTS — ahora con organizationId para filtrado SSO
+// ============================================================================
+
+model Payment {
+  id             String            @id @default(cuid())
+  tenantId       String            // FK legacy → Tenant
+  organizationId String            // UUID del org en owner-dashboard
+  customerId     String?
+  idempotencyKey String
+  amountMinor    BigInt
+  currency       String
+  country        String
+  method         PaymentMethodKind
+  status         PaymentStatus     @default(PENDING)
+  providerId     String
+  externalId     String?
+  description    String?
+  metadata       Json?
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  customer Customer?      @relation(fields: [customerId], references: [id])
+  events   PaymentEvent[]
+  refunds  Refund[]
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([organizationId, status, createdAt])  // SSO: filtro principal
+  @@index([providerId, externalId])
+}
+
+// ============================================================================
+// PAYMENT EVENTS (audit log append-only)
+// ============================================================================
+
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  paymentId String
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, createdAt])
+}
+
+// ============================================================================
+// REFUNDS
+// ============================================================================
+
+model Refund {
+  id               String   @id @default(cuid())
+  paymentId        String
+  amountMinor      BigInt
+  reason           String?
+  externalRefundId String?
+  status           String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+}
+
+// ============================================================================
+// WEBHOOK INBOUND
+// Los webhooks llegan del provider (cross-tenant por naturaleza)
+// organizationId se resuelve al procesar, no al recibir
+// ============================================================================
+
+model WebhookInbound {
+  id          String    @id @default(cuid())
+  providerId  String
+  externalId  String
+  signature   String?
+  headers     Json
+  body        Json
+  processedAt DateTime?
+  status      String    @default("received")
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([providerId, externalId])
+  @@index([status, createdAt])
+}
+
+// ============================================================================
+// PROVIDER ROUTES
+// ============================================================================
+
+model ProviderRoute {
+  id         String            @id @default(cuid())
+  country    String
+  currency   String
+  method     PaymentMethodKind
+  providerId String
+  priority   Int               @default(0)
+  active     Boolean           @default(true)
+
+  @@unique([country, currency, method, providerId])
+  @@index([country, currency, method, active, priority])
+}
+
+// ============================================================================
+// AUDIT LOG INMUTABLE (append-only) — ahora con organizationId
+// ============================================================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  tenantId       String   // FK legacy
+  organizationId String?  // UUID del org en owner-dashboard
+  actorId        String?  // firebaseUid del usuario o 'api-key'
+  action         String
+  resourceId     String
+  resourceType   String
+  before         Json?
+  after          Json?
+  metadata       Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([organizationId, createdAt])  // SSO: filtro principal
+  @@index([resourceId])
+}
+</file>
+
+<file path="pasarelapagos-backend/Dockerfile">
+# Dockerfile — pasarelapagos-backend
+# Railway: Root Directory = /  |  Dockerfile Path = pasarelapagos-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/proto/package.json        ./packages/proto/package.json
+COPY packages/auth-server/package.json  ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json  ./packages/grpc-client/package.json
+COPY pasarelapagos-backend/package.json ./pasarelapagos-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json         ./
+COPY packages/proto/            ./packages/proto/
+COPY packages/auth-server/      ./packages/auth-server/
+COPY packages/grpc-client/      ./packages/grpc-client/
+COPY pasarelapagos-backend/     ./pasarelapagos-backend/
+RUN pnpm --filter pasarelapagos-backend build
+RUN test -f pasarelapagos-backend/dist/main.js || \
+    (echo "ERROR: dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3001
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules                       ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/dist         ./pasarelapagos-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/prisma       ./pasarelapagos-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/package.json ./pasarelapagos-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto               ./packages/proto/proto
+
+WORKDIR /app/pasarelapagos-backend
+USER nestjs
+EXPOSE 3001 5002
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="pasarelapagos-backend/nest-cli.json">
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "assets": [
+      {
+        "include": "../packages/proto/proto/*.proto",
+        "outDir": "./dist/proto",
+        "watchAssets": true
+      }
+    ]
+  }
+}
+</file>
+
+<file path="pasarelapagos-backend/package.json">
+{
+  "name": "pasarelapagos-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@opentelemetry/auto-instrumentations-node": "catalog:",
+    "@opentelemetry/exporter-prometheus": "catalog:",
+    "axios": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "mercadopago": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "stripe": "catalog:",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="pasarelapagos-backend/tsconfig.build.json">
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/**"]
+}
+</file>
+
+<file path="pasarelapagos-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="workers-backend/prisma/schema.prisma">
+// schema.prisma — workers-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+  CANCELLED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+/// Trazabilidad de todos los jobs async del ecosistema
+model JobLog {
+  id             String    @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  queue          String
+  jobId          String    @unique
+  status         JobStatus @default(PENDING)
+  input          Json
+  result         Json?
+  error          String?
+  attempts       Int       @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  durationMs     Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId, queue, status])
+  @@index([queue, status])
+  @@index([jobId])
+}
+
+/// Campanas de email masivo programadas
+model Campaign {
+  id              String         @id @default(cuid())
+  ecosystemId     String
+  organizationId  String
+  templateKey     String
+  status          CampaignStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  totalRecipients Int            @default(0)
+  sentCount       Int            @default(0)
+  failedCount     Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([organizationId, status])
+  @@index([scheduledAt])
+}
+</file>
+
+<file path="workers-backend/Dockerfile">
+# Dockerfile — workers-backend
+# Railway: Root Directory = /  |  Dockerfile Path = workers-backend/Dockerfile
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY workers-backend/package.json      ./workers-backend/package.json
+RUN pnpm install --frozen-lockfile
+FROM deps AS builder
+COPY tsconfig.base.json ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY workers-backend/        ./workers-backend/
+RUN pnpm --filter workers-backend build
+RUN test -f workers-backend/dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3004
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules                 ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/dist         ./workers-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/prisma       ./workers-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./workers-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto          ./packages/proto/proto
+WORKDIR /app/workers-backend
+USER nestjs
+EXPOSE 3004 5005
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node --max-old-space-size=2048 dist/main"]
+</file>
+
+<file path="workers-backend/nest-cli.json">
+{
+  "$schema": "https://json.schemastore.org/nest-cli",
+  "collection": "@nestjs/schematics",
+  "sourceRoot": "src",
+  "compilerOptions": {
+    "deleteOutDir": true,
+    "assets": [{ "include": "../packages/proto/proto/*.proto", "outDir": "./dist/proto", "watchAssets": true }]
+  }
+}
+</file>
+
+<file path="workers-backend/package.json">
+{
+  "name": "workers-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="workers-backend/tsconfig.build.json">
+{
+  "extends": "./tsconfig.json",
+  "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/**"]
+}
+</file>
+
+<file path="workers-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext", "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true, "esModuleInterop": true,
+    "isolatedModules": true, "declaration": true, "removeComments": true,
+    "emitDecoratorMetadata": true, "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true, "target": "ES2023",
+    "sourceMap": true, "outDir": "./dist", "baseUrl": "./",
+    "incremental": true, "skipLibCheck": true, "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false, "strictBindCallApply": false, "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path=".npmrc">
+enable-pre-post-scripts=true
+shamefully-hoist=true
+strict-peer-dependencies=false
+auto-install-peers=true
+link-workspace-packages=true
+dedupe-peer-dependents=true
+ignore-scripts=true
+</file>
+
+<file path="docker-compose.yml">
+version: "3.9"
+services:
+  postgres-chatia:
+    image: postgres:16-alpine
+    container_name: ms_chatia_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chatia_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_chatia_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  postgres-pagos:
+    image: postgres:16-alpine
+    container_name: ms_pagos_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: pagos_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_pagos_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:7-alpine
+    container_name: ms_redis
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_ms_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+volumes:
+  postgres_chatia_data:
+  postgres_pagos_data:
+  redis_ms_data:
+</file>
+
+<file path="Makefile">
+# =============================================================================
+# Makefile — ecosistema-ms
+# Targets de un solo caracter: r (repomix) | x (script) | g (git)
+# =============================================================================
+TIMESTAMP := $(shell date +"%Y-%m-%d %H:%M:%S")
+
+.PHONY: r x g git-empty install build build-packages \
+        build-chatia build-pagos build-notificaciones build-analytics build-workers \
+        dev dev-chatia dev-pagos dev-notificaciones dev-analytics dev-workers \
+        lint lint-chatia lint-pagos \
+        typecheck typecheck-chatia typecheck-pagos \
+        typecheck-notificaciones typecheck-analytics typecheck-workers typecheck-new \
+        test test-chatia test-pagos \
+        test-notificaciones test-analytics test-workers test-new \
+        docker-up docker-down docker-reset docker-logs \
+        migrate-chatia migrate-pagos migrate-all \
+        migrate-notificaciones migrate-analytics migrate-workers migrate-all-new \
+        migrate-deploy-chatia migrate-deploy-pagos \
+        migrate-deploy-notificaciones migrate-deploy-analytics migrate-deploy-workers \
+        generate-chatia generate-pagos generate-all \
+        generate-notificaciones generate-analytics generate-workers \
+        railway-chatia railway-pagos \
+        railway-notificaciones railway-analytics railway-workers railway-all-new \
+        seed-chatia setup queue-stats help
+
+help:
+	@echo "================================================="
+	@echo "  ecosistema-ms"
+	@echo "================================================="
+	@echo ""
+	@echo "  make r             → repomix + copia XMLs a Downloads"
+	@echo "  make x             → ejecuta x.sh (script activo)"
+	@echo "  make g             → git add + commit + push"
+	@echo "  make git-empty     → empty commit → fuerza redeploy Railway"
+	@echo ""
+	@echo "  make dev           → todos los servicios en watch"
+	@echo "  make dev-chatia    → solo chatia-backend"
+	@echo "  make dev-pagos     → solo pasarelapagos-backend"
+	@echo "  make dev-notificaciones → solo notificaciones-backend"
+	@echo "  make dev-analytics → solo analytics-backend"
+	@echo "  make dev-workers   → solo workers-backend"
+	@echo ""
+	@echo "  make docker-up     → levanta postgres + redis local"
+	@echo "  make docker-down   → detiene contenedores"
+	@echo "  make docker-reset  → detiene + borra volúmenes"
+	@echo ""
+	@echo "  make migrate-all       → prisma migrate dev (chatia + pagos)"
+	@echo "  make migrate-all-new   → prisma migrate dev (notif + analytics + workers)"
+	@echo "  make migrate-chatia    → prisma migrate dev chatia"
+	@echo "  make migrate-pagos     → prisma migrate dev pagos"
+	@echo ""
+	@echo "  make typecheck     → typecheck workspace completo"
+	@echo "  make test          → tests workspace completo"
+	@echo "  make build         → build workspace completo"
+	@echo "  make setup         → install + docker-up + migrate-all"
+	@echo "================================================="
+
+# ─────────────────────────────────────────────────────────────────────────────
+# R — REPOMIX → genera XMLs y los copia a Downloads
+# ─────────────────────────────────────────────────────────────────────────────
+r:
+	npx repomix --config repomix.config.json
+	npx repomix --config repomix.infra.json
+	cp ecosistema-ms.xml "/c/Users/Agustin/Downloads/ecosistema-ms.xml"
+	cp ecosistema-ms-infra.xml "/c/Users/Agustin/Downloads/ecosistema-ms-infra.xml"
+	@echo "[+] XMLs copiados a Downloads"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# X — ejecuta bash x.sh (el script activo en la raíz)
+# ─────────────────────────────────────────────────────────────────────────────
+x:
+	@[ -f x.sh ] || (echo "[✗] No existe x.sh en la raíz"; exit 1)
+	@echo "=== Ejecutando x.sh ==="
+	@bash x.sh
+
+# ─────────────────────────────────────────────────────────────────────────────
+# G — GIT: add + commit timestamp + push
+# ─────────────────────────────────────────────────────────────────────────────
+g:
+	@echo "=== Git: add + commit + push ==="
+	@git add .
+	@{ git commit -m "chore: $(TIMESTAMP)" 2>/dev/null && \
+	   git push origin main && \
+	   echo "[✓] pusheado"; } || \
+	   echo "[!] sin cambios o ya pusheado"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GIT EMPTY — fuerza redeploy en Railway sin cambios de código
+# ─────────────────────────────────────────────────────────────────────────────
+git-empty:
+	@echo "=== Empty commit → fuerza redeploy Railway ==="
+	@git commit --allow-empty -m "chore: redeploy $(TIMESTAMP)"
+	@git push origin main
+	@echo "[✓] Redeploy disparado"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# INSTALACIÓN Y BUILD
+# ─────────────────────────────────────────────────────────────────────────────
+install:
+	pnpm install
+
+build:
+	pnpm --filter "./packages/*" build
+	pnpm --filter chatia-backend build
+	pnpm --filter pasarelapagos-backend build
+	pnpm --filter notificaciones-backend build
+	pnpm --filter analytics-backend build
+	pnpm --filter workers-backend build
+
+build-packages:
+	pnpm --filter "./packages/*" build
+
+build-chatia:
+	pnpm --filter chatia-backend build
+
+build-pagos:
+	pnpm --filter pasarelapagos-backend build
+
+build-notificaciones:
+	pnpm --filter notificaciones-backend build
+
+build-analytics:
+	pnpm --filter analytics-backend build
+
+build-workers:
+	pnpm --filter workers-backend build
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DESARROLLO
+# ─────────────────────────────────────────────────────────────────────────────
+dev:
+	pnpm --parallel \
+		--filter chatia-backend \
+		--filter pasarelapagos-backend \
+		--filter notificaciones-backend \
+		--filter analytics-backend \
+		--filter workers-backend \
+		start:dev
+
+dev-chatia:
+	pnpm --filter chatia-backend start:dev
+
+dev-pagos:
+	pnpm --filter pasarelapagos-backend start:dev
+
+dev-notificaciones:
+	pnpm --filter notificaciones-backend start:dev
+
+dev-analytics:
+	pnpm --filter analytics-backend start:dev
+
+dev-workers:
+	pnpm --filter workers-backend start:dev
+
+# ─────────────────────────────────────────────────────────────────────────────
+# CALIDAD DE CÓDIGO
+# ─────────────────────────────────────────────────────────────────────────────
+lint:
+	pnpm --recursive lint
+
+lint-chatia:
+	pnpm --filter chatia-backend lint
+
+lint-pagos:
+	pnpm --filter pasarelapagos-backend lint
+
+typecheck:
+	pnpm --recursive typecheck
+
+typecheck-chatia:
+	pnpm --filter chatia-backend typecheck
+
+typecheck-pagos:
+	pnpm --filter pasarelapagos-backend typecheck
+
+typecheck-notificaciones:
+	pnpm --filter notificaciones-backend typecheck
+
+typecheck-analytics:
+	pnpm --filter analytics-backend typecheck
+
+typecheck-workers:
+	pnpm --filter workers-backend typecheck
+
+typecheck-new: typecheck-notificaciones typecheck-analytics typecheck-workers
+
+test:
+	pnpm --recursive test
+
+test-chatia:
+	pnpm --filter chatia-backend test
+
+test-pagos:
+	pnpm --filter pasarelapagos-backend test
+
+test-notificaciones:
+	pnpm --filter notificaciones-backend test
+
+test-analytics:
+	pnpm --filter analytics-backend test
+
+test-workers:
+	pnpm --filter workers-backend test
+
+test-new: test-notificaciones test-analytics test-workers
+
+test-cov:
+	pnpm --recursive test:cov
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DOCKER
+# ─────────────────────────────────────────────────────────────────────────────
+docker-up:
+	docker compose up -d
+	@echo "[✓] Infra local lista"
+	@echo "  postgres chatia  → localhost:5434"
+	@echo "  postgres pagos   → localhost:5435"
+	@echo "  redis            → localhost:6380"
+
+docker-down:
+	docker compose down
+
+docker-reset:
+	docker compose down -v
+	@echo "[!] Volúmenes eliminados"
+
+docker-logs:
+	docker compose logs -f
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRISMA — migrate dev
+# ─────────────────────────────────────────────────────────────────────────────
+migrate-chatia:
+	pnpm --filter chatia-backend prisma:migrate:dev
+
+migrate-pagos:
+	cd pasarelapagos-backend && pnpm exec prisma migrate dev
+
+migrate-notificaciones:
+	cd notificaciones-backend && pnpm exec prisma migrate dev
+
+migrate-analytics:
+	cd analytics-backend && pnpm exec prisma migrate dev
+
+migrate-workers:
+	cd workers-backend && pnpm exec prisma migrate dev
+
+migrate-all: migrate-chatia migrate-pagos
+
+migrate-all-new: migrate-notificaciones migrate-analytics migrate-workers
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRISMA — migrate deploy (producción)
+# ─────────────────────────────────────────────────────────────────────────────
+migrate-deploy-chatia:
+	pnpm --filter chatia-backend start:migrate
+
+migrate-deploy-pagos:
+	pnpm --filter pasarelapagos-backend start:migrate
+
+migrate-deploy-notificaciones:
+	pnpm --filter notificaciones-backend start:migrate
+
+migrate-deploy-analytics:
+	pnpm --filter analytics-backend start:migrate
+
+migrate-deploy-workers:
+	pnpm --filter workers-backend start:migrate
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PRISMA — generate
+# ─────────────────────────────────────────────────────────────────────────────
+generate-chatia:
+	cd chatia-backend && pnpm exec prisma generate
+
+generate-pagos:
+	cd pasarelapagos-backend && pnpm exec prisma generate
+
+generate-notificaciones:
+	cd notificaciones-backend && pnpm exec prisma generate
+
+generate-analytics:
+	cd analytics-backend && pnpm exec prisma generate
+
+generate-workers:
+	cd workers-backend && pnpm exec prisma generate
+
+generate-all: generate-chatia generate-pagos generate-notificaciones generate-analytics generate-workers
+
+seed-chatia:
+	cd chatia-backend && pnpm exec ts-node prisma/seed-welver.ts
+
+# ─────────────────────────────────────────────────────────────────────────────
+# RAILWAY — build Docker local
+# ─────────────────────────────────────────────────────────────────────────────
+railway-chatia:
+	docker build -f chatia-backend/Dockerfile -t ecosistema-ms/chatia-backend:local .
+	@echo "[✓] ecosistema-ms/chatia-backend:local"
+
+railway-pagos:
+	docker build -f pasarelapagos-backend/Dockerfile -t ecosistema-ms/pasarelapagos-backend:local .
+	@echo "[✓] ecosistema-ms/pasarelapagos-backend:local"
+
+railway-notificaciones:
+	docker build -f notificaciones-backend/Dockerfile -t ecosistema-ms/notificaciones-backend:local .
+	@echo "[✓] ecosistema-ms/notificaciones-backend:local"
+
+railway-analytics:
+	docker build -f analytics-backend/Dockerfile -t ecosistema-ms/analytics-backend:local .
+	@echo "[✓] ecosistema-ms/analytics-backend:local"
+
+railway-workers:
+	docker build -f workers-backend/Dockerfile -t ecosistema-ms/workers-backend:local .
+	@echo "[✓] ecosistema-ms/workers-backend:local"
+
+railway-all-new: railway-notificaciones railway-analytics railway-workers
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UTILS
+# ─────────────────────────────────────────────────────────────────────────────
+queue-stats:
+	curl -s http://localhost:3004/api/v1/dlq/stats | jq .
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SETUP INICIAL
+# ─────────────────────────────────────────────────────────────────────────────
+setup: install docker-up migrate-all
+	@echo ""
+	@echo "[✓] ecosistema-ms listo"
+	@echo ""
+	@echo "  1. Editar chatia-backend/.env"
+	@echo "  2. Editar pasarelapagos-backend/.env"
+	@echo "  3. make seed-chatia"
+	@echo "  4. make dev"
+	@echo ""
+</file>
+
+<file path="package.json">
+{
+  "name": "ecosistema-ms",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ecosistema de microservicios — grupojl/ecosistema-ms",
+  "scripts": {
+    "build:packages": "pnpm --filter \"./packages/*\" build",
+    "build": "pnpm build:packages && pnpm --recursive --filter \"./chatia-backend\" --filter \"./pasarelapagos-backend\" --filter \"./notificaciones-backend\" --filter \"./analytics-backend\" --filter \"./workers-backend\" build",
+    "dev": "pnpm --parallel --filter chatia-backend --filter pasarelapagos-backend --filter notificaciones-backend --filter analytics-backend --filter workers-backend start:dev",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --recursive test"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
+</file>
+
+<file path="pnpm-workspace.yaml">
+packages:
+  - "chatia-backend"
+  - "pasarelapagos-backend"
+  - "workers-backend"
+  - "analytics-backend"
+  - "notificaciones-backend"
+  - "packages/*"
+catalog:
+  # ── Core ──────────────────────────────────────────────
+  typescript: "^5.8.3"
+  zod: "^3.25.76"
+  uuid: "^11.1.0"
+  axios: "^1.9.0"
+  # ── Types ─────────────────────────────────────────────
+  "@types/node": "^22.15.31"
+  "@types/express": "^5.0.3"
+  "@types/bcryptjs": "^2.4.6"
+  "@types/uuid": "^10.0.0"
+  "@types/jest": "^30.0.0"
+  "@types/supertest": "^6.0.3"
+  # ── NestJS ────────────────────────────────────────────
+  "@nestjs/common": "^11.1.3"
+  "@nestjs/core": "^11.1.3"
+  "@nestjs/platform-express": "^11.1.3"
+  "@nestjs/config": "^4.0.3"
+  "@nestjs/microservices": "^11.1.3"
+  "@nestjs/event-emitter": "^3.1.0"
+  "@nestjs/bullmq": "^11.0.2"
+  "@nestjs/throttler": "^6.5.0"
+  "@nestjs/swagger": "^11.2.0"
+  "@nestjs/terminus": "^11.0.0"
+  "@nestjs/mapped-types": "^2.0.6"
+  "@nestjs/schedule": "^5.0.1"
+  "@nestjs/cache-manager": "^3.0.1"
+  "@nestjs/cli": "^11.0.0"
+  "@nestjs/schematics": "^11.0.0"
+  "@nestjs/testing": "^11.0.1"
+  # ── Prisma ────────────────────────────────────────────
+  "@prisma/client": "^7.4.2"
+  "@prisma/adapter-pg": "^7.4.2"
+  prisma: "^7.4.2"
+  # ── DB / Cache ────────────────────────────────────────
+  pg: "^8.16.3"
+  ioredis: "^5.6.1"
+  bullmq: "^5.56.0"
+  cache-manager: "^6.4.0"
+  # ── Auth / Security ───────────────────────────────────
+  bcryptjs: "^3.0.2"
+  firebase-admin: "^13.4.0"
+  helmet: "^8.1.0"
+  # ── Validation / Transform ────────────────────────────
+  class-validator: "^0.15.1"
+  class-transformer: "^0.5.1"
+  # ── HTTP / Runtime ────────────────────────────────────
+  reflect-metadata: "^0.2.2"
+  rxjs: "^7.8.2"
+  dotenv: "^17.2.0"
+  swagger-ui-express: "^5.0.1"
+  # ── Logging ───────────────────────────────────────────
+  nestjs-pino: "^4.4.0"
+  pino: "^9.7.0"
+  pino-http: "^10.5.0"
+  # ── gRPC ──────────────────────────────────────────────
+  "@grpc/grpc-js": "^1.13.3"
+  "@grpc/proto-loader": "^0.7.15"
+  protobufjs: "^7.5.3"
+  # ── Payment providers ─────────────────────────────────
+  stripe: "^18.2.0"
+  mercadopago: "^2.3.0"
+  # ── OpenTelemetry ─────────────────────────────────────
+  "@opentelemetry/sdk-node": "^0.57.2"
+  "@opentelemetry/auto-instrumentations-node": "^0.58.0"
+  "@opentelemetry/exporter-prometheus": "^0.57.2"
+  # ── Dev / Build ───────────────────────────────────────
+  "@eslint/js": "^9.18.0"
+  "@eslint/eslintrc": "^3.2.0"
+  eslint: "^9.18.0"
+  eslint-config-prettier: "^10.0.1"
+  eslint-plugin-prettier: "^5.2.2"
+  globals: "^16.0.0"
+  prettier: "^3.4.2"
+  typescript-eslint: "^8.20.0"
+  jest: "^29.7.0"
+  supertest: "^7.1.0"
+  ts-node: "^10.9.2"
+  ts-jest: "^29.4.0"
+  ts-loader: "^9.5.2"
+  tsconfig-paths: "^4.2.0"
+  source-map-support: "^0.5.21"
+</file>
+
+<file path="tsconfig.base.json">
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "incremental": false,
+    "typeRoots": []
+  }
+}
+</file>
+
+</files>
+
+
+
+<instruction>
+# Ecosistema MS — grupojl/ecosistema-ms
+
+## Entorno
+- Windows + Git Bash
+- Node 24.14.0
+- pnpm 10.30.3
+- Deploy: Railway (servicios separados, mismo repo)
+
+## CRÍTICO — pnpm catalog
+**Los named catalogs NO funcionan en este entorno.**
+Usar SIEMPRE un solo `catalog:` default para todo el ecosistema.
+Si ves `catalog:algo` en cualquier package.json → es un bug, hay que normalizarlo a `catalog:`.
+
+## Microservicios
+
+| Carpeta | Nombre pkg | Puerto HTTP | Puerto gRPC | Rol |
+|---------|-----------|-------------|-------------|-----|
+| `chatia-backend` | `chatia-backend` | 3000 | 5001 | Chat IA, Knowledge Base, Canales, Agentes |
+| `pasarelapagos-backend` | `pasarelapagos-backend` | 3001 | 5002 | Pagos MercadoPago/Stripe, Transacciones |
+
+## Packages compartidos
+
+| Carpeta | Nombre pkg | Rol |
+|---------|-----------|-----|
+| `packages/proto` | `@ecosistema-ms/proto` | Contratos gRPC (.proto files + paths TS) |
+| `packages/auth-server` | `@ecosistema-ms/auth-server` | Guards, decorators, TenantContext NestJS |
+| `packages/grpc-client` | `@ecosistema-ms/grpc-client` | Módulos NestJS para llamadas gRPC inter-servicio |
+
+## Comunicación inter-servicio
+
+- **gRPC** sobre red privada Railway para llamadas síncronas entre microservicios
+- Contratos definidos en `packages/proto/proto/*.proto`
+- En local: `localhost:500X` | En Railway: `{servicio}.railway.internal:500X`
+- Variables de entorno: `CHATIA_GRPC_URL`, `PAGOS_GRPC_URL`
+
+## Stack
+- Backend: NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
+- Comunicación: gRPC (`@nestjs/microservices` + `@grpc/grpc-js`)
+- Auth: Firebase Authentication (client) + Firebase Admin (server)
+- Workspace: pnpm 10 workspaces con catalog único
+
+## Convenciones de código
+- TypeScript strict — `any` implícito es bug de diseño
+- Lógica de negocio en domain/application, nunca en controllers
+- Queries N+1 son errores — siempre `include` explícito en Prisma
+- RBAC: OWNER > ADMIN > MEMBER > VIEWER
+- Multi-tenant: toda query lleva `ecosystemId` + `organizationId` como filtro obligatorio
+- Cobertura mínima 85% en paths críticos
+- Cada microservicio expone: HTTP (público) + gRPC (interno, solo red privada Railway)
+
+## Relación con otros ecosistemas
+- `grupojl/welver` (ecosistema 1) consume estos microservicios via HTTP+gRPC
+- Aislamiento por `FIREBASE_PROJECT_ID` + `DATABASE_URL` separada por ecosistema cliente
+- El `TenantGuard` resuelve `ecosystemId` del token Firebase en cada request
+
+## Deploy en Railway
+Cada microservicio es un servicio separado en Railway apuntando al mismo repo:
+- **Root Directory**: `/` (siempre la raíz del monorepo)
+- **Dockerfile Path**: `{servicio}/Dockerfile`
+- **Build Command**: (vacío, lo maneja el Dockerfile)
+- **Variables de entorno**: ver `{servicio}/.env.example`
+</instruction>

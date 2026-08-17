@@ -1,0 +1,23 @@
+{
+  "name": "@ecosistema-ms/grpc-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Clientes gRPC tipados para comunicación inter-servicio del ecosistema-ms",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@ecosistema-ms/grpc-client ok\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@ecosistema-ms/proto": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

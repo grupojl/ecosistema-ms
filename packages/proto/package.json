@@ -1,0 +1,21 @@
+{
+  "name": "@ecosistema-ms/proto",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Contratos gRPC del ecosistema — .proto files + tipos generados",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "echo \"@ecosistema-ms/proto ok\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "protobufjs": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "@types/node": "catalog:"
+  }
+}

@@ -1,0 +1,44 @@
+// schema.prisma — analytics-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Evento operacional raw — append-only, nunca se actualiza
+model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  eventType      String
+  payload        Json
+  occurredAt     DateTime
+  processedAt    DateTime @default(now())
+
+  @@index([organizationId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@index([organizationId, occurredAt])
+}
+
+/// Proyeccion materializada — recalculada cada hora por ProjectionsService
+model DailyConversationSummary {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  date           DateTime @db.Date
+  channel        String
+  total          Int      @default(0)
+  resolved       Int      @default(0)
+  escalated      Int      @default(0)
+  avgResponseMin Float    @default(0)
+  calculatedAt   DateTime @default(now())
+
+  @@unique([organizationId, date, channel])
+  @@index([organizationId, date])
+}

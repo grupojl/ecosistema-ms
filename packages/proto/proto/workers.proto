@@ -1,0 +1,16 @@
+syntax = "proto3";
+package workers;
+// Puerto gRPC interno: 5005 | Interaccion principal via BullMQ (fire-and-forget)
+// gRPC solo para consultas sincronas de estado desde welver
+service WorkersService {
+  rpc GetJobStatus (JobStatusRequest)  returns (JobStatusResponse);
+  rpc CancelJob    (CancelJobRequest)  returns (CancelJobResponse);
+  rpc Ping         (PingRequest)       returns (PingResponse);
+}
+enum JobStatus { JOB_STATUS_UNSPECIFIED=0; PENDING=1; PROCESSING=2; DONE=3; FAILED=4; CANCELLED=5; }
+message JobStatusRequest  { string job_id=1; string queue=2; }
+message JobStatusResponse { string job_id=1; string queue=2; JobStatus status=3; int32 attempts=4; int64 started_at=5; int64 completed_at=6; int32 duration_ms=7; string error=8; bytes result_json=9; }
+message CancelJobRequest  { string job_id=1; string queue=2; string organization_id=3; }
+message CancelJobResponse { bool success=1; string message=2; }
+message PingRequest  { string from=1; }
+message PingResponse { string pong=1; int64 timestamp_unix=2; }

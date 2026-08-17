@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package chatia;
+
+// ─── Servicio Chat IA ──────────────────────────────────────────────────────
+// Puerto gRPC interno: 5001
+// Usado por: pasarelapagos-backend, futuros microservicios
+service ChatIaService {
+  // Enviar mensaje a un proyecto de chat
+  rpc SendMessage (SendMessageRequest) returns (SendMessageResponse);
+  // Consultar estado de un proyecto
+  rpc GetProject (GetProjectRequest) returns (GetProjectResponse);
+  // Health check inter-servicio
+  rpc Ping (PingRequest) returns (PingResponse);
+}
+
+message SendMessageRequest {
+  string organization_id = 1;
+  string project_slug    = 2;
+  string user_id         = 3;
+  string message         = 4;
+  string channel         = 5; // api | widget | whatsapp | etc.
+  string ecosystem_id    = 6;
+}
+
+message SendMessageResponse {
+  bool   success          = 1;
+  string conversation_id  = 2;
+  string message_id       = 3;
+  string response         = 4;
+  string error            = 5;
+}
+
+message GetProjectRequest {
+  string organization_id = 1;
+  string project_slug    = 2;
+}
+
+message GetProjectResponse {
+  bool   found        = 1;
+  string project_id   = 2;
+  string name         = 3;
+  bool   is_enabled   = 4;
+}
+
+message PingRequest  { string caller = 1; }
+message PingResponse { string status = 1; string timestamp = 2; }

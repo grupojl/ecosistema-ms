@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package pagos;
+
+// ─── Servicio Pasarela de Pagos ───────────────────────────────────────────
+// Puerto gRPC interno: 5002
+// Usado por: chatia-backend (pagos de suscripción), futuros microservicios
+service PagosService {
+  // Crear intención de pago
+  rpc CreatePaymentIntent (CreatePaymentIntentRequest) returns (CreatePaymentIntentResponse);
+  // Consultar estado de un pago
+  rpc GetPaymentStatus (GetPaymentStatusRequest) returns (GetPaymentStatusResponse);
+  // Health check inter-servicio
+  rpc Ping (PingRequest) returns (PingResponse);
+}
+
+message CreatePaymentIntentRequest {
+  string organization_id  = 1;
+  string ecosystem_id     = 2;
+  int64  amount_cents      = 3;
+  string currency         = 4;  // ARS | USD
+  string description      = 5;
+  string metadata_json    = 6;  // JSON string con datos extra
+}
+
+message CreatePaymentIntentResponse {
+  bool   success          = 1;
+  string payment_id       = 2;
+  string client_secret    = 3;  // para el frontend (Stripe/MP)
+  string status           = 4;
+  string error            = 5;
+}
+
+message GetPaymentStatusRequest {
+  string payment_id       = 1;
+  string organization_id  = 2;
+}
+
+message GetPaymentStatusResponse {
+  bool   found    = 1;
+  string status   = 2;  // PENDING | COMPLETED | FAILED | REFUNDED
+  int64  amount_cents = 3;
+  string currency = 4;
+}
+
+message PingRequest  { string caller = 1; }
+message PingResponse { string status = 1; string timestamp = 2; }

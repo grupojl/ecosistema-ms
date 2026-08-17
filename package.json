@@ -1,0 +1,21 @@
+{
+  "name": "ecosistema-ms",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Ecosistema de microservicios — grupojl/ecosistema-ms",
+  "scripts": {
+    "build:packages": "pnpm --filter \"./packages/*\" build",
+    "build": "pnpm build:packages && pnpm --recursive --filter \"./chatia-backend\" --filter \"./pasarelapagos-backend\" --filter \"./notificaciones-backend\" --filter \"./analytics-backend\" --filter \"./workers-backend\" build",
+    "dev": "pnpm --parallel --filter chatia-backend --filter pasarelapagos-backend --filter notificaciones-backend --filter analytics-backend --filter workers-backend start:dev",
+    "lint": "pnpm --recursive lint",
+    "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --recursive test"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}
