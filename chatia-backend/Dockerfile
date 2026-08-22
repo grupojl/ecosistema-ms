@@ -41,4 +41,4 @@ COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/package.json ./pac
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3000 5001
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main"]
+CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
