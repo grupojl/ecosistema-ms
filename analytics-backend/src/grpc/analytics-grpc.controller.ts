@@ -7,8 +7,8 @@ export class AnalyticsGrpcController {
   constructor(private readonly svc: AnalyticsService) {}
   @GrpcMethod("AnalyticsService", "TrackEvent")
   async trackEvent(data: { ecosystem_id:string; organization_id:string; event_type:string; occurred_at:string; payload_json:Buffer }) {
-    const event = await this.svc.persistEvent({ ecosystemId: data.ecosystem_id, organizationId: data.organization_id, eventType: data.event_type, payload: JSON.parse(data.payload_json.toString()), occurredAt: new Date(parseInt(data.occurred_at)) });
-    return { accepted: true, event_id: event.id };
+    const event = const result = await this.svc.persistEvent({ ecosystemId: data.ecosystem_id, organizationId: data.organization_id, eventType: data.event_type, payload: JSON.parse(data.payload_json.toString()), occurredAt: new Date(parseInt(data.occurred_at)) });
+    return { accepted: true, event_id: result?.id ?? "" };
   }
   @GrpcMethod("AnalyticsService", "GetOverview")
   async getOverview(data: { ecosystem_id:string; organization_id:string; from_unix:string; to_unix:string }) {

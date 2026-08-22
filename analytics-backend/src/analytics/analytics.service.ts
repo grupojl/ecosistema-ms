@@ -156,7 +156,8 @@ export class AnalyticsService {
     eventType:      string;
     payload:        Record<string, unknown>;
     occurredAt:     Date;
-  }): Promise<void> {
-    await this.prisma.analyticsEvent.create({ data });
+  }): Promise<{ id: string }> {
+    const created = await this.prisma.analyticsEvent.create({ data: { ...data, payload: data.payload as import("@prisma/client").Prisma.InputJsonValue } });
+    return created;
   }
 }
