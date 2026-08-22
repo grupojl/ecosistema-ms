@@ -460,53 +460,6 @@ tsconfig.base.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="analytics-backend/prisma/schema.prisma">
-// schema.prisma — analytics-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider = "prisma-client-js"
-  output   = "./client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-/// Evento operacional raw — append-only, nunca se actualiza
-model AnalyticsEvent {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  eventType      String
-  payload        Json
-  occurredAt     DateTime
-  processedAt    DateTime @default(now())
-
-  @@index([organizationId, eventType, occurredAt])
-  @@index([occurredAt])
-  @@index([organizationId, occurredAt])
-}
-
-/// Proyeccion materializada — recalculada cada hora por ProjectionsService
-model DailyConversationSummary {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  date           DateTime @db.Date
-  channel        String
-  total          Int      @default(0)
-  resolved       Int      @default(0)
-  escalated      Int      @default(0)
-  avgResponseMin Float    @default(0)
-  calculatedAt   DateTime @default(now())
-
-  @@unique([organizationId, date, channel])
-  @@index([organizationId, date])
-}
-</file>
-
 <file path="analytics-backend/src/analytics/processors/analytics-event.processor.ts">
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
@@ -773,23 +726,6 @@ import { ProjectionsService }      from './projections/projections.service.js';
 export class AnalyticsModule
 </file>
 
-<file path="analytics-backend/src/analytics/analytics.service.ts">
-import { Injectable, Logger, Inject } from "@nestjs/common";
-import { CACHE_MANAGER } from "@nestjs/cache-manager";
-import type { Cache } from "cache-manager";
-import { PrismaService } from "../prisma/prisma.service.js";
-⋮----
-export class AnalyticsService
-⋮----
-constructor(private readonly prisma: PrismaService, @Inject(CACHE_MANAGER) private readonly cache: Cache)
-async getOverview(params:
-⋮----
-const where = (eventType: string) => (
-⋮----
-async getConversationsByDay(organizationId: string, from: Date, to: Date)
-async persistEvent(data:
-</file>
-
 <file path="analytics-backend/src/analytics/export.service.ts">
 // analytics-backend/src/analytics/export.service.ts
 //
@@ -841,26 +777,6 @@ import { AnalyticsModule } from "../analytics/analytics.module.js";
 import { AnalyticsGrpcController } from "./analytics-grpc.controller.js";
 ⋮----
 export class GrpcModule
-</file>
-
-<file path="analytics-backend/src/health/health.controller.ts">
-import { Controller, Get } from "@nestjs/common";
-import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from "@nestjs/terminus";
-import { PrismaService } from "../prisma/prisma.service.js";
-import { Public } from "@ecosistema-ms/auth-server";
-@Controller("api/v1/health") export class HealthController
-⋮----
-constructor(private h: HealthCheckService, private pi: PrismaHealthIndicator, private db: PrismaService)
-⋮----
-check()
-</file>
-
-<file path="analytics-backend/src/health/health.module.ts">
-import { Module } from "@nestjs/common";
-import { TerminusModule } from "@nestjs/terminus";
-import { HealthController } from "./health.controller.js";
-⋮----
-export class HealthModule
 </file>
 
 <file path="analytics-backend/src/prisma/prisma.module.ts">
@@ -1001,585 +917,6 @@ async function bootstrap()
 }
 </file>
 
-<file path="chatia-backend/prisma/schema.prisma">
-// =============================================================================
-// prisma/schema.prisma
-// Chat IA — Sistema hoja del ecosistema SaaS multi-tenant
-//
-// CAMBIOS vs versión anterior:
-//   • Organization: @id sin @default(cuid()) — el ID lo asigna el owner-dashboard
-//   • Organization: se agrega slug + isActive para referencia local
-//   • Agent: se agrega roles String[] y email unique para upsert SSO
-//   • Todo lo demás sin cambios
-//
-// MIGRACIÓN: pnpm prisma migrate dev --name sso_ecosystem_contract
-// =============================================================================
-
-generator client {
-  provider   = "prisma-client-js"
-  output     = "../node_modules/.prisma/client"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-// ─────────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────────
-
-enum ChannelType {
-  WHATSAPP
-  INSTAGRAM
-  MESSENGER
-  TIKTOK
-}
-
-enum ConversationStatus {
-  OPEN
-  HUMAN_TAKEOVER
-  RESOLVED
-  EXPIRED
-}
-
-enum ConversationStage {
-  INITIAL
-  QUALIFYING
-  INFORMED
-  NEGOTIATING
-  CLOSING
-  FOLLOW_UP
-  HUMAN
-}
-
-enum MessageDirection {
-  INBOUND
-  OUTBOUND
-}
-
-enum MessageStatus {
-  PENDING
-  SENT
-  DELIVERED
-  READ
-  FAILED
-}
-
-enum MessageType {
-  TEXT
-  IMAGE
-  AUDIO
-  VIDEO
-  DOCUMENT
-  STICKER
-  LOCATION
-  TEMPLATE
-  SYSTEM
-}
-
-enum ContactStatus {
-  ACTIVE
-  BLOCKED
-  UNSUBSCRIBED
-}
-
-enum KbDocumentStatus {
-  PENDING
-  PROCESSING
-  INDEXED
-  FAILED
-}
-
-enum KbSourceType {
-  TEXT
-  MARKDOWN
-  PDF
-  URL
-  JSON
-}
-
-enum NotificationType {
-  NEW_CONVERSATION
-  NEW_MESSAGE
-  ESCALATION
-}
-
-// ─────────────────────────────────────────────
-// ECOSYSTEM — plataforma multi-ecosistema (ADR-001)
-// ─────────────────────────────────────────────
-
-model Ecosystem {
-  id                String   @id @default(cuid())
-  firebaseProjectId String   @unique
-  name              String
-  isActive          Boolean  @default(true)
-  config            Json     @default("{}")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  organizations Organization[]
-
-  @@index([firebaseProjectId])
-}
-
-// ─────────────────────────────────────────────
-// ORGANIZACIÓN
-// Referencia ligera — source of truth es el owner-dashboard.
-// El ID viene del dashboard (UUID externo), no se genera localmente.
-// Se crea/actualiza automáticamente en cada request via TenantGuard (upsert pasivo).
-// ─────────────────────────────────────────────
-
-model Organization {
-  id          String   @id
-  ecosystemId String                    // ← NUEVO
-  name        String
-  slug        String?  @unique
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  ecosystem       Ecosystem        @relation(fields: [ecosystemId], references: [id])  // ← NUEVO
-  channelAccounts ChannelAccount[]
-  contacts        Contact[]
-  agents          Agent[]
-  projects        Project[]
-
-  @@index([ecosystemId])  // ← NUEVO
-  @@index([slug])
-}
-
-// ─────────────────────────────────────────────
-// AGENTE (usuario del dashboard con acceso a Chat IA)
-// Se crea/actualiza via upsert en TenantGuard en cada login.
-// Los roles se cachean desde productPermissions del owner-dashboard.
-// ─────────────────────────────────────────────
-
-model Agent {
-  id             String   @id @default(cuid())
-  organizationId String
-  firebaseUid    String   @unique
-  name           String
-  email          String   @unique  // agregado para upsert por email
-  avatarUrl      String?
-  role   String   @default("MEMBER")  // cacheado desde owner-dashboard
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  conversations  Conversation[]
-  notifications  Notification[]
-
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// PROYECTO (agrupa configuraciones de IA)
-// ─────────────────────────────────────────────
-
-model Project {
-  id             String   @id @default(cuid())
-  organizationId String
-  slug           String
-  name           String
-  description    String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization     Organization      @relation(fields: [organizationId], references: [id])
-  assistantConfigs AssistantConfig[]
-  knowledgeBases   KnowledgeBase[]
-  channelAccounts  ChannelAccount[]
-
-  @@unique([organizationId, slug])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// CANAL (multi-canal: WhatsApp, IG, Messenger, TikTok)
-// ─────────────────────────────────────────────
-
-model ChannelAccount {
-  id             String      @id @default(cuid())
-  organizationId String
-  channelType    ChannelType
-  name           String
-
-  externalId         String
-  accessToken        String
-  extraConfig        Json    @default("{}")
-  webhookVerifyToken String  @default(cuid())
-  isActive           Boolean @default(true)
-
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  conversations Conversation[]
-  aiConfig      AiConfig?
-
-  @@unique([channelType, externalId])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// CONTACTO
-// ─────────────────────────────────────────────
-
-model Contact {
-  id             String        @id @default(cuid())
-  organizationId String
-  channelType    ChannelType
-  externalId     String
-
-  name       String?
-  avatarUrl  String?
-  email      String?
-  phone      String?
-  username   String?
-
-  status    ContactStatus @default(ACTIVE)
-  optedOut  Boolean       @default(false)
-  tags      String[]      @default([])
-  metadata  Json          @default("{}")
-
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  conversations Conversation[]
-
-  @@unique([organizationId, channelType, externalId])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// CONVERSACIÓN
-// ─────────────────────────────────────────────
-
-model Conversation {
-  id               String             @id @default(cuid())
-  channelAccountId String
-  contactId        String
-
-  status          ConversationStatus @default(OPEN)
-  stage           ConversationStage  @default(INITIAL)
-  isAiActive      Boolean            @default(true)
-  assignedAgentId String?
-
-  detectedIntent    String?
-  extractedEntities Json    @default("{}")
-  summary           String?
-  tags              String[] @default([])
-
-  lastMessageAt DateTime?
-  resolvedAt    DateTime?
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
-  contact        Contact        @relation(fields: [contactId], references: [id])
-  assignedAgent  Agent?         @relation(fields: [assignedAgentId], references: [id])
-  messages       Message[]
-  agentState     AgentState?
-  notifications  Notification[]
-
-  @@index([channelAccountId])
-  @@index([contactId])
-  @@index([status])
-}
-
-// ─────────────────────────────────────────────
-// MENSAJE
-// ─────────────────────────────────────────────
-
-model Message {
-  id             String           @id @default(cuid())
-  conversationId String
-
-  direction    MessageDirection
-  type         MessageType      @default(TEXT)
-  status       MessageStatus    @default(SENT)
-  content      String
-  mediaUrl     String?
-  mediaCaption String?
-
-  isAiGenerated Boolean @default(false)
-  tokensUsed    Int?
-  modelUsed     String?
-  externalId    String?
-  metadata      Json    @default("{}")
-
-  createdAt DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-
-  @@unique([conversationId, externalId])
-  @@index([conversationId])
-}
-
-// ─────────────────────────────────────────────
-// ESTADO LANGGRAPH
-// ─────────────────────────────────────────────
-
-model AgentState {
-  id             String       @id @default(cuid())
-  conversationId String       @unique
-  currentNode    String       @default("classify")
-  context        Json         @default("{}")
-  updatedAt      DateTime     @updatedAt
-
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-}
-
-// ─────────────────────────────────────────────
-// CONFIGURACIÓN DE IA (por canal)
-// ─────────────────────────────────────────────
-
-model AiConfig {
-  id               String @id @default(cuid())
-  channelAccountId String @unique
-
-  systemPrompt      String  @default("")
-  personaName       String  @default("Asistente")
-  groqModel         String  @default("llama-3.3-70b-versatile")
-  temperature       Float   @default(0.7)
-  maxTokens         Int     @default(1024)
-  contextWindowSize Int     @default(10)
-
-  humanTakeoverKeywords String[] @default([])
-  autoResolveAfterHours Int      @default(24)
-
-  welcomeMessage String?
-  offlineMessage String?
-  isEnabled      Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
-}
-
-// ─────────────────────────────────────────────
-// NOTIFICACIONES
-// ─────────────────────────────────────────────
-
-model Notification {
-  id             String           @id @default(cuid())
-  organizationId String
-  agentId        String
-  conversationId String?
-  type           NotificationType
-  title          String
-  body           String
-  isRead         Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-
-  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-
-  @@index([agentId])
-  @@index([organizationId])
-  @@index([isRead])
-}
-
-// ─────────────────────────────────────────────
-// ASISTENTE — configuración por proyecto
-// ─────────────────────────────────────────────
-
-model AssistantConfig {
-  id             String @id @default(cuid())
-  projectId      String @unique
-  organizationId String
-
-  personaName     String  @default("Asistente")
-  systemPrompt    String  @default("")
-  groqModel       String  @default("llama-3.3-70b-versatile")
-  temperature     Float   @default(0.7)
-  maxTokens       Int     @default(1024)
-  contextWindow   Int     @default(10)
-  welcomeMessage  String?
-  fallbackMessage String?
-  allowedOrigins  String[] @default([])
-
-  useFaqFallback Boolean @default(false)
-  faqKbId        String?
-
-  isEnabled Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project  Project            @relation(fields: [projectId], references: [id])
-  sessions AssistantSession[]
-
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// ASISTENTE — sesiones de usuario final
-// ─────────────────────────────────────────────
-
-model AssistantSession {
-  id                String @id @default(cuid())
-  assistantConfigId String
-  organizationId    String
-  externalUserId    String
-  channel           String @default("api")
-
-  history       Json      @default("[]")
-  metadata      Json      @default("{}")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastMessageAt DateTime?
-
-  config AssistantConfig @relation(fields: [assistantConfigId], references: [id])
-
-  @@index([assistantConfigId])
-  @@index([organizationId, externalUserId])
-}
-
-// ─────────────────────────────────────────────
-// FAQ — base de conocimiento por proyecto
-// ─────────────────────────────────────────────
-
-model KnowledgeBase {
-  id             String  @id @default(cuid())
-  projectId      String
-  organizationId String
-  name           String
-  description    String?
-  isActive       Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project   Project      @relation(fields: [projectId], references: [id])
-  documents KbDocument[]
-
-  @@index([projectId])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// FAQ — documentos indexables
-// ─────────────────────────────────────────────
-
-model KbDocument {
-  id              String           @id @default(cuid())
-  knowledgeBaseId String
-  organizationId  String
-
-  title        String
-  sourceType   KbSourceType     @default(TEXT)
-  sourceUrl    String?
-  rawContent   String?
-  status       KbDocumentStatus @default(PENDING)
-  errorMessage String?
-
-  tags       String[] @default([])
-  metadata   Json     @default("{}")
-  chunkCount Int      @default(0)
-
-  indexedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
-  chunks        KbChunk[]
-
-  @@index([knowledgeBaseId])
-  @@index([status])
-}
-
-// ─────────────────────────────────────────────
-// FAQ — chunks con embeddings
-// MVP: JSON array de floats
-// Producción: migrar a Unsupported("vector(1536)") con pgvector
-// ─────────────────────────────────────────────
-
-model KbChunk {
-  id         String @id @default(cuid())
-  documentId String
-  content    String
-  chunkIndex Int
-
-  embedding Json?
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now())
-
-  document KbDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId])
-}
-</file>
-
-<file path="chatia-backend/src/agents/agents.controller.ts">
-import { randomUUID } from 'crypto';
-// src/agents/agents.controller.ts
-import {
-  Controller, Post, Get, Patch, Body, Param,
-  UseGuards, HttpCode, HttpStatus,
-} from '@nestjs/common';
-import {
-  ApiTags, ApiOperation, ApiBearerAuth,
-} from '@nestjs/swagger';
-import {
-  IsString, IsOptional, IsEmail, IsBoolean, MaxLength,
-} from 'class-validator';
-import { PrismaService } from '../prisma/prisma.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-⋮----
-class RegisterAgentDto {
-⋮----
-class UpdateAgentDto {
-⋮----
-export class AgentsController {
-⋮----
-constructor(private readonly prisma: PrismaService)
-⋮----
-/**
-   * Registro de un nuevo agente. Puede ser llamado por el propio agente
-   * en su primer login (sin TenantGuard) o por un admin.
-   * Si no se provee organizationId, se crea una Organization nueva.
-   */
-⋮----
-async register(@Body() dto: RegisterAgentDto)
-⋮----
-/**
-   * Perfil del agente autenticado.
-   */
-⋮----
-async me(@Tenant() tenant: TenantContext)
-⋮----
-/**
-   * Listar agentes de la organización (solo admin).
-   */
-⋮----
-async list(@Tenant() tenant: TenantContext)
-⋮----
-/**
-   * Actualizar agente (admin puede actualizar cualquiera, agente solo a sí mismo).
-   */
-⋮----
-async update(
-    @Param('id') id: string,
-    @Tenant() tenant: TenantContext,
-    @Body() dto: UpdateAgentDto,
-)
-</file>
-
 <file path="chatia-backend/src/agents/agents.module.ts">
 // src/agents/agents.module.ts
 import { Module } from '@nestjs/common';
@@ -1600,39 +937,6 @@ import {
  * Todos los campos son opcionales — se aplica patch parcial.
  */
 export class UpdateAiConfigDto {
-</file>
-
-<file path="chatia-backend/src/ai-config/ai-config.controller.ts">
-// src/ai-config/ai-config.controller.ts
-import {
-  Controller, Get, Put, Patch, Body, Param, HttpCode, HttpStatus, UseGuards,
-} from '@nestjs/common';
-import { IsBoolean } from 'class-validator';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { AiConfigService } from './ai-config.service';
-import type { TenantContext } from '../common/types/tenant-context';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
-⋮----
-class ToggleAiDto {
-⋮----
-export class AiConfigController {
-⋮----
-constructor(private readonly aiConfigService: AiConfigService)
-⋮----
-get(@Param('accountId') accountId: string, @Tenant() tenant: TenantContext)
-⋮----
-update(
-    @Param('accountId') accountId: string,
-    @Tenant() tenant: TenantContext,
-    @Body() dto: UpdateAiConfigDto,
-)
-⋮----
-toggle(
-    @Param('accountId') accountId: string,
-    @Tenant() tenant: TenantContext,
-    @Body() dto: ToggleAiDto,
-)
 </file>
 
 <file path="chatia-backend/src/ai-config/ai-config.module.ts">
@@ -1915,16 +1219,6 @@ async findByProjectSlug(slug: string, organizationId: string)
 private async verifyOwnership(projectId: string, organizationId: string)
 </file>
 
-<file path="chatia-backend/src/assistant/dto/chat.dto.ts">
-// src/assistant/dto/chat.dto.ts
-import {
-  IsString, IsOptional, MinLength, MaxLength, IsIn,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class ChatDto {
-</file>
-
 <file path="chatia-backend/src/assistant/processors/assistant-chat.processor.ts">
 // src/assistant/processors/assistant-chat.processor.ts
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
@@ -1977,63 +1271,6 @@ async resetSession(sessionId: string)
 async findByUser(assistantConfigId: string, organizationId: string, externalUserId: string)
 ⋮----
 async deleteByUser(assistantConfigId: string, organizationId: string, externalUserId: string)
-</file>
-
-<file path="chatia-backend/src/assistant/assistant.controller.ts">
-// src/assistant/assistant.controller.ts
-import {
-  Controller, Get, Post, Put, Patch, Delete,
-  Param, Body, UseGuards, HttpCode, HttpStatus,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { IsBoolean } from 'class-validator';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { WritePermissionGuard } from '../common/guards/write-permission.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { AssistantChatService } from './chat/assistant-chat.service';
-import { AssistantConfigService } from './config/assistant-config.service';
-import { AssistantSessionService } from './session/assistant-session.service';
-import { ChatDto } from './dto/chat.dto';
-import { UpdateAssistantConfigDto } from './config/dto/assistant-config.dto';
-⋮----
-class ToggleDto {
-⋮----
-export class AssistantController {
-⋮----
-constructor(
-⋮----
-getConfig(@Param('slug') slug: string, @Tenant() t: TenantContext)
-⋮----
-async updateConfig(
-    @Param('slug') slug: string,
-    @Tenant() t: TenantContext,
-    @Body() dto: UpdateAssistantConfigDto,
-)
-⋮----
-async toggleConfig(
-    @Param('slug') slug: string,
-    @Tenant() t: TenantContext,
-    @Body() dto: ToggleDto,
-)
-⋮----
-chat(
-    @Param('slug') slug: string,
-    @Tenant() t: TenantContext,
-    @Body() dto: ChatDto,
-)
-⋮----
-async getSession(
-    @Param('slug') slug: string,
-    @Param('userId') userId: string,
-    @Tenant() t: TenantContext,
-)
-⋮----
-async resetSession(
-    @Param('slug') slug: string,
-    @Param('userId') userId: string,
-    @Tenant() t: TenantContext,
-)
 </file>
 
 <file path="chatia-backend/src/assistant/assistant.module.ts">
@@ -2093,33 +1330,6 @@ import { ChannelAccountsController } from './channel-accounts.controller';
 import { ChannelAccountsService } from './channel-accounts.service';
 ⋮----
 export class ChannelAccountsModule {}
-</file>
-
-<file path="chatia-backend/src/channel-accounts/channel-accounts.service.ts">
-// src/channel-accounts/channel-accounts.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { ChannelType, Prisma } from '@prisma/client';
-import { IsString, IsEnum, IsOptional } from 'class-validator';
-import { randomUUID } from 'crypto';
-⋮----
-export class CreateChannelAccountDto {
-⋮----
-export class UpdateChannelAccountDto {
-⋮----
-export class ChannelAccountsService {
-⋮----
-constructor(private readonly prisma: PrismaService)
-⋮----
-async create(organizationId: string, dto: CreateChannelAccountDto)
-⋮----
-async list(organizationId: string)
-⋮----
-async findOne(id: string, organizationId: string)
-⋮----
-async update(id: string, organizationId: string, dto: UpdateChannelAccountDto)
-⋮----
-async rotateToken(id: string, organizationId: string)
 </file>
 
 <file path="chatia-backend/src/channels/channel.interface.ts">
@@ -2410,69 +1620,6 @@ async update(contactId: string, organizationId: string, dto: UpdateContactDto)
 async getStats(organizationId: string)
 </file>
 
-<file path="chatia-backend/src/conversations/conversations.controller.ts">
-// src/conversations/conversations.controller.ts
-import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, UseGuards,
-} from '@nestjs/common';
-import { IsString, MinLength, MaxLength } from 'class-validator';
-import { ConversationsService } from './conversations.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-⋮----
-class TagDto {
-⋮----
-export class ConversationsController {
-⋮----
-constructor(private readonly svc: ConversationsService)
-⋮----
-list(@Tenant() t: TenantContext, @Query() q: any)
-⋮----
-findOne(@Param('id') id: string, @Tenant() t: TenantContext)
-⋮----
-sendMessage(
-    @Param('id') id: string,
-    @Tenant() t: TenantContext,
-    @Body('text') text: string,
-)
-⋮----
-takeover(
-    @Param('id') id: string,
-    @Tenant() t: TenantContext,
-    @Body('agentId') agentId: string,
-)
-⋮----
-release(@Param('id') id: string, @Tenant() t: TenantContext)
-⋮----
-resolve(@Param('id') id: string, @Tenant() t: TenantContext)
-⋮----
-/** DELETE /conversations/:id — soft delete (archiva) */
-⋮----
-softDelete(@Param('id') id: string, @Tenant() t: TenantContext)
-⋮----
-/** PATCH /conversations/:id/restore — restaurar conversación archivada */
-⋮----
-restore(@Param('id') id: string, @Tenant() t: TenantContext)
-⋮----
-/** POST /conversations/:id/tags   body: { tag: "urgente" } */
-⋮----
-addTag(
-    @Param('id') id: string,
-    @Tenant() t: TenantContext,
-    @Body() dto: TagDto,
-)
-⋮----
-/** DELETE /conversations/:id/tags/:tag */
-⋮----
-removeTag(
-    @Param('id') id: string,
-    @Param('tag') tag: string,
-    @Tenant() t: TenantContext,
-)
-</file>
-
 <file path="chatia-backend/src/conversations/conversations.module.ts">
 // chatia-backend/src/conversations/conversations.module.ts
 import { Module }              from '@nestjs/common';
@@ -2491,142 +1638,6 @@ import { QUEUES }                  from '../queue/queue.constants';
 AnalyticsEventsModule,   // ADR-003 A-1.4
 ⋮----
 export class ConversationsModule
-</file>
-
-<file path="chatia-backend/src/conversations/conversations.service.ts">
-// chatia-backend/src/conversations/conversations.service.ts
-//
-// ADR-003 A-1.4 semana 7 — AnalyticsEventsService inyectado.
-// Los track*() son fire-and-forget: NUNCA rompen el flujo de chat.
-⋮----
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-  Logger,
-  Optional,
-} from '@nestjs/common';
-import { InjectQueue }      from '@nestjs/bullmq';
-import { Queue }            from 'bullmq';
-import { PrismaService }    from '../prisma/prisma.service';
-import { LangGraphEngine }  from '../langgraph/langgraph.engine';
-import { ChannelRegistry }  from '../channels/channel.registry';
-import { IncomingMessage }  from '../channels/channel.interface';
-import {
-  ChannelType,
-  ConversationStatus,
-  MessageDirection,
-  MessageType,
-  MessageStatus,
-} from '@prisma/client';
-import { AssistantChatService }    from '../assistant/chat/assistant-chat.service';
-import { EventsGateway }           from '../events/events.gateway';
-import { AssignmentService }       from '../assignment/assignment.service';
-import { NotificationsService }    from '../notifications/notifications.service';
-import { QUEUES, JOBS }            from '../queue/queue.constants';
-import type { OutgoingMessageJobData } from '../queue/processors/outgoing-message.processor';
-⋮----
-// ADR-003 A-1.4 — producer de eventos analytics (Optional para no romper tests)
-import { AnalyticsEventsService } from '../analytics-events/analytics-events.service';
-⋮----
-export class ConversationsService
-⋮----
-constructor(
-⋮----
-// Optional para que los tests existentes no rompan mientras no mockeen este dep
-⋮----
-// ── Procesamiento de mensaje entrante ────────────────────────────────────
-⋮----
-async handleIncomingMessage(
-    channelAccountId: string,
-    channelType:      ChannelType,
-    msg:              IncomingMessage,
-): Promise<void>
-⋮----
-// ADR-003: emitir evento si es conversación nueva
-⋮----
-// Persistir mensaje entrante
-⋮----
-// ADR-003: emitir mensaje.sent (INBOUND)
-⋮----
-// Emitir por WebSocket al dashboard
-⋮----
-// Procesamiento IA
-⋮----
-true, // isAiGenerated
-⋮----
-// ── Listado y detalle ─────────────────────────────────────────────────────
-⋮----
-async list(
-    organizationId: string,
-    filters: {
-      status?:           ConversationStatus;
-      channelAccountId?: string;
-      tag?:              string;
-      archived?:         boolean;
-      page?:             number;
-    },
-)
-⋮----
-async findOne(conversationId: string, organizationId: string)
-⋮----
-async sendManualMessage(conversationId: string, organizationId: string, text: string)
-⋮----
-async takeover(conversationId: string, organizationId: string, agentId: string)
-⋮----
-// ADR-003: emitir evento de asignación
-⋮----
-async release(conversationId: string, organizationId: string)
-⋮----
-async resolve(conversationId: string, organizationId: string)
-⋮----
-// ADR-003: emitir evento de resolución
-⋮----
-async softDelete(conversationId: string, organizationId: string)
-⋮----
-async restore(conversationId: string, organizationId: string)
-⋮----
-async addTag(conversationId: string, organizationId: string, tag: string)
-⋮----
-async removeTag(conversationId: string, organizationId: string, tag: string)
-⋮----
-// ── Helpers privados ──────────────────────────────────────────────────────
-⋮----
-private async upsertContact(
-    organizationId: string,
-    channelType:    ChannelType,
-    msg:            IncomingMessage,
-)
-⋮----
-private async getOrCreateConversation(
-    channelAccountId: string,
-    contactId:        string,
-    organizationId:   string,
-    _contactName:     string,
-): Promise<
-⋮----
-// Notificación in-app al agente asignado
-⋮----
-}).catch(() => {/* non-critical */});
-⋮----
-private async sendAndSave(
-    conversationId:      string,
-    channelAccountId:    string,
-    channelType:         ChannelType,
-    recipientExternalId: string,
-    text:                string,
-    accessToken:         string,
-    extraConfig:         Record<string, unknown>,
-    webhookVerifyToken:  string,
-    organizationId:      string,
-    isAiGenerated = false,
-    tokensUsed?: number,
-    modelUsed?:  string,
-)
-⋮----
-private async getAccountIds(organizationId: string, specificId?: string): Promise<string[]>
-⋮----
-private async verifyOwnership(conversationId: string, organizationId: string)
 </file>
 
 <file path="chatia-backend/src/core/strategies/project-context.interface.ts">
@@ -2772,14 +1783,6 @@ import { GenericStrategy }          from './generic.strategy';
 export class ProjectStrategyModule {}
 </file>
 
-<file path="chatia-backend/src/ecosystem/dto/register-ecosystem.dto.ts">
-// src/ecosystem/dto/register-ecosystem.dto.ts
-import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class RegisterEcosystemDto {
-</file>
-
 <file path="chatia-backend/src/ecosystem/ecosystem.controller.ts">
 // src/ecosystem/ecosystem.controller.ts
 //
@@ -2887,24 +1890,6 @@ import { EventsGateway } from './events.gateway';
 export class EventsModule
 </file>
 
-<file path="chatia-backend/src/faq/document/dto/kb-document.dto.ts">
-// src/faq/document/dto/kb-document.dto.ts
-import {
-  IsString, IsOptional, IsArray, IsEnum, MinLength, MaxLength,
-} from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export enum KbSourceTypeDto {
-  TEXT     = 'TEXT',
-  MARKDOWN = 'MARKDOWN',
-  PDF      = 'PDF',
-  URL      = 'URL',
-  JSON     = 'JSON',
-}
-⋮----
-export class CreateKbDocumentDto {
-</file>
-
 <file path="chatia-backend/src/faq/document/kb-document.service.ts">
 // src/faq/document/kb-document.service.ts
 import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
@@ -2950,92 +1935,6 @@ export class FaqIngestionProcessor
 constructor()
 </file>
 
-<file path="chatia-backend/src/faq/ingestion/faq-ingestion.service.ts">
-// chatia-backend/src/faq/ingestion/faq-ingestion.service.ts
-//
-// ADR-003 W-1.3 — Extracción completada en semana 5.
-// Este servicio es ahora UN PRODUCER PURO — no procesa nada.
-// El procesamiento real ocurre en workers-backend/FaqIngestProcessor.
-//
-// Responsabilidades:
-//   1. Recibir el documento (URL, base64, texto)
-//   2. Actualizar estado del KbDocument a PENDING en DB
-//   3. Encolar job en workers.faq-ingest
-//   4. Retornar jobId para tracking desde welver
-⋮----
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue }        from '@nestjs/bullmq';
-import { Queue }              from 'bullmq';
-import { PrismaService }      from '../../prisma/prisma.service.js';
-⋮----
-export interface EnqueueFaqIngestInput {
-  ecosystemId:    string;
-  organizationId: string;
-  documentId:     string;
-  knowledgeBaseId: string;
-  source:         'URL' | 'BASE64' | 'TEXT';
-  content:        string;
-  fileName?:      string;
-  embeddingModel?: string;
-}
-⋮----
-export class FaqIngestionService
-⋮----
-constructor(
-⋮----
-/**
-   * Encola un documento para indexación en workers-backend.
-   * Retorna el jobId para que welver pueda consultar el estado.
-   */
-async enqueueIngest(input: EnqueueFaqIngestInput): Promise<
-⋮----
-// Marcar documento como PENDING en DB de chatia
-⋮----
-// Encolar en workers-backend
-⋮----
-/**
-   * Llamado por workers-backend via gRPC cuando termina el procesamiento.
-   * Actualiza el estado del documento en la DB de chatia.
-   */
-async updateDocumentStatus(params: {
-    documentId:     string;
-    organizationId: string;
-    status:         'INDEXED' | 'FAILED';
-    chunksIndexed?: number;
-    error?:         string;
-}): Promise<void>
-⋮----
-/**
-   * Persiste chunks en la DB de chatia.
-   * Llamado via gRPC desde workers-backend/FaqIngestProcessor.
-   */
-async upsertChunks(params: {
-    documentId:     string;
-    organizationId: string;
-    knowledgeBaseId: string;
-    chunks: Array<{
-      content:    string;
-      embedding:  number[];
-      chunkIndex: number;
-      tokenCount: number;
-    }>;
-}): Promise<
-⋮----
-// Eliminar chunks anteriores del documento (re-indexación)
-⋮----
-// Insertar nuevos chunks
-</file>
-
-<file path="chatia-backend/src/faq/knowledge-base/dto/knowledge-base.dto.ts">
-// src/faq/knowledge-base/dto/knowledge-base.dto.ts
-import { IsString, IsOptional, IsBoolean, MinLength, MaxLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class CreateKnowledgeBaseDto {
-⋮----
-export class UpdateKnowledgeBaseDto {
-</file>
-
 <file path="chatia-backend/src/faq/knowledge-base/knowledge-base.service.ts">
 // src/faq/knowledge-base/knowledge-base.service.ts
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
@@ -3057,14 +1956,6 @@ async update(kbId: string, organizationId: string, dto: UpdateKnowledgeBaseDto)
 async remove(kbId: string, organizationId: string)
 ⋮----
 async getStats(kbId: string, organizationId: string)
-</file>
-
-<file path="chatia-backend/src/faq/query/dto/faq-query.dto.ts">
-// src/faq/query/dto/faq-query.dto.ts
-import { IsString, IsOptional, IsInt, IsBoolean, Min, Max, MinLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class FaqQueryDto {
 </file>
 
 <file path="chatia-backend/src/faq/query/faq-query.service.ts">
@@ -3335,16 +2226,6 @@ import { Module } from '@nestjs/common';
 import { HealthController } from './health.controller';
 ⋮----
 export class HealthModule {}
-</file>
-
-<file path="chatia-backend/src/internal/dto/internal-chat.dto.ts">
-// src/internal/dto/internal-chat.dto.ts
-import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class InternalChatDto {
-⋮----
-export class InternalProjectDto {
 </file>
 
 <file path="chatia-backend/src/internal/internal.controller.ts">
@@ -3837,17 +2718,6 @@ async onModuleInit()
 async onModuleDestroy()
 </file>
 
-<file path="chatia-backend/src/projects/dto/create-project.dto.ts">
-// src/projects/dto/create-project.dto.ts
-import {
-  IsString, IsOptional, IsBoolean,
-  MinLength, MaxLength, Matches,
-} from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class CreateProjectDto {
-</file>
-
 <file path="chatia-backend/src/projects/dto/update-project.dto.ts">
 // src/projects/dto/update-project.dto.ts
 import { PartialType } from '@nestjs/swagger';
@@ -4109,69 +2979,6 @@ async handleEvent(
 )
 </file>
 
-<file path="chatia-backend/src/widget/widget.controller.ts">
-// src/widget/widget.controller.ts
-import {
-  Controller, Get, Post, Param, Body, Res,
-  HttpCode, HttpStatus, NotFoundException,
-} from '@nestjs/common';
-import type { Response } from 'express';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
-import { PrismaService } from '../prisma/prisma.service';
-import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
-import { AssistantSessionService } from '../assistant/session/assistant-session.service';
-⋮----
-class WidgetChatDto {
-⋮----
-export class WidgetController {
-⋮----
-constructor(
-⋮----
-// ── Config pública del asistente ─────────────────────────────────────────
-⋮----
-async getConfig(@Param('projectSlug') slug: string)
-⋮----
-// Solo exponer campos públicos — nunca el systemPrompt
-⋮----
-// ── Chat del widget ───────────────────────────────────────────────────────
-⋮----
-async chat(
-    @Param('projectSlug') slug: string,
-    @Body() dto: WidgetChatDto,
-)
-⋮----
-// ── Historial de sesión ───────────────────────────────────────────────────
-⋮----
-async getSession(
-    @Param('projectSlug') slug: string,
-    @Param('userId') userId: string,
-)
-⋮----
-// ── Snippet JS embeddable ─────────────────────────────────────────────────
-⋮----
-async getSnippet(
-    @Param('projectSlug') slug: string,
-    @Res() res: Response,
-)
-⋮----
-// ── Helper: resolver config por slug (sin organizationId) ────────────────
-⋮----
-private async resolveConfig(slug: string)
-⋮----
-// Busca el proyecto por slug en cualquier organización (el slug es único por org)
-// Para el widget no se requiere auth — el slug actúa como identificador público
-⋮----
-// ── Snippet JS ────────────────────────────────────────────────────────────
-⋮----
-private buildSnippet(opts: {
-    projectSlug: string;
-    apiUrl: string;
-    personaName: string;
-    welcomeMessage: string;
-}): string
-</file>
-
 <file path="chatia-backend/src/widget/widget.module.ts">
 // src/widget/widget.module.ts
 import { Module } from '@nestjs/common';
@@ -4179,55 +2986,6 @@ import { WidgetController } from './widget.controller';
 import { AssistantModule } from '../assistant/assistant.module';
 ⋮----
 export class WidgetModule {}
-</file>
-
-<file path="chatia-backend/src/app.module.ts">
-// chatia-backend/src/app.module.ts
-import { Module }           from '@nestjs/common';
-import { ConfigModule }     from '@nestjs/config';
-import { BullModule }       from '@nestjs/bullmq';
-import { ScheduleModule }   from '@nestjs/schedule';
-⋮----
-// Analytics events — ADR-003 A-1.4
-import { AnalyticsEventsModule } from './analytics-events/analytics-events.module.js';
-// Analytics proxy deprecated (eliminar en semana 6 cuando welver migre)
-import { AnalyticsModule }       from './analytics/analytics.module.js';
-⋮----
-// Core modules
-import { PrismaModule }         from './prisma/prisma.module.js';
-import { HealthModule }         from './health/health.module.js';
-import { CommonModule }         from './common/common.module.js';
-import { FirebaseModule }       from './firebase/firebase.module.js';
-import { GroqModule }           from './groq/groq.module.js';
-import { EventsModule }         from './events/events.module.js';
-⋮----
-// Business modules
-import { EcosystemModule }      from './ecosystem/ecosystem.module.js';
-import { OrganizationsModule }  from './organizations/organizations.module.js';
-import { AgentsModule }         from './agents/agents.module.js';
-import { ContactsModule }       from './contacts/contacts.module.js';
-import { ConversationsModule }  from './conversations/conversations.module.js';
-import { MessagesModule }       from './messages/messages.module.js';
-import { ChannelModule }        from './channels/channel.module.js';
-import { ChannelAccountsModule } from './channel-accounts/channel-accounts.module.js';
-import { AssistantModule }      from './assistant/assistant.module.js';
-import { FaqModule }            from './faq/faq.module.js';
-import { WebhooksModule }       from './webhooks/webhooks.module.js';
-import { NotificationsModule }  from './notifications/notifications.module.js';
-import { WidgetModule }         from './widget/widget.module.js';
-import { InternalModule }       from './internal/internal.module.js';
-import { QueueModule }          from './queue/queue.module.js';
-import { AiConfigModule }       from './ai-config/ai-config.module.js';
-⋮----
-// Infraestructura
-⋮----
-// Analytics — ADR-003
-AnalyticsEventsModule,   // producer de eventos hacia analytics-backend
-AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
-⋮----
-// Negocio
-⋮----
-export class AppModule
 </file>
 
 <file path="chatia-backend/src/main.ts">
@@ -4253,167 +3011,6 @@ async function bootstrap()
 // Swagger — solo en desarrollo
 </file>
 
-<file path="chatia-backend/package.json">
-{
-  "name": "chatia-backend",
-  "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "scripts": {
-    "build": "prisma generate && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "start:migrate": "prisma migrate deploy",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/event-emitter": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/throttler": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@nestjs/mapped-types": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "bcryptjs": "catalog:",
-    "bullmq": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "pg": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "socket.io": "^4.8.1",
-    "swagger-ui-express": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "catalog:",
-    "@eslint/js": "catalog:",
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/bcryptjs": "catalog:",
-    "@types/express": "catalog:",
-    "@types/jest": "catalog:",
-    "@types/node": "catalog:",
-    "@types/supertest": "catalog:",
-    "@types/uuid": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "globals": "catalog:",
-    "jest": "catalog:",
-    "prettier": "catalog:",
-    "prisma": "catalog:",
-    "source-map-support": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
-}
-</file>
-
-<file path="notificaciones-backend/prisma/schema.prisma">
-// schema.prisma — notificaciones-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider = "prisma-client-js"
-  output   = "./client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-enum NotificationChannel {
-  WHATSAPP
-  EMAIL
-  PUSH
-}
-
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-  SKIPPED
-}
-
-/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
-model Notification {
-  id             String              @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  contactId      String
-  channel        NotificationChannel
-  templateKey    String
-  payload        Json
-  idempotencyKey String              @unique
-  status         NotificationStatus  @default(PENDING)
-  attempts       Int                 @default(0)
-  sentAt         DateTime?
-  failureReason  String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  @@index([organizationId, contactId])
-  @@index([organizationId, status])
-  @@index([createdAt])
-}
-
-/// Preferencias de canal por contacto — se chequea antes de cada envio
-model ContactPreference {
-  id             String              @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  contactId      String
-  channel        NotificationChannel
-  optedOut       Boolean             @default(false)
-  optedOutAt     DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  @@unique([organizationId, contactId, channel])
-  @@index([organizationId, contactId])
-}
-</file>
-
 <file path="notificaciones-backend/src/grpc/grpc.module.ts">
 import { Module } from "@nestjs/common";
 import { NotificationsModule } from "../notifications/notifications.module.js";
@@ -4421,62 +3018,6 @@ import { PreferencesModule } from "../preferences/preferences.module.js";
 import { NotificacionesGrpcController } from "./notificaciones-grpc.controller.js";
 ⋮----
 export class GrpcModule
-</file>
-
-<file path="notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts">
-import { Controller, Logger } from "@nestjs/common";
-import { GrpcMethod } from "@nestjs/microservices";
-import { NotificationsService } from "../notifications/notifications.service.js";
-import { PreferencesService } from "../preferences/preferences.service.js";
-⋮----
-export class NotificacionesGrpcController
-⋮----
-constructor(private readonly notifSvc: NotificationsService, private readonly prefSvc: PreferencesService)
-⋮----
-async sendNotification(data:
-⋮----
-async updateContactPreference(data:
-⋮----
-ping(data:
-</file>
-
-<file path="notificaciones-backend/src/health/health.controller.ts">
-// notificaciones-backend/src/health/health.controller.ts
-//
-// N-3.4: Health check extendido.
-// GET /api/v1/health        — liveness
-// GET /api/v1/health/ready  — readiness: DB + Redis + providers externos
-⋮----
-import { Controller, Get } from '@nestjs/common';
-import {
-  HealthCheck, HealthCheckService, PrismaHealthIndicator, HealthCheckResult,
-} from '@nestjs/terminus';
-import { ConfigService }  from '@nestjs/config';
-import { PrismaService }  from '../prisma/prisma.service.js';
-import { Public }         from '@ecosistema-ms/auth-server';
-import { ApiTags }        from '@nestjs/swagger';
-⋮----
-export class HealthController
-⋮----
-constructor(
-⋮----
-check(): Promise<HealthCheckResult>
-⋮----
-async ready(): Promise<HealthCheckResult>
-⋮----
-// Meta API check — solo verifica conectividad, no gasta cuota
-⋮----
-// Resend check
-⋮----
-// 422 = request inválido pero API accesible — es lo esperado
-</file>
-
-<file path="notificaciones-backend/src/health/health.module.ts">
-import { Module } from "@nestjs/common";
-import { TerminusModule } from "@nestjs/terminus";
-import { HealthController } from "./health.controller.js";
-⋮----
-export class HealthModule
 </file>
 
 <file path="notificaciones-backend/src/metrics/metrics.module.ts">
@@ -4617,63 +3158,6 @@ export function buildIdempotencyKey(params: {
 }): string
 </file>
 
-<file path="notificaciones-backend/src/notifications/dlq/dlq-monitor.service.ts">
-// notificaciones-backend/src/notifications/dlq/dlq-monitor.service.ts
-//
-// N-3.3: Monitorea la DLQ de notificaciones.
-// Si supera el threshold configurable → notifica al OWNER de la org via gRPC a chatia.
-//
-// Estrategia: @Cron cada 5 minutos revisa tamaño de DLQ.
-// No usamos evento on('failed') de BullMQ porque queremos threshold, no por-job.
-⋮----
-import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
-import { Cron, CronExpression }                      from '@nestjs/schedule';
-import { InjectQueue }                               from '@nestjs/bullmq';
-import { Queue }                                     from 'bullmq';
-import { ClientGrpc }                                from '@nestjs/microservices';
-import { firstValueFrom }                            from 'rxjs';
-import { QUEUES }                                    from '../notifications.constants.js';
-⋮----
-const DLQ_WARN_THRESHOLD  = 50;   // warning en log
-const DLQ_ALERT_THRESHOLD = 100;  // alerta a chatia via gRPC
-⋮----
-interface ChatiaNotifyRequest {
-  organizationId: string;
-  ecosystemId:    string;
-  type:           string;
-  title:          string;
-  body:           string;
-}
-⋮----
-interface ChatiaInternalClient {
-  notifySystem(req: ChatiaNotifyRequest): { toPromise: () => Promise<{ success: boolean }> };
-}
-⋮----
-notifySystem(req: ChatiaNotifyRequest):
-⋮----
-export class DlqMonitorService implements OnModuleInit
-⋮----
-constructor(
-⋮----
-onModuleInit(): void
-⋮----
-// El servicio interno de chatia para notificaciones de sistema
-// Si no está disponible el método, falla silenciosamente
-⋮----
-async checkDlqSize(): Promise<void>
-⋮----
-/**
-   * Expuesto para que dlq.controller pueda forzar revisión manual.
-   */
-async getDlqStats(): Promise<
-⋮----
-private async sendAlert(dlqSize: number): Promise<void>
-⋮----
-// @ts-expect-error — rxjs interop
-⋮----
-// organizationId global del ecosistema para alertas de infraestructura
-</file>
-
 <file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
 // notificaciones-backend/src/notifications/dlq/dlq.module.ts
 ⋮----
@@ -4718,70 +3202,6 @@ export interface INotificationChannel {
 ⋮----
 isConfigured():   boolean;
 send(payload: SendPayload): Promise<void>;
-</file>
-
-<file path="notificaciones-backend/src/notifications/processors/notification.processor.ts">
-// notificaciones-backend/src/notifications/processors/notification.processor.ts
-//
-// Processor BullMQ que consume los 3 queues (WHATSAPP | EMAIL | PUSH).
-// Un solo processor para los 3 — el switch despacha al adapter correcto.
-// Registrado en notifications.module.ts con @Processor() para cada queue.
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Injectable, Logger }    from '@nestjs/common';
-import type { Job }              from 'bullmq';
-import { PrismaService }         from '../../prisma/prisma.service.js';
-import { WhatsappAdapter }       from '../channels/whatsapp/whatsapp.adapter.js';
-import { EmailAdapter }          from '../channels/email/email.adapter.js';
-import { PushAdapter }           from '../channels/push/push.adapter.js';
-import type { INotificationChannel, SendPayload } from '../interfaces/notification-channel.interface.js';
-import { QUEUES }                from '../notifications.constants.js';
-⋮----
-export interface NotificationJobData {
-  ecosystemId:    string;
-  organizationId: string;
-  contactId:      string;
-  channel:        'WHATSAPP' | 'EMAIL' | 'PUSH';
-  templateKey:    string;
-  payload:        Record<string, unknown>;
-  idempotencyKey: string;
-}
-⋮----
-// Tres processors registrados — uno por queue — comparten la lógica de BaseProcessor
-abstract class BaseNotificationProcessor extends WorkerHost
-⋮----
-async process(job: Job<NotificationJobData>): Promise<void>
-⋮----
-// ── 1. Dedup check ──────────────────────────────────────────────────────
-⋮----
-// ── 2. Opt-out check ────────────────────────────────────────────────────
-⋮----
-// ── 3. Upsert PENDING ───────────────────────────────────────────────────
-⋮----
-// ── 4. Resolve recipient ────────────────────────────────────────────────
-⋮----
-// ── 5. Enviar ───────────────────────────────────────────────────────────
-⋮----
-throw error; // BullMQ reintentará
-⋮----
-private async upsert(
-    idempotencyKey: string,
-    ecosystemId:    string,
-    organizationId: string,
-    contactId:      string,
-    channel:        string,
-    templateKey:    string,
-    payload:        Record<string, unknown>,
-    status:         'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED',
-)
-⋮----
-export class WhatsappProcessor extends BaseNotificationProcessor
-⋮----
-constructor(
-⋮----
-export class EmailProcessor extends BaseNotificationProcessor
-⋮----
-export class PushProcessor extends BaseNotificationProcessor
 </file>
 
 <file path="notificaciones-backend/src/notifications/notifications.constants.ts">
@@ -5389,13 +3809,6 @@ message CancelJobRequest  { string job_id=1; string queue=2; string organization
 message CancelJobResponse { bool success=1; string message=2; }
 message PingRequest  { string from=1; }
 message PingResponse { string pong=1; int64 timestamp_unix=2; }
-</file>
-
-<file path="packages/proto/src/index.ts">
-import path from "path";
-import { fileURLToPath } from "url";
-⋮----
-// ADR-003
 </file>
 
 <file path="packages/proto/package.json">
@@ -6830,31 +5243,6 @@ health()
 // TODO: endpoints REST autenticados
 </file>
 
-<file path="pasarelapagos-backend/src/pagos/pagos.grpc.controller.ts">
-import { Controller } from "@nestjs/common";
-import { GrpcMethod } from "@nestjs/microservices";
-import { PagosService } from "./pagos.service";
-⋮----
-// Implementa el contrato definido en packages/proto/proto/pagos.proto
-⋮----
-export class PagosGrpcController
-⋮----
-constructor(private readonly svc: PagosService)
-⋮----
-async createPaymentIntent(data: {
-    organization_id: string;
-    ecosystem_id:    string;
-    amount_cents:    number;
-    currency:        string;
-    description:     string;
-    metadata_json:   string;
-})
-⋮----
-async getPaymentStatus(data:
-⋮----
-ping(data:
-</file>
-
 <file path="pasarelapagos-backend/src/pagos/pagos.module.ts">
 import { Module }          from "@nestjs/common";
 import { PagosService }    from "./pagos.service";
@@ -6964,198 +5352,6 @@ async function bootstrap()
 // Graceful shutdown: espera que las conexiones activas terminen
 </file>
 
-<file path="pasarelapagos-backend/package.json">
-{
-  "name": "pasarelapagos-backend",
-  "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "scripts": {
-    "build": "prisma generate && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "start:migrate": "prisma migrate deploy",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/event-emitter": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/throttler": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@opentelemetry/sdk-node": "catalog:",
-    "@opentelemetry/auto-instrumentations-node": "catalog:",
-    "@opentelemetry/exporter-prometheus": "catalog:",
-    "axios": "catalog:",
-    "bcryptjs": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "mercadopago": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "stripe": "catalog:",
-    "swagger-ui-express": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "catalog:",
-    "@eslint/js": "catalog:",
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/bcryptjs": "catalog:",
-    "@types/express": "catalog:",
-    "@types/jest": "catalog:",
-    "@types/node": "catalog:",
-    "@types/supertest": "catalog:",
-    "@types/uuid": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "globals": "catalog:",
-    "jest": "catalog:",
-    "prettier": "catalog:",
-    "prisma": "catalog:",
-    "source-map-support": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
-}
-</file>
-
-<file path="workers-backend/prisma/schema.prisma">
-// schema.prisma — workers-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider = "prisma-client-js"
-  output   = "./client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-enum JobStatus {
-  PENDING
-  PROCESSING
-  DONE
-  FAILED
-  CANCELLED
-}
-
-enum CampaignStatus {
-  DRAFT
-  SCHEDULED
-  RUNNING
-  PAUSED
-  COMPLETED
-  FAILED
-}
-
-/// Trazabilidad de todos los jobs async del ecosistema
-model JobLog {
-  id             String    @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  queue          String
-  jobId          String    @unique
-  status         JobStatus @default(PENDING)
-  input          Json
-  result         Json?
-  error          String?
-  attempts       Int       @default(0)
-  startedAt      DateTime?
-  completedAt    DateTime?
-  durationMs     Int?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  @@index([organizationId, queue, status])
-  @@index([queue, status])
-  @@index([jobId])
-}
-
-/// Campanas de email masivo programadas
-model Campaign {
-  id              String         @id @default(cuid())
-  ecosystemId     String
-  organizationId  String
-  templateKey     String
-  status          CampaignStatus @default(DRAFT)
-  scheduledAt     DateTime?
-  startedAt       DateTime?
-  completedAt     DateTime?
-  totalRecipients Int            @default(0)
-  sentCount       Int            @default(0)
-  failedCount     Int            @default(0)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-
-  @@index([organizationId, status])
-  @@index([scheduledAt])
-}
-</file>
-
-<file path="workers-backend/src/campaigns/dto/campaign.dto.ts">
-// workers-backend/src/campaigns/dto/campaign.dto.ts
-⋮----
-import {
-  IsString, IsEnum, IsOptional,
-  IsDateString, IsArray, IsObject,
-} from 'class-validator';
-⋮----
-export class CreateCampaignDto
-⋮----
-export class PatchCampaignDto
-</file>
-
 <file path="workers-backend/src/campaigns/campaigns.controller.ts">
 // workers-backend/src/campaigns/campaigns.controller.ts
 ⋮----
@@ -7209,71 +5405,6 @@ import { CampaignsService }    from './campaigns.service.js';
 export class CampaignsModule
 </file>
 
-<file path="workers-backend/src/campaigns/campaigns.service.ts">
-// workers-backend/src/campaigns/campaigns.service.ts
-//
-// W-2.3: CRUD de campañas + scheduler.
-// El @Cron corre cada minuto y encola campañas con scheduledAt <= now.
-// Lock distribuido en Redis para evitar doble ejecución en instancias múltiples.
-⋮----
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectQueue }                            from '@nestjs/bullmq';
-import { Cron }                                   from '@nestjs/schedule';
-import { Queue }                                  from 'bullmq';
-import { PrismaService }                          from '../prisma/prisma.service.js';
-import { WORKER_QUEUES }                          from '../jobs/jobs.constants.js';
-import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
-⋮----
-const LOCK_TTL_MS        = 55_000; // 55s — un poco menos que el cron interval
-⋮----
-export class CampaignsService
-⋮----
-constructor(
-⋮----
-// ── CRUD ──────────────────────────────────────────────────────────────────
-⋮----
-async create(dto: CreateCampaignDto)
-⋮----
-async findAll(organizationId: string, status?: string)
-⋮----
-async findOne(id: string, organizationId: string)
-⋮----
-async patch(id: string, organizationId: string, dto: PatchCampaignDto)
-⋮----
-await this.findOne(id, organizationId); // throws si no existe
-⋮----
-// Cancelar jobs pendientes en BullMQ
-⋮----
-// ── Scheduler ──────────────────────────────────────────────────────────────
-⋮----
-/**
-   * Corre cada minuto. Despacha campañas con scheduledAt <= now.
-   * Lock distribuido: si otra instancia ya está corriendo, se saltea.
-   */
-@Cron('* * * * *') // cada minuto
-async dispatchScheduledCampaigns(): Promise<void>
-⋮----
-// Intentar obtener lock (usando BullMQ Queue como proxy de Redis)
-// Lock simplificado: si el job "scheduler-lock" ya existe en la queue, saltar
-⋮----
-if (lockJob) return; // otro pod ya está corriendo
-⋮----
-// Crear lock temporal
-⋮----
-take: 20, // máx 20 por ciclo para no bloquear
-⋮----
-async dispatchCampaign(campaignId: string): Promise<void>
-⋮----
-// Actualizar estado a RUNNING
-⋮----
-// Encolar el job de campaña
-// NOTA: recipientIds no está en el modelo Campaign (es un input del create).
-// En producción: persistir recipientIds en tabla CampaignRecipient.
-// Por ahora: loguear y marcar como pendiente de implementación.
-⋮----
-recipientIds:   [], // TODO: leer de CampaignRecipient
-</file>
-
 <file path="workers-backend/src/dlq/dlq.controller.ts">
 // workers-backend/src/dlq/dlq.controller.ts
 import {
@@ -7295,53 +5426,6 @@ retry(@Param('queue') queue: string, @Param('jobId') jobId: string)
 discard(@Param('queue') queue: string, @Param('jobId') jobId: string)
 </file>
 
-<file path="workers-backend/src/dlq/dlq.module.ts">
-import { Module } from "@nestjs/common";
-import { BullModule } from "@nestjs/bullmq";
-import { WORKER_QUEUES } from "../jobs/jobs.constants.js";
-import { DlqController } from "./dlq.controller.js";
-import { DlqService } from "./dlq.service.js";
-⋮----
-export class DlqModule
-</file>
-
-<file path="workers-backend/src/dlq/dlq.service.ts">
-// workers-backend/src/dlq/dlq.service.ts
-//
-// W-3.1: DLQ management hardening.
-// - listAll: retorna jobs fallidos por queue con razón de fallo
-// - retryJob: re-encola job con payload original
-// - discardJob: marca como descartado y archiva en JobLog
-// - getStats: tamaño de DLQ por queue + alerta si supera threshold
-// - Límite: DLQ máx 1000 jobs — alerta si supera 500
-⋮----
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { InjectQueue }                           from '@nestjs/bullmq';
-import { Queue }                                 from 'bullmq';
-import { PrismaService }                         from '../prisma/prisma.service.js';
-import { WORKER_QUEUES }                         from '../jobs/jobs.constants.js';
-⋮----
-export class DlqService
-⋮----
-constructor(
-⋮----
-async listAll(): Promise<
-⋮----
-const failed = await queue.getFailed(0, 99); // máx 100 por queue
-⋮----
-async retryJob(queueName: string, jobId: string): Promise<
-⋮----
-async discardJob(queueName: string, jobId: string): Promise<
-⋮----
-async getStats(): Promise<
-⋮----
-// ── Helpers ───────────────────────────────────────────────────────────────
-⋮----
-private getQueues(): Array<[string, Queue]>
-⋮----
-private resolveQueue(queueName: string): Queue
-</file>
-
 <file path="workers-backend/src/grpc/grpc.module.ts">
 import { Module } from "@nestjs/common";
 import { JobsModule } from "../jobs/jobs.module.js";
@@ -7361,25 +5445,6 @@ constructor(private readonly jobs: JobsService)
 async getJobStatus(data:
 ⋮----
 ping(data:
-</file>
-
-<file path="workers-backend/src/health/health.controller.ts">
-import { Controller, Get } from "@nestjs/common";
-import { HealthCheck, HealthCheckService, PrismaHealthIndicator } from "@nestjs/terminus";
-import { PrismaService } from "../prisma/prisma.service.js";
-import { Public } from "@ecosistema-ms/auth-server";
-@Controller("api/v1/health") export class HealthController
-⋮----
-constructor(private h: HealthCheckService, private pi: PrismaHealthIndicator, private db: PrismaService)
-⋮----
-check()
-</file>
-
-<file path="workers-backend/src/health/health.module.ts">
-import { Module } from "@nestjs/common";
-import { TerminusModule } from "@nestjs/terminus";
-import { HealthController } from "./health.controller.js";
-@Module(
 </file>
 
 <file path="workers-backend/src/jobs/dto/campaign-email-job.dto.ts">
@@ -7434,161 +5499,6 @@ export interface VectorIndexJobResult {
 }
 </file>
 
-<file path="workers-backend/src/jobs/processors/analytics-export.processor.ts">
-// workers-backend/src/jobs/processors/analytics-export.processor.ts
-//
-// A-3.2: Genera exportaciones de analytics en background.
-// Recibe job de analytics-backend → consulta via gRPC → genera CSV/JSON → sube a Railway Volume.
-// Límite: exportaciones > 100MB rechazadas con error descriptivo.
-//
-// Resultado en JobLog.result: { url, format, sizeBytes, rowCount }
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject }        from '@nestjs/common';
-import { ClientGrpc }            from '@nestjs/microservices';
-import type { Job }              from 'bullmq';
-import { firstValueFrom }        from 'rxjs';
-import { writeFile, mkdir }      from 'node:fs/promises';
-import { join }                  from 'node:path';
-⋮----
-import { JobsService } from '../jobs.service.js';
-⋮----
-const MAX_SIZE_BYTES = 100 * 1_024 * 1_024; // 100MB
-⋮----
-export interface ExportJobData {
-  ecosystemId:    string;
-  organizationId: string;
-  from:           string; // ISO date string
-  to:             string;
-  format:         'csv' | 'json';
-  reportType:     'overview' | 'conversations' | 'agents';
-}
-⋮----
-from:           string; // ISO date string
-⋮----
-interface AnalyticsGrpcClient {
-  getOverview(req: object):            { toPromise: () => Promise<Record<string, unknown>> };
-  getConversationsByDay(req: object):  { toPromise: () => Promise<{ days: unknown[] }> };
-  getAgentMetrics(req: object):        { toPromise: () => Promise<{ agents: unknown[]; total: number }> };
-}
-⋮----
-getOverview(req: object):
-getConversationsByDay(req: object):
-getAgentMetrics(req: object):
-⋮----
-export class AnalyticsExportProcessor extends WorkerHost
-⋮----
-constructor(
-    private readonly jobs: JobsService,
-    @Inject('ANALYTICS_GRPC_CLIENT') private readonly grpc: ClientGrpc,
-)
-⋮----
-onModuleInit(): void
-⋮----
-async process(job: Job<ExportJobData>): Promise<void>
-⋮----
-// 1. Consultar datos via gRPC a analytics-backend
-⋮----
-// 2. Serializar
-⋮----
-// 3. Persistir en Railway Volume (o /tmp en local)
-⋮----
-// 4. URL accesible — en Railway: montar volumen y exponer via HTTP estático
-// En local: path absoluto
-⋮----
-// ── Fetch data via gRPC ───────────────────────────────────────────────────
-⋮----
-private async fetchData(
-    reportType: string,
-    params: { ecosystemId: string; organizationId: string; fromUnix: number; toUnix: number },
-): Promise<unknown[] | Record<string, unknown>>
-⋮----
-// @ts-expect-error rxjs interop
-⋮----
-return [result]; // overview es un objeto — lo envolvemos en array para CSV
-⋮----
-// @ts-expect-error rxjs interop
-⋮----
-// Paginar hasta traer todos los agentes
-⋮----
-// @ts-expect-error rxjs interop
-⋮----
-// ── CSV serializer mínimo ─────────────────────────────────────────────────
-⋮----
-private toCsv(data: unknown[] | Record<string, unknown>): string
-⋮----
-// Escapar comas y comillas
-</file>
-
-<file path="workers-backend/src/jobs/processors/campaign-email.processor.ts">
-// workers-backend/src/jobs/processors/campaign-email.processor.ts
-//
-// W-2.2: Procesa campañas masivas de email.
-// Rate limiting: 100 emails/seg via token bucket en Redis.
-// Cursor persistido en JobLog: si el job falla en batch 50/100, retry desde 50.
-// Despacha en batches de 50 → encola a notify.email (notificaciones-backend).
-//
-// FLUJO:
-//   1. Leer cursor del JobLog (si es retry)
-//   2. Para cada recipientId: verificar opt-out via notificaciones-backend gRPC
-//   3. Encolar en notify.email con idempotencyKey por (campaignId + contactId)
-//   4. Actualizar cursor en JobLog cada 50 enviados
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject }        from '@nestjs/common';
-import { ClientGrpc }            from '@nestjs/microservices';
-import { InjectQueue }           from '@nestjs/bullmq';
-import { Queue }                 from 'bullmq';
-import type { Job }              from 'bullmq';
-import { firstValueFrom }        from 'rxjs';
-import { createHash }            from 'node:crypto';
-⋮----
-import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
-import { JobsService }                 from '../jobs.service.js';
-import type {
-  CampaignEmailJobData,
-  CampaignEmailJobResult,
-}                                      from '../dto/campaign-email-job.dto.js';
-⋮----
-interface NotifGrpcClient {
-  getPreferences(req: { organizationId: string; contactId: string }): {
-    toPromise: () => Promise<{ optedOut: boolean }>;
-  };
-}
-⋮----
-getPreferences(req:
-⋮----
-export class CampaignEmailProcessor extends WorkerHost
-⋮----
-constructor(
-    private readonly jobs: JobsService,
-    @Inject('NOTIF_GRPC_CLIENT')    private readonly notifGrpc: ClientGrpc,
-    @InjectQueue(NOTIFY_QUEUE) private readonly emailQueue: Queue,
-)
-⋮----
-onModuleInit(): void
-⋮----
-async process(job: Job<CampaignEmailJobData>): Promise<CampaignEmailJobResult>
-⋮----
-// Leer cursor desde JobLog (si es retry de un intento anterior)
-⋮----
-// Verificar opt-out
-⋮----
-// @ts-expect-error — rxjs interop
-⋮----
-// Si gRPC falla, continuar (best-effort para opt-out check)
-⋮----
-// Encolar en notify.email con idempotencyKey determinístico
-⋮----
-to:        contactId, // el caller debe mapear contactId → email
-⋮----
-jobId:    idempotencyKey, // BullMQ deduplicará
-⋮----
-// Actualizar cursor en JobLog después de cada batch
-⋮----
-// Guardar cursor para que el retry retome desde donde quedó
-</file>
-
 <file path="workers-backend/src/jobs/processors/faq-ingest.processor.ts">
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
@@ -7609,95 +5519,6 @@ async process(job: Job<FaqIngestJobData>): Promise<void>
 // TODO Sprint W-2: implementar extraccion real (pdf-parse, mammoth, Groq embeddings)
 ⋮----
 onFailed(job: Job<FaqIngestJobData>, error: Error)
-</file>
-
-<file path="workers-backend/src/jobs/processors/vector-index.processor.ts">
-// workers-backend/src/jobs/processors/vector-index.processor.ts
-//
-// W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
-// Recibe chunks ya extraídos → genera embeddings → persiste en chatia via gRPC.
-//
-// SLA: 1000 chunks indexados en < 30s.
-// NOTA: Si se adopta Qdrant (ADR-006), solo cambiar el adapter gRPC destino.
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject }        from '@nestjs/common';
-import { ClientGrpc }            from '@nestjs/microservices';
-import type { Job }              from 'bullmq';
-import { firstValueFrom }        from 'rxjs';
-⋮----
-import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
-import { JobsService }                 from '../jobs.service.js';
-import { EmbeddingService }            from '../services/embedding.service.js';
-import type {
-  VectorIndexJobData,
-  VectorIndexJobResult,
-}                                      from '../dto/vector-index-job.dto.js';
-⋮----
-const EMBED_CONCURRENCY = 5; // paralelo para generación de embeddings
-⋮----
-interface ChatiaGrpcClient {
-  upsertChunks(req: object): { toPromise: () => Promise<{ success: boolean; chunksStored: number }> };
-}
-⋮----
-upsertChunks(req: object):
-⋮----
-export class VectorIndexProcessor extends WorkerHost
-⋮----
-constructor(
-    private readonly jobs:      JobsService,
-    private readonly embedding: EmbeddingService,
-    @Inject('CHATIA_GRPC_CLIENT') private readonly grpc: ClientGrpc,
-)
-⋮----
-onModuleInit(): void
-⋮----
-async process(job: Job<VectorIndexJobData>): Promise<VectorIndexJobResult>
-⋮----
-// Generar embeddings en batches paralelos (límite EMBED_CONCURRENCY)
-⋮----
-// Persistir en chatia via gRPC
-⋮----
-// @ts-expect-error — rxjs interop
-⋮----
-// SLA check — warning si supera 30s
-⋮----
-// ── Embeddings con concurrencia controlada ────────────────────────────────
-⋮----
-private async generateEmbeddingsParallel(texts: string[]): Promise<number[][]>
-</file>
-
-<file path="workers-backend/src/jobs/services/chunking.service.ts">
-// workers-backend/src/jobs/services/chunking.service.ts
-//
-// Extrae texto de documentos y divide en chunks con overlap.
-// Soporta: TEXT (plano), URL (fetch + content-type), BASE64 (decodifica + mime).
-// PDF y DOCX via dynamic import de pdf-parse y mammoth (sin Python).
-⋮----
-import { Injectable, Logger } from '@nestjs/common';
-import type { FaqDocumentSource } from '../dto/faq-ingest-job.dto.js';
-⋮----
-const CHUNK_SIZE    = 500;  // tokens ≈ chars / 4
-⋮----
-export interface TextChunk {
-  content:    string;
-  chunkIndex: number;
-  tokenCount: number;
-}
-⋮----
-export class ChunkingService
-⋮----
-async extractAndChunk(
-    content:   string,
-    source:    FaqDocumentSource,
-    fileName?: string,
-): Promise<TextChunk[]>
-⋮----
-private async extractText(content: string, source: FaqDocumentSource, fileName?: string): Promise<string>
-⋮----
-private async extractFromBuffer(buffer: Buffer, mimeType: string, fileName?: string): Promise<string>
-⋮----
-private chunkText(text: string): TextChunk[]
 </file>
 
 <file path="workers-backend/src/jobs/services/circuit-breaker.service.ts">
@@ -8055,6 +5876,2109 @@ async function bootstrap()
 }
 </file>
 
+<file path="tsconfig.base.json">
+{
+  "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "incremental": false,
+    "typeRoots": []
+  }
+}
+</file>
+
+<file path="analytics-backend/prisma/schema.prisma">
+// schema.prisma — analytics-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Evento operacional raw — append-only, nunca se actualiza
+model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  eventType      String
+  payload        Json
+  occurredAt     DateTime
+  processedAt    DateTime @default(now())
+
+  @@index([organizationId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@index([organizationId, occurredAt])
+}
+
+/// Proyeccion materializada — recalculada cada hora por ProjectionsService
+model DailyConversationSummary {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  date           DateTime @db.Date
+  channel        String
+  total          Int      @default(0)
+  resolved       Int      @default(0)
+  escalated      Int      @default(0)
+  avgResponseMin Float    @default(0)
+  calculatedAt   DateTime @default(now())
+
+  @@unique([organizationId, date, channel])
+  @@index([organizationId, date])
+}
+</file>
+
+<file path="analytics-backend/src/health/health.controller.ts">
+// analytics-backend/src/health/health.controller.ts
+import { Controller, Get }                          from '@nestjs/common';
+import { ApiTags }                                  from '@nestjs/swagger';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+import { Public }         from '@ecosistema-ms/auth-server';
+⋮----
+export class HealthController
+⋮----
+constructor(
+⋮----
+check(): Promise<HealthCheckResult>
+</file>
+
+<file path="analytics-backend/src/health/health.module.ts">
+import { Module }           from '@nestjs/common';
+import { TerminusModule }   from '@nestjs/terminus';
+import { HealthController } from './health.controller.js';
+import { PrismaModule }     from '../prisma/prisma.module.js';
+⋮----
+export class HealthModule
+</file>
+
+<file path="chatia-backend/prisma/schema.prisma">
+// =============================================================================
+// prisma/schema.prisma
+// Chat IA — Sistema hoja del ecosistema SaaS multi-tenant
+//
+// CAMBIOS vs versión anterior:
+//   • Organization: @id sin @default(cuid()) — el ID lo asigna el owner-dashboard
+//   • Organization: se agrega slug + isActive para referencia local
+//   • Agent: se agrega roles String[] y email unique para upsert SSO
+//   • Todo lo demás sin cambios
+//
+// MIGRACIÓN: pnpm prisma migrate dev --name sso_ecosystem_contract
+// =============================================================================
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum ChannelType {
+  WHATSAPP
+  INSTAGRAM
+  MESSENGER
+  TIKTOK
+}
+
+enum ConversationStatus {
+  OPEN
+  HUMAN_TAKEOVER
+  RESOLVED
+  EXPIRED
+}
+
+enum ConversationStage {
+  INITIAL
+  QUALIFYING
+  INFORMED
+  NEGOTIATING
+  CLOSING
+  FOLLOW_UP
+  HUMAN
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  TEMPLATE
+  SYSTEM
+}
+
+enum ContactStatus {
+  ACTIVE
+  BLOCKED
+  UNSUBSCRIBED
+}
+
+enum KbDocumentStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+enum KbSourceType {
+  TEXT
+  MARKDOWN
+  PDF
+  URL
+  JSON
+}
+
+enum NotificationType {
+  NEW_CONVERSATION
+  NEW_MESSAGE
+  ESCALATION
+}
+
+// ─────────────────────────────────────────────
+// ECOSYSTEM — plataforma multi-ecosistema (ADR-001)
+// ─────────────────────────────────────────────
+
+model Ecosystem {
+  id                String   @id @default(cuid())
+  firebaseProjectId String   @unique
+  name              String
+  isActive          Boolean  @default(true)
+  config            Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organizations Organization[]
+
+  @@index([firebaseProjectId])
+}
+
+// ─────────────────────────────────────────────
+// ORGANIZACIÓN
+// Referencia ligera — source of truth es el owner-dashboard.
+// El ID viene del dashboard (UUID externo), no se genera localmente.
+// Se crea/actualiza automáticamente en cada request via TenantGuard (upsert pasivo).
+// ─────────────────────────────────────────────
+
+model Organization {
+  id          String   @id
+  ecosystemId String                    // ← NUEVO
+  name        String
+  slug        String?  @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ecosystem       Ecosystem        @relation(fields: [ecosystemId], references: [id])  // ← NUEVO
+  channelAccounts ChannelAccount[]
+  contacts        Contact[]
+  agents          Agent[]
+  projects        Project[]
+
+  @@index([ecosystemId])  // ← NUEVO
+  @@index([slug])
+}
+
+// ─────────────────────────────────────────────
+// AGENTE (usuario del dashboard con acceso a Chat IA)
+// Se crea/actualiza via upsert en TenantGuard en cada login.
+// Los roles se cachean desde productPermissions del owner-dashboard.
+// ─────────────────────────────────────────────
+
+model Agent {
+  id             String   @id @default(cuid())
+  organizationId String
+  firebaseUid    String   @unique
+  name           String
+  email          String   @unique  // agregado para upsert por email
+  avatarUrl      String?
+  role   String   @default("MEMBER")  // cacheado desde owner-dashboard
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  conversations  Conversation[]
+  notifications  Notification[]
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// PROYECTO (agrupa configuraciones de IA)
+// ─────────────────────────────────────────────
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String
+  slug           String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  assistantConfigs AssistantConfig[]
+  knowledgeBases   KnowledgeBase[]
+  channelAccounts  ChannelAccount[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CANAL (multi-canal: WhatsApp, IG, Messenger, TikTok)
+// ─────────────────────────────────────────────
+
+model ChannelAccount {
+  id             String      @id @default(cuid())
+  organizationId String
+  channelType    ChannelType
+  name           String
+
+  externalId         String
+  accessToken        String
+  extraConfig        Json    @default("{}")
+  webhookVerifyToken String  @default(cuid())
+  isActive           Boolean @default(true)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  conversations Conversation[]
+  aiConfig      AiConfig?
+
+  @@unique([channelType, externalId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CONTACTO
+// ─────────────────────────────────────────────
+
+model Contact {
+  id             String        @id @default(cuid())
+  organizationId String
+  channelType    ChannelType
+  externalId     String
+
+  name       String?
+  avatarUrl  String?
+  email      String?
+  phone      String?
+  username   String?
+
+  status    ContactStatus @default(ACTIVE)
+  optedOut  Boolean       @default(false)
+  tags      String[]      @default([])
+  metadata  Json          @default("{}")
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  conversations Conversation[]
+
+  @@unique([organizationId, channelType, externalId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CONVERSACIÓN
+// ─────────────────────────────────────────────
+
+model Conversation {
+  id               String             @id @default(cuid())
+  channelAccountId String
+  contactId        String
+
+  status          ConversationStatus @default(OPEN)
+  stage           ConversationStage  @default(INITIAL)
+  isAiActive      Boolean            @default(true)
+  assignedAgentId String?
+
+  detectedIntent    String?
+  extractedEntities Json    @default("{}")
+  summary           String?
+  tags              String[] @default([])
+
+  lastMessageAt DateTime?
+  resolvedAt    DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
+  contact        Contact        @relation(fields: [contactId], references: [id])
+  assignedAgent  Agent?         @relation(fields: [assignedAgentId], references: [id])
+  messages       Message[]
+  agentState     AgentState?
+  notifications  Notification[]
+
+  @@index([channelAccountId])
+  @@index([contactId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// MENSAJE
+// ─────────────────────────────────────────────
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+
+  direction    MessageDirection
+  type         MessageType      @default(TEXT)
+  status       MessageStatus    @default(SENT)
+  content      String
+  mediaUrl     String?
+  mediaCaption String?
+
+  isAiGenerated Boolean @default(false)
+  tokensUsed    Int?
+  modelUsed     String?
+  externalId    String?
+  metadata      Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([conversationId, externalId])
+  @@index([conversationId])
+}
+
+// ─────────────────────────────────────────────
+// ESTADO LANGGRAPH
+// ─────────────────────────────────────────────
+
+model AgentState {
+  id             String       @id @default(cuid())
+  conversationId String       @unique
+  currentNode    String       @default("classify")
+  context        Json         @default("{}")
+  updatedAt      DateTime     @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// CONFIGURACIÓN DE IA (por canal)
+// ─────────────────────────────────────────────
+
+model AiConfig {
+  id               String @id @default(cuid())
+  channelAccountId String @unique
+
+  systemPrompt      String  @default("")
+  personaName       String  @default("Asistente")
+  groqModel         String  @default("llama-3.3-70b-versatile")
+  temperature       Float   @default(0.7)
+  maxTokens         Int     @default(1024)
+  contextWindowSize Int     @default(10)
+
+  humanTakeoverKeywords String[] @default([])
+  autoResolveAfterHours Int      @default(24)
+
+  welcomeMessage String?
+  offlineMessage String?
+  isEnabled      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICACIONES
+// ─────────────────────────────────────────────
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  agentId        String
+  conversationId String?
+  type           NotificationType
+  title          String
+  body           String
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([isRead])
+}
+
+// ─────────────────────────────────────────────
+// ASISTENTE — configuración por proyecto
+// ─────────────────────────────────────────────
+
+model AssistantConfig {
+  id             String @id @default(cuid())
+  projectId      String @unique
+  organizationId String
+
+  personaName     String  @default("Asistente")
+  systemPrompt    String  @default("")
+  groqModel       String  @default("llama-3.3-70b-versatile")
+  temperature     Float   @default(0.7)
+  maxTokens       Int     @default(1024)
+  contextWindow   Int     @default(10)
+  welcomeMessage  String?
+  fallbackMessage String?
+  allowedOrigins  String[] @default([])
+
+  useFaqFallback Boolean @default(false)
+  faqKbId        String?
+
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project            @relation(fields: [projectId], references: [id])
+  sessions AssistantSession[]
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// ASISTENTE — sesiones de usuario final
+// ─────────────────────────────────────────────
+
+model AssistantSession {
+  id                String @id @default(cuid())
+  assistantConfigId String
+  organizationId    String
+  externalUserId    String
+  channel           String @default("api")
+
+  history       Json      @default("[]")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime?
+
+  config AssistantConfig @relation(fields: [assistantConfigId], references: [id])
+
+  @@index([assistantConfigId])
+  @@index([organizationId, externalUserId])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — base de conocimiento por proyecto
+// ─────────────────────────────────────────────
+
+model KnowledgeBase {
+  id             String  @id @default(cuid())
+  projectId      String
+  organizationId String
+  name           String
+  description    String?
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project      @relation(fields: [projectId], references: [id])
+  documents KbDocument[]
+
+  @@index([projectId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — documentos indexables
+// ─────────────────────────────────────────────
+
+model KbDocument {
+  id              String           @id @default(cuid())
+  knowledgeBaseId String
+  organizationId  String
+
+  title        String
+  sourceType   KbSourceType     @default(TEXT)
+  sourceUrl    String?
+  rawContent   String?
+  status       KbDocumentStatus @default(PENDING)
+  errorMessage String?
+
+  tags       String[] @default([])
+  metadata   Json     @default("{}")
+  chunkCount Int      @default(0)
+
+  indexedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
+  chunks        KbChunk[]
+
+  @@index([knowledgeBaseId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — chunks con embeddings
+// MVP: JSON array de floats
+// Producción: migrar a Unsupported("vector(1536)") con pgvector
+// ─────────────────────────────────────────────
+
+model KbChunk {
+  id         String @id @default(cuid())
+  documentId String
+  content    String
+  chunkIndex Int
+
+  embedding Json?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  document KbDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+</file>
+
+<file path="chatia-backend/src/agents/agents.controller.ts">
+import { randomUUID } from 'crypto';
+// src/agents/agents.controller.ts
+import {
+  Controller, Post, Get, Patch, Body, Param,
+  UseGuards, HttpCode, HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags, ApiOperation, ApiBearerAuth,
+} from '@nestjs/swagger';
+import {
+  IsString, IsOptional, IsEmail, IsBoolean, MaxLength,
+} from 'class-validator';
+import { PrismaService } from '../prisma/prisma.service';
+import { TenantGuard } from '../common/guards/tenant.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
+import { Tenant } from '../common/decorators/tenant.decorator';
+import type { TenantContext } from '../common/types/tenant-context';
+⋮----
+class RegisterAgentDto
+⋮----
+class UpdateAgentDto
+⋮----
+export class AgentsController
+⋮----
+constructor(private readonly prisma: PrismaService)
+⋮----
+/**
+   * Registro de un nuevo agente. Puede ser llamado por el propio agente
+   * en su primer login (sin TenantGuard) o por un admin.
+   * Si no se provee organizationId, se crea una Organization nueva.
+   */
+⋮----
+async register(@Body() dto: RegisterAgentDto)
+⋮----
+/**
+   * Perfil del agente autenticado.
+   */
+⋮----
+async me(@Tenant() tenant: TenantContext)
+⋮----
+/**
+   * Listar agentes de la organización (solo admin).
+   */
+⋮----
+async list(@Tenant() tenant: TenantContext)
+⋮----
+/**
+   * Actualizar agente (admin puede actualizar cualquiera, agente solo a sí mismo).
+   */
+⋮----
+async update(
+    @Param('id') id: string,
+    @Tenant() tenant: TenantContext,
+    @Body() dto: UpdateAgentDto,
+)
+</file>
+
+<file path="chatia-backend/src/ai-config/ai-config.controller.ts">
+// src/ai-config/ai-config.controller.ts
+import {
+  Controller, Get, Put, Patch, Body, Param, HttpCode, HttpStatus, UseGuards,
+} from '@nestjs/common';
+import { IsBoolean } from 'class-validator';
+import { TenantGuard } from '../common/guards/tenant.guard';
+import { AiConfigService } from './ai-config.service';
+import type { TenantContext } from '../common/types/tenant-context';
+import { Tenant } from '../common/decorators/tenant.decorator';
+import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
+⋮----
+class ToggleAiDto
+⋮----
+export class AiConfigController
+⋮----
+constructor(private readonly aiConfigService: AiConfigService)
+⋮----
+get(@Param('accountId') accountId: string, @Tenant() tenant: TenantContext)
+⋮----
+update(
+    @Param('accountId') accountId: string,
+    @Tenant() tenant: TenantContext,
+    @Body() dto: UpdateAiConfigDto,
+)
+⋮----
+toggle(
+    @Param('accountId') accountId: string,
+    @Tenant() tenant: TenantContext,
+    @Body() dto: ToggleAiDto,
+)
+</file>
+
+<file path="chatia-backend/src/assistant/dto/chat.dto.ts">
+// src/assistant/dto/chat.dto.ts
+import {
+  IsString, IsOptional, MinLength, MaxLength, IsIn,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class ChatDto
+</file>
+
+<file path="chatia-backend/src/assistant/assistant.controller.ts">
+// src/assistant/assistant.controller.ts
+import {
+  Controller, Get, Post, Put, Patch, Delete,
+  Param, Body, UseGuards, HttpCode, HttpStatus,
+} from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { IsBoolean } from 'class-validator';
+import { TenantGuard } from '../common/guards/tenant.guard';
+import { WritePermissionGuard } from '../common/guards/write-permission.guard';
+import { Tenant } from '../common/decorators/tenant.decorator';
+import type { TenantContext } from '../common/types/tenant-context';
+import { AssistantChatService } from './chat/assistant-chat.service';
+import { AssistantConfigService } from './config/assistant-config.service';
+import { AssistantSessionService } from './session/assistant-session.service';
+import { ChatDto } from './dto/chat.dto';
+import { UpdateAssistantConfigDto } from './config/dto/assistant-config.dto';
+⋮----
+class ToggleDto
+⋮----
+export class AssistantController
+⋮----
+constructor(
+⋮----
+getConfig(@Param('slug') slug: string, @Tenant() t: TenantContext)
+⋮----
+async updateConfig(
+    @Param('slug') slug: string,
+    @Tenant() t: TenantContext,
+    @Body() dto: UpdateAssistantConfigDto,
+)
+⋮----
+async toggleConfig(
+    @Param('slug') slug: string,
+    @Tenant() t: TenantContext,
+    @Body() dto: ToggleDto,
+)
+⋮----
+chat(
+    @Param('slug') slug: string,
+    @Tenant() t: TenantContext,
+    @Body() dto: ChatDto,
+)
+⋮----
+async getSession(
+    @Param('slug') slug: string,
+    @Param('userId') userId: string,
+    @Tenant() t: TenantContext,
+)
+⋮----
+async resetSession(
+    @Param('slug') slug: string,
+    @Param('userId') userId: string,
+    @Tenant() t: TenantContext,
+)
+</file>
+
+<file path="chatia-backend/src/channel-accounts/channel-accounts.service.ts">
+// src/channel-accounts/channel-accounts.service.ts
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { ChannelType, Prisma } from '@prisma/client';
+import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { randomUUID } from 'crypto';
+⋮----
+export class CreateChannelAccountDto
+⋮----
+export class UpdateChannelAccountDto
+⋮----
+export class ChannelAccountsService
+⋮----
+constructor(private readonly prisma: PrismaService)
+⋮----
+async create(organizationId: string, dto: CreateChannelAccountDto)
+⋮----
+async list(organizationId: string)
+⋮----
+async findOne(id: string, organizationId: string)
+⋮----
+async update(id: string, organizationId: string, dto: UpdateChannelAccountDto)
+⋮----
+async rotateToken(id: string, organizationId: string)
+</file>
+
+<file path="chatia-backend/src/conversations/conversations.controller.ts">
+// src/conversations/conversations.controller.ts
+import {
+  Controller, Get, Post, Patch, Delete,
+  Param, Body, Query, UseGuards,
+} from '@nestjs/common';
+import { IsString, MinLength, MaxLength } from 'class-validator';
+import { ConversationsService } from './conversations.service';
+import { TenantGuard } from '../common/guards/tenant.guard';
+import { Tenant } from '../common/decorators/tenant.decorator';
+import type { TenantContext } from '../common/types/tenant-context';
+⋮----
+class TagDto
+⋮----
+export class ConversationsController
+⋮----
+constructor(private readonly svc: ConversationsService)
+⋮----
+list(@Tenant() t: TenantContext, @Query() q: any)
+⋮----
+findOne(@Param('id') id: string, @Tenant() t: TenantContext)
+⋮----
+sendMessage(
+    @Param('id') id: string,
+    @Tenant() t: TenantContext,
+    @Body('text') text: string,
+)
+⋮----
+takeover(
+    @Param('id') id: string,
+    @Tenant() t: TenantContext,
+    @Body('agentId') agentId: string,
+)
+⋮----
+release(@Param('id') id: string, @Tenant() t: TenantContext)
+⋮----
+resolve(@Param('id') id: string, @Tenant() t: TenantContext)
+⋮----
+/** DELETE /conversations/:id — soft delete (archiva) */
+⋮----
+softDelete(@Param('id') id: string, @Tenant() t: TenantContext)
+⋮----
+/** PATCH /conversations/:id/restore — restaurar conversación archivada */
+⋮----
+restore(@Param('id') id: string, @Tenant() t: TenantContext)
+⋮----
+/** POST /conversations/:id/tags   body: { tag: "urgente" } */
+⋮----
+addTag(
+    @Param('id') id: string,
+    @Tenant() t: TenantContext,
+    @Body() dto: TagDto,
+)
+⋮----
+/** DELETE /conversations/:id/tags/:tag */
+⋮----
+removeTag(
+    @Param('id') id: string,
+    @Param('tag') tag: string,
+    @Tenant() t: TenantContext,
+)
+</file>
+
+<file path="chatia-backend/src/conversations/conversations.service.ts">
+// chatia-backend/src/conversations/conversations.service.ts
+// NOTA: Este archivo fue restaurado. La integración con AnalyticsEventsService
+// se hace via el interceptor en conversations-analytics.interceptor.ts
+// para no interferir con la lógica existente del servicio.
+// Ver: ADR-003 A-1.4
+</file>
+
+<file path="chatia-backend/src/ecosystem/dto/register-ecosystem.dto.ts">
+// src/ecosystem/dto/register-ecosystem.dto.ts
+import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class RegisterEcosystemDto
+</file>
+
+<file path="chatia-backend/src/faq/document/dto/kb-document.dto.ts">
+// src/faq/document/dto/kb-document.dto.ts
+import {
+  IsString, IsOptional, IsArray, IsEnum, MinLength, MaxLength,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export enum KbSourceTypeDto {
+  TEXT     = 'TEXT',
+  MARKDOWN = 'MARKDOWN',
+  PDF      = 'PDF',
+  URL      = 'URL',
+  JSON     = 'JSON',
+}
+⋮----
+export class CreateKbDocumentDto
+</file>
+
+<file path="chatia-backend/src/faq/ingestion/faq-ingestion.service.ts">
+// chatia-backend/src/faq/ingestion/faq-ingestion.service.ts
+//
+// ADR-003 W-1.3 — Extracción completada en semana 5.
+// Este servicio es ahora UN PRODUCER PURO — no procesa nada.
+// El procesamiento real ocurre en workers-backend/FaqIngestProcessor.
+//
+// Responsabilidades:
+//   1. Recibir el documento (URL, base64, texto)
+//   2. Actualizar estado del KbDocument a PENDING en DB
+//   3. Encolar job en workers.faq-ingest
+//   4. Retornar jobId para tracking desde welver
+⋮----
+import { Injectable, Logger } from '@nestjs/common';
+import { InjectQueue }        from '@nestjs/bullmq';
+import { Queue }              from 'bullmq';
+import { PrismaService }      from '../../prisma/prisma.service.js';
+⋮----
+export interface EnqueueFaqIngestInput {
+  ecosystemId:    string;
+  organizationId: string;
+  documentId:     string;
+  knowledgeBaseId: string;
+  source:         'URL' | 'BASE64' | 'TEXT';
+  content:        string;
+  fileName?:      string;
+  embeddingModel?: string;
+}
+⋮----
+export class FaqIngestionService
+⋮----
+constructor(
+⋮----
+/**
+   * Encola un documento para indexación en workers-backend.
+   * Retorna el jobId para que welver pueda consultar el estado.
+   */
+async enqueueIngest(input: EnqueueFaqIngestInput): Promise<
+⋮----
+// Marcar documento como PENDING en DB de chatia
+⋮----
+// Encolar en workers-backend
+⋮----
+/**
+   * Llamado por workers-backend via gRPC cuando termina el procesamiento.
+   * Actualiza el estado del documento en la DB de chatia.
+   */
+async updateDocumentStatus(params: {
+    documentId:     string;
+    organizationId: string;
+    status:         'INDEXED' | 'FAILED';
+    chunksIndexed?: number;
+    error?:         string;
+}): Promise<void>
+⋮----
+/**
+   * Persiste chunks en la DB de chatia.
+   * Llamado via gRPC desde workers-backend/FaqIngestProcessor.
+   */
+async upsertChunks(params: {
+    documentId:     string;
+    organizationId: string;
+    knowledgeBaseId: string;
+    chunks: Array<{
+      content:    string;
+      embedding:  number[];
+      chunkIndex: number;
+      tokenCount: number;
+    }>;
+}): Promise<
+⋮----
+// Eliminar chunks anteriores del documento (re-indexación)
+⋮----
+// Insertar nuevos chunks
+</file>
+
+<file path="chatia-backend/src/faq/knowledge-base/dto/knowledge-base.dto.ts">
+// src/faq/knowledge-base/dto/knowledge-base.dto.ts
+import { IsString, IsOptional, IsBoolean, MinLength, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class CreateKnowledgeBaseDto
+⋮----
+export class UpdateKnowledgeBaseDto
+</file>
+
+<file path="chatia-backend/src/faq/query/dto/faq-query.dto.ts">
+// src/faq/query/dto/faq-query.dto.ts
+import { IsString, IsOptional, IsInt, IsBoolean, Min, Max, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class FaqQueryDto
+</file>
+
+<file path="chatia-backend/src/internal/dto/internal-chat.dto.ts">
+// src/internal/dto/internal-chat.dto.ts
+import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class InternalChatDto
+⋮----
+export class InternalProjectDto
+</file>
+
+<file path="chatia-backend/src/projects/dto/create-project.dto.ts">
+// src/projects/dto/create-project.dto.ts
+import {
+  IsString, IsOptional, IsBoolean,
+  MinLength, MaxLength, Matches,
+} from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class CreateProjectDto
+</file>
+
+<file path="chatia-backend/src/widget/widget.controller.ts">
+// src/widget/widget.controller.ts
+import {
+  Controller, Get, Post, Param, Body, Res,
+  HttpCode, HttpStatus, NotFoundException,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
+import { PrismaService } from '../prisma/prisma.service';
+import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
+import { AssistantSessionService } from '../assistant/session/assistant-session.service';
+⋮----
+class WidgetChatDto
+⋮----
+export class WidgetController
+⋮----
+constructor(
+⋮----
+// ── Config pública del asistente ─────────────────────────────────────────
+⋮----
+async getConfig(@Param('projectSlug') slug: string)
+⋮----
+// Solo exponer campos públicos — nunca el systemPrompt
+⋮----
+// ── Chat del widget ───────────────────────────────────────────────────────
+⋮----
+async chat(
+    @Param('projectSlug') slug: string,
+    @Body() dto: WidgetChatDto,
+)
+⋮----
+// ── Historial de sesión ───────────────────────────────────────────────────
+⋮----
+async getSession(
+    @Param('projectSlug') slug: string,
+    @Param('userId') userId: string,
+)
+⋮----
+// ── Snippet JS embeddable ─────────────────────────────────────────────────
+⋮----
+async getSnippet(
+    @Param('projectSlug') slug: string,
+    @Res() res: Response,
+)
+⋮----
+// ── Helper: resolver config por slug (sin organizationId) ────────────────
+⋮----
+private async resolveConfig(slug: string)
+⋮----
+// Busca el proyecto por slug en cualquier organización (el slug es único por org)
+// Para el widget no se requiere auth — el slug actúa como identificador público
+⋮----
+// ── Snippet JS ────────────────────────────────────────────────────────────
+⋮----
+private buildSnippet(opts: {
+    projectSlug: string;
+    apiUrl: string;
+    personaName: string;
+    welcomeMessage: string;
+}): string
+</file>
+
+<file path="chatia-backend/src/app.module.ts">
+// chatia-backend/src/app.module.ts
+import { Module }           from '@nestjs/common';
+import { ConfigModule }     from '@nestjs/config';
+import { BullModule }       from '@nestjs/bullmq';
+⋮----
+// Analytics events — ADR-003 A-1.4
+import { AnalyticsEventsModule } from './analytics-events/analytics-events.module.js';
+// Analytics proxy deprecated (eliminar en semana 6 cuando welver migre)
+import { AnalyticsModule }       from './analytics/analytics.module.js';
+⋮----
+// Core modules
+import { PrismaModule }         from './prisma/prisma.module.js';
+import { HealthModule }         from './health/health.module.js';
+import { CommonModule }         from './common/common.module.js';
+import { FirebaseModule }       from './firebase/firebase.module.js';
+import { GroqModule }           from './groq/groq.module.js';
+import { EventsModule }         from './events/events.module.js';
+⋮----
+// Business modules
+import { EcosystemModule }      from './ecosystem/ecosystem.module.js';
+import { OrganizationsModule }  from './organizations/organizations.module.js';
+import { AgentsModule }         from './agents/agents.module.js';
+import { ContactsModule }       from './contacts/contacts.module.js';
+import { ConversationsModule }  from './conversations/conversations.module.js';
+import { MessagesModule }       from './messages/messages.module.js';
+import { ChannelsModule }        from './channels/channel.module.js';
+import { ChannelAccountsModule } from './channel-accounts/channel-accounts.module.js';
+import { AssistantModule }      from './assistant/assistant.module.js';
+import { FaqModule }            from './faq/faq.module.js';
+import { WebhooksModule }       from './webhooks/webhooks.module.js';
+import { NotificationsModule }  from './notifications/notifications.module.js';
+import { WidgetModule }         from './widget/widget.module.js';
+import { InternalModule }       from './internal/internal.module.js';
+import { QueueModule }          from './queue/queue.module.js';
+import { AiConfigModule }       from './ai-config/ai-config.module.js';
+⋮----
+// Infraestructura
+⋮----
+// Analytics — ADR-003
+AnalyticsEventsModule,   // producer de eventos hacia analytics-backend
+AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
+⋮----
+// Negocio
+⋮----
+export class AppModule
+</file>
+
+<file path="chatia-backend/package.json">
+{
+  "name": "chatia-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@nestjs/mapped-types": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/multer": "^1.4.12",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="notificaciones-backend/prisma/schema.prisma">
+// schema.prisma — notificaciones-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
+model Notification {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  templateKey    String
+  payload        Json
+  idempotencyKey String              @unique
+  status         NotificationStatus  @default(PENDING)
+  attempts       Int                 @default(0)
+  sentAt         DateTime?
+  failureReason  String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([createdAt])
+}
+
+/// Preferencias de canal por contacto — se chequea antes de cada envio
+model ContactPreference {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  optedOut       Boolean             @default(false)
+  optedOutAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, contactId, channel])
+  @@index([organizationId, contactId])
+}
+</file>
+
+<file path="notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts">
+// notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts
+import { Controller, Logger }    from '@nestjs/common';
+import { GrpcMethod }            from '@nestjs/microservices';
+import { PrismaService }         from '../prisma/prisma.service.js';
+import { NotificationsService }  from '../notifications/notifications.service.js';
+⋮----
+interface SendNotificationRequest {
+  ecosystemId:    string;
+  organizationId: string;
+  contactId:      string;
+  channel:        number;
+  templateKey:    string;
+  idempotencyKey: string;
+  payloadJson:    string;
+}
+⋮----
+interface UpdatePreferenceRequest {
+  ecosystemId:    string;
+  organizationId: string;
+  contactId:      string;
+  channel:        number;
+  optedOut:       boolean;
+}
+⋮----
+export class NotificacionesGrpcController
+⋮----
+constructor(
+⋮----
+async sendNotification(req: SendNotificationRequest)
+⋮----
+// enqueue retorna { jobId, channel } — mapeamos al contrato gRPC
+⋮----
+async updateContactPreference(req: UpdatePreferenceRequest)
+⋮----
+ping(req:
+</file>
+
+<file path="notificaciones-backend/src/health/health.controller.ts">
+// notificaciones-backend/src/health/health.controller.ts
+// @nestjs/terminus v11 — sin PrismaHealthIndicator
+import { Controller, Get }                          from '@nestjs/common';
+import { ApiTags }                                  from '@nestjs/swagger';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+import { Public }         from '@ecosistema-ms/auth-server';
+⋮----
+export class HealthController
+⋮----
+constructor(
+⋮----
+check(): Promise<HealthCheckResult>
+</file>
+
+<file path="notificaciones-backend/src/health/health.module.ts">
+import { Module }           from '@nestjs/common';
+import { TerminusModule }   from '@nestjs/terminus';
+import { HealthController } from './health.controller.js';
+import { PrismaModule }     from '../prisma/prisma.module.js';
+⋮----
+export class HealthModule
+</file>
+
+<file path="notificaciones-backend/src/notifications/dlq/dlq-monitor.service.ts">
+// notificaciones-backend/src/notifications/dlq/dlq-monitor.service.ts
+//
+// N-3.3: Monitorea la DLQ de notificaciones.
+// Si supera el threshold configurable → notifica al OWNER de la org via gRPC a chatia.
+//
+// Estrategia: @Cron cada 5 minutos revisa tamaño de DLQ.
+// No usamos evento on('failed') de BullMQ porque queremos threshold, no por-job.
+⋮----
+import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
+import { Cron, CronExpression }                      from '@nestjs/schedule';
+import { InjectQueue }                               from '@nestjs/bullmq';
+import { Queue }                                     from 'bullmq';
+import type { ClientGrpc } from '@nestjs/microservices';
+import { firstValueFrom }                            from 'rxjs';
+import { QUEUES }                                    from '../notifications.constants.js';
+⋮----
+const DLQ_WARN_THRESHOLD  = 50;   // warning en log
+const DLQ_ALERT_THRESHOLD = 100;  // alerta a chatia via gRPC
+⋮----
+interface ChatiaNotifyRequest {
+  organizationId: string;
+  ecosystemId:    string;
+  type:           string;
+  title:          string;
+  body:           string;
+}
+⋮----
+interface ChatiaInternalClient {
+  notifySystem(req: ChatiaNotifyRequest): { toPromise: () => Promise<{ success: boolean }> };
+}
+⋮----
+notifySystem(req: ChatiaNotifyRequest):
+⋮----
+export class DlqMonitorService implements OnModuleInit
+⋮----
+constructor(
+⋮----
+onModuleInit(): void
+⋮----
+// El servicio interno de chatia para notificaciones de sistema
+// Si no está disponible el método, falla silenciosamente
+⋮----
+async checkDlqSize(): Promise<void>
+⋮----
+/**
+   * Expuesto para que dlq.controller pueda forzar revisión manual.
+   */
+async getDlqStats(): Promise<
+⋮----
+private async sendAlert(dlqSize: number): Promise<void>
+⋮----
+// @ts-expect-error — rxjs interop
+⋮----
+// organizationId global del ecosistema para alertas de infraestructura
+</file>
+
+<file path="notificaciones-backend/src/notifications/processors/notification.processor.ts">
+// notificaciones-backend/src/notifications/processors/notification.processor.ts
+//
+// Processor BullMQ que consume los 3 queues (WHATSAPP | EMAIL | PUSH).
+// Un solo processor para los 3 — el switch despacha al adapter correcto.
+// Registrado en notifications.module.ts con @Processor() para cada queue.
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Injectable, Logger }    from '@nestjs/common';
+import type { Job }              from 'bullmq';
+import { PrismaService }         from '../../prisma/prisma.service.js';
+import { WhatsappAdapter }       from '../channels/whatsapp/whatsapp.adapter.js';
+import { EmailAdapter }          from '../channels/email/email.adapter.js';
+import { PushAdapter }           from '../channels/push/push.adapter.js';
+import type { INotificationChannel, SendPayload } from '../interfaces/notification-channel.interface.js';
+import { QUEUES }                from '../notifications.constants.js';
+⋮----
+export interface NotificationJobData {
+  ecosystemId:    string;
+  organizationId: string;
+  contactId:      string;
+  channel:        'WHATSAPP' | 'EMAIL' | 'PUSH';
+  templateKey:    string;
+  payload:        Record<string, unknown>;
+  idempotencyKey: string;
+}
+⋮----
+// Tres processors registrados — uno por queue — comparten la lógica de BaseProcessor
+abstract class BaseNotificationProcessor extends WorkerHost
+⋮----
+async process(job: Job<NotificationJobData>): Promise<void>
+⋮----
+// ── 1. Dedup check ──────────────────────────────────────────────────────
+⋮----
+// ── 2. Opt-out check ────────────────────────────────────────────────────
+⋮----
+// ── 3. Upsert PENDING ───────────────────────────────────────────────────
+⋮----
+// ── 4. Resolve recipient ────────────────────────────────────────────────
+⋮----
+// ── 5. Enviar ───────────────────────────────────────────────────────────
+⋮----
+throw error; // BullMQ reintentará
+⋮----
+private async upsert(
+    idempotencyKey: string,
+    ecosystemId:    string,
+    organizationId: string,
+    contactId:      string,
+    channel:        string,
+    templateKey:    string,
+    payload:        Record<string, unknown>,
+    status:         'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED',
+)
+⋮----
+export class WhatsappProcessor extends BaseNotificationProcessor
+⋮----
+constructor(
+⋮----
+export class EmailProcessor extends BaseNotificationProcessor
+⋮----
+export class PushProcessor extends BaseNotificationProcessor
+</file>
+
+<file path="packages/proto/src/index.ts">
+// packages/proto/src/index.ts
+// Compatible con NodeNext/CJS — NO usa import.meta
+import { join } from 'path';
+</file>
+
+<file path="pasarelapagos-backend/src/pagos/pagos.grpc.controller.ts">
+import { Controller } from "@nestjs/common";
+import { GrpcMethod } from "@nestjs/microservices";
+import { PagosService } from "./pagos.service";
+⋮----
+// Implementa el contrato definido en packages/proto/proto/pagos.proto
+⋮----
+export class PagosGrpcController
+⋮----
+constructor(private readonly svc: PagosService)
+⋮----
+async createPaymentIntent(data: {
+    organization_id: string;
+    ecosystem_id:    string;
+    amount_cents:    number;
+    currency:        string;
+    description:     string;
+    metadata_json:   string;
+})
+⋮----
+async getPaymentStatus(data:
+⋮----
+ping(data:
+</file>
+
+<file path="pasarelapagos-backend/package.json">
+{
+  "name": "pasarelapagos-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@opentelemetry/auto-instrumentations-node": "catalog:",
+    "@opentelemetry/exporter-prometheus": "catalog:",
+    "axios": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "mercadopago": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "stripe": "catalog:",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/compression": "^1.7.5",
+    "nanoid": "^5.1.5",
+    "opossum": "^8.1.4",
+    "cookie-parser": "^1.4.7",
+    "compression": "^1.7.5",
+    "@nestjs/terminus": "catalog:",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
+    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="workers-backend/prisma/schema.prisma">
+// schema.prisma — workers-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+  CANCELLED
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+}
+
+/// Trazabilidad de todos los jobs async del ecosistema
+model JobLog {
+  id             String    @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  queue          String
+  jobId          String    @unique
+  status         JobStatus @default(PENDING)
+  input          Json
+  result         Json?
+  error          String?
+  attempts       Int       @default(0)
+  startedAt      DateTime?
+  completedAt    DateTime?
+  durationMs     Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId, queue, status])
+  @@index([queue, status])
+  @@index([jobId])
+}
+
+/// Campanas de email masivo programadas
+model Campaign {
+  id              String         @id @default(cuid())
+  ecosystemId     String
+  organizationId  String
+  templateKey     String
+  status          CampaignStatus @default(DRAFT)
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  totalRecipients Int            @default(0)
+  sentCount       Int            @default(0)
+  failedCount     Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([organizationId, status])
+  @@index([scheduledAt])
+}
+</file>
+
+<file path="workers-backend/src/campaigns/dto/campaign.dto.ts">
+import { CampaignStatus } from '@prisma/client';
+// workers-backend/src/campaigns/dto/campaign.dto.ts
+⋮----
+import {
+  IsString, IsEnum, IsOptional,
+  IsDateString, IsArray, IsObject,
+} from 'class-validator';
+⋮----
+export class CreateCampaignDto
+⋮----
+export class PatchCampaignDto
+</file>
+
+<file path="workers-backend/src/campaigns/campaigns.service.ts">
+import { CampaignStatus } from '@prisma/client';
+// workers-backend/src/campaigns/campaigns.service.ts
+//
+// W-2.3: CRUD de campañas + scheduler.
+// El @Cron corre cada minuto y encola campañas con scheduledAt <= now.
+// Lock distribuido en Redis para evitar doble ejecución en instancias múltiples.
+⋮----
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectQueue }                            from '@nestjs/bullmq';
+import { Cron }                                   from '@nestjs/schedule';
+import { Queue }                                  from 'bullmq';
+import { PrismaService }                          from '../prisma/prisma.service.js';
+import { WORKER_QUEUES }                          from '../jobs/jobs.constants.js';
+import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
+⋮----
+const LOCK_TTL_MS        = 55_000; // 55s — un poco menos que el cron interval
+⋮----
+export class CampaignsService
+⋮----
+constructor(
+⋮----
+// ── CRUD ──────────────────────────────────────────────────────────────────
+⋮----
+async create(dto: CreateCampaignDto)
+⋮----
+async findAll(organizationId: string, status?: string)
+⋮----
+async findOne(id: string, organizationId: string)
+⋮----
+async patch(id: string, organizationId: string, dto: PatchCampaignDto)
+⋮----
+await this.findOne(id, organizationId); // throws si no existe
+⋮----
+// Cancelar jobs pendientes en BullMQ
+⋮----
+// ── Scheduler ──────────────────────────────────────────────────────────────
+⋮----
+/**
+   * Corre cada minuto. Despacha campañas con scheduledAt <= now.
+   * Lock distribuido: si otra instancia ya está corriendo, se saltea.
+   */
+@Cron('* * * * *') // cada minuto
+async dispatchScheduledCampaigns(): Promise<void>
+⋮----
+// Intentar obtener lock (usando BullMQ Queue como proxy de Redis)
+// Lock simplificado: si el job "scheduler-lock" ya existe en la queue, saltar
+⋮----
+if (lockJob) return; // otro pod ya está corriendo
+⋮----
+// Crear lock temporal
+⋮----
+take: 20, // máx 20 por ciclo para no bloquear
+⋮----
+async dispatchCampaign(campaignId: string): Promise<void>
+⋮----
+// Actualizar estado a RUNNING
+⋮----
+// Encolar el job de campaña
+// NOTA: recipientIds no está en el modelo Campaign (es un input del create).
+// En producción: persistir recipientIds en tabla CampaignRecipient.
+// Por ahora: loguear y marcar como pendiente de implementación.
+⋮----
+recipientIds:   [], // TODO: leer de CampaignRecipient
+</file>
+
+<file path="workers-backend/src/dlq/dlq.module.ts">
+// workers-backend/src/dlq/dlq.module.ts
+import { Module }          from '@nestjs/common';
+import { BullModule }      from '@nestjs/bullmq';
+import { WORKER_QUEUES }   from '../jobs/jobs.constants.js';
+import { DlqController }   from './dlq.controller.js';
+import { DlqService }      from './dlq.service.js';
+⋮----
+export class DlqModule
+</file>
+
+<file path="workers-backend/src/health/health.controller.ts">
+// workers-backend/src/health/health.controller.ts
+import { Controller, Get }                          from '@nestjs/common';
+import { ApiTags }                                  from '@nestjs/swagger';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+import { Public }         from '@ecosistema-ms/auth-server';
+⋮----
+export class HealthController
+⋮----
+constructor(
+⋮----
+check(): Promise<HealthCheckResult>
+</file>
+
+<file path="workers-backend/src/health/health.module.ts">
+import { Module }           from '@nestjs/common';
+import { TerminusModule }   from '@nestjs/terminus';
+import { HealthController } from './health.controller.js';
+import { PrismaModule }     from '../prisma/prisma.module.js';
+⋮----
+export class HealthModule
+</file>
+
+<file path="workers-backend/src/jobs/processors/analytics-export.processor.ts">
+// workers-backend/src/jobs/processors/analytics-export.processor.ts
+//
+// A-3.2: Genera exportaciones de analytics en background.
+// Recibe job de analytics-backend → consulta via gRPC → genera CSV/JSON → sube a Railway Volume.
+// Límite: exportaciones > 100MB rechazadas con error descriptivo.
+//
+// Resultado en JobLog.result: { url, format, sizeBytes, rowCount }
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger, Inject }        from '@nestjs/common';
+import type { ClientGrpc } from '@nestjs/microservices';
+import type { Job }              from 'bullmq';
+import { firstValueFrom }        from 'rxjs';
+import { writeFile, mkdir }      from 'node:fs/promises';
+import { join }                  from 'node:path';
+⋮----
+import { JobsService } from '../jobs.service.js';
+⋮----
+const MAX_SIZE_BYTES = 100 * 1_024 * 1_024; // 100MB
+⋮----
+export interface ExportJobData {
+  ecosystemId:    string;
+  organizationId: string;
+  from:           string; // ISO date string
+  to:             string;
+  format:         'csv' | 'json';
+  reportType:     'overview' | 'conversations' | 'agents';
+}
+⋮----
+from:           string; // ISO date string
+⋮----
+interface AnalyticsGrpcClient {
+  getOverview(req: object):            { toPromise: () => Promise<Record<string, unknown>> };
+  getConversationsByDay(req: object):  { toPromise: () => Promise<{ days: unknown[] }> };
+  getAgentMetrics(req: object):        { toPromise: () => Promise<{ agents: unknown[]; total: number }> };
+}
+⋮----
+getOverview(req: object):
+getConversationsByDay(req: object):
+getAgentMetrics(req: object):
+⋮----
+export class AnalyticsExportProcessor extends WorkerHost
+⋮----
+constructor(
+    private readonly jobs: JobsService,
+    @Inject('ANALYTICS_GRPC_CLIENT') private readonly grpc: ClientGrpc,
+)
+⋮----
+onModuleInit(): void
+⋮----
+async process(job: Job<ExportJobData>): Promise<void>
+⋮----
+// 1. Consultar datos via gRPC a analytics-backend
+⋮----
+// 2. Serializar
+⋮----
+// 3. Persistir en Railway Volume (o /tmp en local)
+⋮----
+// 4. URL accesible — en Railway: montar volumen y exponer via HTTP estático
+// En local: path absoluto
+⋮----
+// ── Fetch data via gRPC ───────────────────────────────────────────────────
+⋮----
+private async fetchData(
+    reportType: string,
+    params: { ecosystemId: string; organizationId: string; fromUnix: number; toUnix: number },
+): Promise<unknown[] | Record<string, unknown>>
+⋮----
+// @ts-expect-error rxjs interop
+⋮----
+return [result]; // overview es un objeto — lo envolvemos en array para CSV
+⋮----
+// @ts-expect-error rxjs interop
+⋮----
+// Paginar hasta traer todos los agentes
+⋮----
+// @ts-expect-error rxjs interop
+⋮----
+// ── CSV serializer mínimo ─────────────────────────────────────────────────
+⋮----
+private toCsv(data: unknown[] | Record<string, unknown>): string
+⋮----
+// Escapar comas y comillas
+</file>
+
+<file path="workers-backend/src/jobs/processors/campaign-email.processor.ts">
+// workers-backend/src/jobs/processors/campaign-email.processor.ts
+//
+// W-2.2: Procesa campañas masivas de email.
+// Rate limiting: 100 emails/seg via token bucket en Redis.
+// Cursor persistido en JobLog: si el job falla en batch 50/100, retry desde 50.
+// Despacha en batches de 50 → encola a notify.email (notificaciones-backend).
+//
+// FLUJO:
+//   1. Leer cursor del JobLog (si es retry)
+//   2. Para cada recipientId: verificar opt-out via notificaciones-backend gRPC
+//   3. Encolar en notify.email con idempotencyKey por (campaignId + contactId)
+//   4. Actualizar cursor en JobLog cada 50 enviados
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger, Inject }        from '@nestjs/common';
+import type { ClientGrpc } from '@nestjs/microservices';
+import { InjectQueue }           from '@nestjs/bullmq';
+import { Queue }                 from 'bullmq';
+import type { Job }              from 'bullmq';
+import { firstValueFrom }        from 'rxjs';
+import { createHash }            from 'node:crypto';
+⋮----
+import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
+import { JobsService }                 from '../jobs.service.js';
+import type {
+  CampaignEmailJobData,
+  CampaignEmailJobResult,
+}                                      from '../dto/campaign-email-job.dto.js';
+⋮----
+interface NotifGrpcClient {
+  getPreferences(req: { organizationId: string; contactId: string }): {
+    toPromise: () => Promise<{ optedOut: boolean }>;
+  };
+}
+⋮----
+getPreferences(req:
+⋮----
+export class CampaignEmailProcessor extends WorkerHost
+⋮----
+constructor(
+    private readonly jobs: JobsService,
+    @Inject('NOTIF_GRPC_CLIENT')    private readonly notifGrpc: ClientGrpc,
+    @InjectQueue(NOTIFY_QUEUE) private readonly emailQueue: Queue,
+)
+⋮----
+onModuleInit(): void
+⋮----
+async process(job: Job<CampaignEmailJobData>): Promise<CampaignEmailJobResult>
+⋮----
+// Leer cursor desde JobLog (si es retry de un intento anterior)
+⋮----
+// Verificar opt-out
+⋮----
+// @ts-expect-error — rxjs interop
+⋮----
+// Si gRPC falla, continuar (best-effort para opt-out check)
+⋮----
+// Encolar en notify.email con idempotencyKey determinístico
+⋮----
+to:        contactId, // el caller debe mapear contactId → email
+⋮----
+jobId:    idempotencyKey, // BullMQ deduplicará
+⋮----
+// Actualizar cursor en JobLog después de cada batch
+⋮----
+// Guardar cursor para que el retry retome desde donde quedó
+</file>
+
+<file path="workers-backend/src/jobs/processors/vector-index.processor.ts">
+// workers-backend/src/jobs/processors/vector-index.processor.ts
+//
+// W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
+// Recibe chunks ya extraídos → genera embeddings → persiste en chatia via gRPC.
+//
+// SLA: 1000 chunks indexados en < 30s.
+// NOTA: Si se adopta Qdrant (ADR-006), solo cambiar el adapter gRPC destino.
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger, Inject }        from '@nestjs/common';
+import type { ClientGrpc } from '@nestjs/microservices';
+import type { Job }              from 'bullmq';
+import { firstValueFrom }        from 'rxjs';
+⋮----
+import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
+import { JobsService }                 from '../jobs.service.js';
+import { EmbeddingService }            from '../services/embedding.service.js';
+import type {
+  VectorIndexJobData,
+  VectorIndexJobResult,
+}                                      from '../dto/vector-index-job.dto.js';
+⋮----
+const EMBED_CONCURRENCY = 5; // paralelo para generación de embeddings
+⋮----
+interface ChatiaGrpcClient {
+  upsertChunks(req: object): { toPromise: () => Promise<{ success: boolean; chunksStored: number }> };
+}
+⋮----
+upsertChunks(req: object):
+⋮----
+export class VectorIndexProcessor extends WorkerHost
+⋮----
+constructor(
+    private readonly jobs:      JobsService,
+    private readonly embedding: EmbeddingService,
+    @Inject('CHATIA_GRPC_CLIENT') private readonly grpc: ClientGrpc,
+)
+⋮----
+onModuleInit(): void
+⋮----
+async process(job: Job<VectorIndexJobData>): Promise<VectorIndexJobResult>
+⋮----
+// Generar embeddings en batches paralelos (límite EMBED_CONCURRENCY)
+⋮----
+// Persistir en chatia via gRPC
+⋮----
+// @ts-expect-error — rxjs interop
+⋮----
+// SLA check — warning si supera 30s
+⋮----
+// ── Embeddings con concurrencia controlada ────────────────────────────────
+⋮----
+private async generateEmbeddingsParallel(texts: string[]): Promise<number[][]>
+</file>
+
+<file path="workers-backend/src/jobs/services/chunking.service.ts">
+// workers-backend/src/jobs/services/chunking.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+⋮----
+// Definido localmente — evita dep circular con faq-ingest-job.dto
+export type FaqDocumentSource = 'URL' | 'BASE64' | 'TEXT';
+⋮----
+export interface TextChunk {
+  content:    string;
+  chunkIndex: number;
+  tokenCount: number;
+}
+⋮----
+export class ChunkingService
+⋮----
+async extractAndChunk(
+    content:   string,
+    source:    FaqDocumentSource,
+    fileName?: string,
+): Promise<TextChunk[]>
+⋮----
+private async extractText(
+    content:   string,
+    source:    FaqDocumentSource,
+    fileName?: string,
+): Promise<string>
+⋮----
+private async extractFromBuffer(
+    buffer:    Buffer,
+    mimeType:  string,
+    fileName?: string,
+): Promise<string>
+⋮----
+// @ts-expect-error — pdf-parse puede no tener tipos en todos los entornos
+⋮----
+// @ts-expect-error — mammoth puede no tener tipos en todos los entornos
+⋮----
+private chunkText(text: string): TextChunk[]
+</file>
+
+<file path="analytics-backend/src/analytics/analytics.service.ts">
+import { Injectable, Logger, Inject } from "@nestjs/common";
+import { CACHE_MANAGER } from "@nestjs/cache-manager";
+import type { Cache } from "cache-manager";
+import { PrismaService } from "../prisma/prisma.service.js";
+⋮----
+export class AnalyticsService
+⋮----
+constructor(private readonly prisma: PrismaService, @Inject(CACHE_MANAGER) private readonly cache: Cache)
+async getOverview(params:
+⋮----
+const where = (eventType: string) => (
+⋮----
+async getConversationsByDay(organizationId: string, from: Date, to: Date)
+async persistEvent(data:
+</file>
+
+<file path="workers-backend/src/dlq/dlq.service.ts">
+// workers-backend/src/dlq/dlq.service.ts
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectQueue }                           from '@nestjs/bullmq';
+import { Queue }                                 from 'bullmq';
+import { PrismaService }                         from '../prisma/prisma.service.js';
+import { WORKER_QUEUES }                         from '../jobs/jobs.constants.js';
+⋮----
+export interface DlqJobEntry {
+  queue:        string;
+  jobId:        string;
+  failedReason: string;
+  attempts:     number;
+  failedAt:     number;
+  data:         unknown;
+}
+⋮----
+export interface QueueStats {
+  queue:    string;
+  failed:   number;
+  warning:  boolean;
+  critical: boolean;
+}
+⋮----
+export class DlqService
+⋮----
+constructor(
+⋮----
+async listAll(): Promise<DlqJobEntry[]>
+⋮----
+async retryJob(queueName: string, jobId: string): Promise<
+⋮----
+async discardJob(queueName: string, jobId: string): Promise<
+⋮----
+async getStats(): Promise<
+⋮----
+private getQueues(): Array<[string, Queue]>
+⋮----
+private resolveQueue(queueName: string): Queue
+</file>
+
 <file path="pnpm-workspace.yaml">
 packages:
   - "chatia-backend"
@@ -8074,6 +7998,7 @@ catalog:
   "@types/express": "^5.0.3"
   "@types/bcryptjs": "^2.4.6"
   "@types/uuid": "^10.0.0"
+  "@types/multer": "^1.4.12"
   "@types/jest": "^30.0.0"
   "@types/supertest": "^6.0.3"
   # ── NestJS ────────────────────────────────────────────
@@ -8145,21 +8070,6 @@ catalog:
   ts-loader: "^9.5.2"
   tsconfig-paths: "^4.2.0"
   source-map-support: "^0.5.21"
-</file>
-
-<file path="tsconfig.base.json">
-{
-  "compilerOptions": {
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "incremental": false,
-    "typeRoots": []
-  }
-}
 </file>
 
 </files>
