@@ -14,5 +14,6 @@ async function bootstrap() {
   await app.startAllMicroservices();
   await app.listen(process.env["PORT"] ?? 3004);
   logger.log(`HTTP :${process.env["PORT"] ?? 3004} | gRPC :${process.env["GRPC_PORT"] ?? 5005}`);
+  //hola
 }
 bootstrap();
