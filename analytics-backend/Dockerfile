@@ -1,44 +1,44 @@
+# syntax=docker/dockerfile:1.7
 # Dockerfile — analytics-backend
 # Railway: Root Directory = /  |  Dockerfile Path = analytics-backend/Dockerfile
 
-FROM node:24-alpine AS base
-RUN npm install -g pnpm@10
+FROM node:24-alpine AS deps
+RUN corepack enable && corepack prepare pnpm@10 --activate
 WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY packages/proto/package.json       ./packages/proto/
+COPY packages/auth-server/package.json ./packages/auth-server/
+COPY packages/grpc-client/package.json ./packages/grpc-client/
+COPY analytics-backend/package.json                 ./analytics-backend/
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
-FROM base AS deps
-COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
-COPY packages/proto/package.json       ./packages/proto/package.json
-COPY packages/auth-server/package.json ./packages/auth-server/package.json
-COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
-COPY analytics-backend/package.json                 ./analytics-backend/package.json
-RUN pnpm install --frozen-lockfile
-
-FROM deps AS builder
-COPY tsconfig.base.json     ./
-COPY packages/proto/        ./packages/proto/
-COPY packages/auth-server/  ./packages/auth-server/
-COPY packages/grpc-client/  ./packages/grpc-client/
-COPY analytics-backend/                  ./analytics-backend/
-RUN pnpm --filter analytics-backend build
-RUN test -f analytics-backend/dist/main.js || \
-    (echo "ERROR: analytics-backend/dist/main.js no generado" && exit 1)
+FROM node:24-alpine AS builder
+RUN corepack enable && corepack prepare pnpm@10 --activate
+WORKDIR /app
+ARG DATABASE_URL="postgresql://build:build@localhost:5432/build"
+ENV DATABASE_URL=$DATABASE_URL
+ENV NODE_ENV=development
+COPY --from=deps /app/node_modules ./node_modules
+COPY tsconfig.base.json            ./tsconfig.base.json
+COPY package.json pnpm-workspace.yaml ./
+COPY packages/                     ./packages/
+COPY analytics-backend/                         ./analytics-backend/
+WORKDIR /app/analytics-backend
+RUN /app/node_modules/.bin/prisma generate
+RUN /app/node_modules/.bin/nest build
+RUN test -f dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
 
 FROM node:24-alpine AS runner
 RUN apk add --no-cache dumb-init
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3003
-
-RUN addgroup --system --gid 1001 nodejs \
- && adduser  --system --uid 1001 nestjs
-
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/dist         ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/dist         ./analytics-backend/dist
-COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma       ./analytics-backend/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json ./analytics-backend/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
-
-WORKDIR /app/analytics-backend
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma       ./prisma
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json ./package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3003 5004
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main"]
