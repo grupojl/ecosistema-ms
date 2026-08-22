@@ -1,84 +1,93 @@
-You reached the start of the range
-2026-08-21 22:17
-unpacking archive
-29.7 MB
-185ms
-uploading snapshot
-9.6 MB
-146ms
+#!/usr/bin/env bash
+# =============================================================================
+# x.sh — Fix Dockerfiles: agregar pnpm-lock.yaml al COPY de deps stage
+# Ejecutar: bash x.sh   ó   make x
+# Sin Python. Entorno: Windows + Git Bash | Node 24 | pnpm 10
+# =============================================================================
+set -euo pipefail
 
-internal
-load build definition from chatia-backend/Dockerfile
-0ms
+ROOT="$(pwd)"
+GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; NC='\033[0m'
+log()  { echo -e "${CYAN}[x]${NC} $*"; }
+ok()   { echo -e "${GREEN}[OK]${NC} $*"; }
+warn() { echo -e "${YELLOW}[WARN]${NC} $*"; }
 
-internal
-load metadata for docker.io/library/node:24-alpine
-156ms
+[ -f "$ROOT/pnpm-workspace.yaml" ] || { echo "Correr desde la raíz de ecosistema-ms/"; exit 1; }
 
-internal
-load .dockerignore
-0ms
+log "Parcheando Dockerfiles — agregando pnpm-lock.yaml al COPY de deps..."
+log ""
 
-internal
-load build context
-0ms
+# Función que reescribe el Dockerfile de un servicio
+patch_dockerfile() {
+  local SVC="$1"
+  local PORT_HTTP="$2"
+  local PORT_GRPC="$3"
+  local DOCKERFILE="$ROOT/$SVC/Dockerfile"
 
-base
-FROM docker.io/library/node:24-alpine@sha256:d32cdf619f63fe0471182d08996dd516c6275bb5fd31ae06e55a570bd9e1ad43
-12ms
+  [ -f "$DOCKERFILE" ] || { warn "$SVC/Dockerfile no existe — saltando"; return; }
 
-runner
-RUN addgroup --system --gid 1001 nodejs  && adduser  --system --uid 1001 nestjs cached
-0ms
+  cat > "$DOCKERFILE" << DEOF
+# Dockerfile — $SVC
+# Railway: Root Directory = /  |  Dockerfile Path = $SVC/Dockerfile
 
-runner
-WORKDIR /app cached
-0ms
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
 
-runner
-RUN apk add --no-cache dumb-init cached
-0ms
-
-deps
-COPY packages/grpc-client/package.json ./packages/grpc-client/package.json cached
-0ms
-
-deps
-COPY packages/auth-server/package.json ./packages/auth-server/package.json cached
-0ms
-
-deps
-COPY packages/proto/package.json       ./packages/proto/package.json cached
-0ms
-
-deps
-COPY pnpm-workspace.yaml package.json .npmrc ./ cached
-0ms
-
-base
-WORKDIR /app cached
-0ms
-
-base
-RUN npm install -g pnpm@10 cached
-0ms
-
-deps
-COPY chatia-backend/package.json       ./chatia-backend/package.json cached
-0ms
-
-deps
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY $SVC/package.json                 ./$SVC/package.json
 RUN pnpm install --frozen-lockfile
-1s
-Scope: all 5 workspace projects
-   ╭──────────────────────────────────────────╮
-   │                                          │
-   │   Update available! 10.34.5 → 11.22.0.   │
-   │   Changelog: https://pnpm.io/v/11.22.0   │
-   │     To update, run: pnpm add -g pnpm     │
-   │                                          │
-   ╰──────────────────────────────────────────╯
- ERR_PNPM_NO_LOCKFILE  Cannot install with "frozen-lockfile" because pnpm-lock.yaml is absent
-Note that in CI environments this setting is true by default. If you still need to run install in such cases, use "pnpm install --no-frozen-lockfile"
-Build Failed: build daemon returned an error < failed to solve: process "/bin/sh -c pnpm install --frozen-lockfile" did not complete successfully: exit code: 1 >
-scheduling build on Metal builder "builder-nnkfrl"
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY $SVC/                  ./$SVC/
+RUN pnpm --filter $SVC build
+RUN test -f $SVC/dist/main.js || \\
+    (echo "ERROR: $SVC/dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=$PORT_HTTP
+
+RUN addgroup --system --gid 1001 nodejs \\
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/$SVC/dist         ./$SVC/dist
+COPY --from=builder --chown=nestjs:nodejs /app/$SVC/prisma       ./$SVC/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/$SVC/package.json ./$SVC/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
+
+WORKDIR /app/$SVC
+USER nestjs
+EXPOSE $PORT_HTTP $PORT_GRPC
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+DEOF
+
+  ok "$SVC/Dockerfile parcheado"
+}
+
+# Parchear los 5 servicios
+patch_dockerfile "chatia-backend"          3000 5001
+patch_dockerfile "pasarelapagos-backend"   3001 5002
+patch_dockerfile "notificaciones-backend"  3002 5003
+patch_dockerfile "analytics-backend"       3003 5004
+patch_dockerfile "workers-backend"         3004 5005
+
+echo ""
+ok "════════════════════════════════════════════════════════"
+ok "  5 Dockerfiles parcheados"
+ok "════════════════════════════════════════════════════════"
+echo ""
+warn "PRÓXIMOS PASOS:"
+warn "  1. make g   → commit + push"
+warn "  2. Railway  → redeploy de cada servicio"
