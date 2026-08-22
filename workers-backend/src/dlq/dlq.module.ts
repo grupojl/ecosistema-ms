@@ -1,11 +1,20 @@
-import { Module } from "@nestjs/common";
-import { BullModule } from "@nestjs/bullmq";
-import { WORKER_QUEUES } from "../jobs/jobs.constants.js";
-import { DlqController } from "./dlq.controller.js";
-import { DlqService } from "./dlq.service.js";
+// workers-backend/src/dlq/dlq.module.ts
+import { Module }          from '@nestjs/common';
+import { BullModule }      from '@nestjs/bullmq';
+import { WORKER_QUEUES }   from '../jobs/jobs.constants.js';
+import { DlqController }   from './dlq.controller.js';
+import { DlqService }      from './dlq.service.js';
+
 @Module({
-  imports: [BullModule.registerQueue({ name: WORKER_QUEUES.FAQ_INGEST_DLQ }, { name: WORKER_QUEUES.VECTOR_INDEX_DLQ }, { name: WORKER_QUEUES.CAMPAIGN_EMAIL_DLQ }, { name: WORKER_QUEUES.ANALYTICS_EXPORT_DLQ })],
+  imports: [
+    BullModule.registerQueue(
+      { name: WORKER_QUEUES.DLQ_FAQ_INGEST },
+      { name: WORKER_QUEUES.DLQ_VECTOR_INDEX },
+      { name: WORKER_QUEUES.DLQ_CAMPAIGN_EMAIL },
+    ),
+  ],
   controllers: [DlqController],
-  providers: [DlqService],
+  providers:   [DlqService],
+  exports:     [DlqService],
 })
 export class DlqModule {}

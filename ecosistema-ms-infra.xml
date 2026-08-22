@@ -155,44 +155,6 @@ model DailyConversationSummary {
 }
 </file>
 
-<file path="analytics-backend/Dockerfile">
-# Dockerfile — analytics-backend
-# Railway: Root Directory = /  |  Dockerfile Path = analytics-backend/Dockerfile
-FROM node:24-alpine AS base
-RUN npm install -g pnpm@10
-WORKDIR /app
-FROM base AS deps
-COPY pnpm-workspace.yaml package.json .npmrc ./
-COPY packages/proto/package.json        ./packages/proto/package.json
-COPY packages/auth-server/package.json  ./packages/auth-server/package.json
-COPY packages/grpc-client/package.json  ./packages/grpc-client/package.json
-COPY analytics-backend/package.json     ./analytics-backend/package.json
-RUN pnpm install --frozen-lockfile
-FROM deps AS builder
-COPY tsconfig.base.json ./
-COPY packages/proto/        ./packages/proto/
-COPY packages/auth-server/  ./packages/auth-server/
-COPY packages/grpc-client/  ./packages/grpc-client/
-COPY analytics-backend/     ./analytics-backend/
-RUN pnpm --filter analytics-backend build
-RUN test -f analytics-backend/dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
-FROM node:24-alpine AS runner
-RUN apk add --no-cache dumb-init
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3003
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules                    ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/dist          ./analytics-backend/dist
-COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma        ./analytics-backend/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json  ./analytics-backend/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto             ./packages/proto/proto
-WORKDIR /app/analytics-backend
-USER nestjs
-EXPOSE 3003 5004
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
-</file>
-
 <file path="analytics-backend/nest-cli.json">
 {
   "$schema": "https://json.schemastore.org/nest-cli",
@@ -838,53 +800,6 @@ model KbChunk {
 }
 </file>
 
-<file path="chatia-backend/Dockerfile">
-# Dockerfile — chatia-backend
-# Railway: Root Directory = /  |  Dockerfile Path = chatia-backend/Dockerfile
-
-FROM node:24-alpine AS base
-RUN npm install -g pnpm@10
-WORKDIR /app
-
-FROM base AS deps
-COPY pnpm-workspace.yaml package.json .npmrc ./
-COPY packages/proto/package.json       ./packages/proto/package.json
-COPY packages/auth-server/package.json ./packages/auth-server/package.json
-COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
-COPY chatia-backend/package.json       ./chatia-backend/package.json
-RUN pnpm install --frozen-lockfile
-
-FROM deps AS builder
-COPY tsconfig.base.json     ./
-COPY packages/proto/        ./packages/proto/
-COPY packages/auth-server/  ./packages/auth-server/
-COPY packages/grpc-client/  ./packages/grpc-client/
-COPY chatia-backend/        ./chatia-backend/
-RUN pnpm --filter chatia-backend build
-RUN test -f chatia-backend/dist/main.js || \
-    (echo "ERROR: dist/main.js no generado" && exit 1)
-
-FROM node:24-alpine AS runner
-RUN apk add --no-cache dumb-init
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3000
-
-RUN addgroup --system --gid 1001 nodejs \
- && adduser  --system --uid 1001 nestjs
-
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules                ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/dist         ./chatia-backend/dist
-COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/prisma       ./chatia-backend/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/package.json ./chatia-backend/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto        ./packages/proto/proto
-
-WORKDIR /app/chatia-backend
-USER nestjs
-EXPOSE 3000 5001
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
-</file>
-
 <file path="chatia-backend/nest-cli.json">
 {
   "$schema": "https://json.schemastore.org/nest-cli",
@@ -1098,44 +1013,6 @@ model ContactPreference {
   @@unique([organizationId, contactId, channel])
   @@index([organizationId, contactId])
 }
-</file>
-
-<file path="notificaciones-backend/Dockerfile">
-# Dockerfile — notificaciones-backend
-# Railway: Root Directory = /  |  Dockerfile Path = notificaciones-backend/Dockerfile
-FROM node:24-alpine AS base
-RUN npm install -g pnpm@10
-WORKDIR /app
-FROM base AS deps
-COPY pnpm-workspace.yaml package.json .npmrc ./
-COPY packages/proto/package.json        ./packages/proto/package.json
-COPY packages/auth-server/package.json  ./packages/auth-server/package.json
-COPY packages/grpc-client/package.json  ./packages/grpc-client/package.json
-COPY notificaciones-backend/package.json ./notificaciones-backend/package.json
-RUN pnpm install --frozen-lockfile
-FROM deps AS builder
-COPY tsconfig.base.json ./
-COPY packages/proto/        ./packages/proto/
-COPY packages/auth-server/  ./packages/auth-server/
-COPY packages/grpc-client/  ./packages/grpc-client/
-COPY notificaciones-backend/ ./notificaciones-backend/
-RUN pnpm --filter notificaciones-backend build
-RUN test -f notificaciones-backend/dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
-FROM node:24-alpine AS runner
-RUN apk add --no-cache dumb-init
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3002
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules                        ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/dist         ./notificaciones-backend/dist
-COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/prisma       ./notificaciones-backend/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/package.json ./notificaciones-backend/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto                ./packages/proto/proto
-WORKDIR /app/notificaciones-backend
-USER nestjs
-EXPOSE 3002 5003
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
 </file>
 
 <file path="notificaciones-backend/nest-cli.json">
@@ -1637,53 +1514,6 @@ model AuditLog {
 }
 </file>
 
-<file path="pasarelapagos-backend/Dockerfile">
-# Dockerfile — pasarelapagos-backend
-# Railway: Root Directory = /  |  Dockerfile Path = pasarelapagos-backend/Dockerfile
-
-FROM node:24-alpine AS base
-RUN npm install -g pnpm@10
-WORKDIR /app
-
-FROM base AS deps
-COPY pnpm-workspace.yaml package.json .npmrc ./
-COPY packages/proto/package.json        ./packages/proto/package.json
-COPY packages/auth-server/package.json  ./packages/auth-server/package.json
-COPY packages/grpc-client/package.json  ./packages/grpc-client/package.json
-COPY pasarelapagos-backend/package.json ./pasarelapagos-backend/package.json
-RUN pnpm install --frozen-lockfile
-
-FROM deps AS builder
-COPY tsconfig.base.json         ./
-COPY packages/proto/            ./packages/proto/
-COPY packages/auth-server/      ./packages/auth-server/
-COPY packages/grpc-client/      ./packages/grpc-client/
-COPY pasarelapagos-backend/     ./pasarelapagos-backend/
-RUN pnpm --filter pasarelapagos-backend build
-RUN test -f pasarelapagos-backend/dist/main.js || \
-    (echo "ERROR: dist/main.js no generado" && exit 1)
-
-FROM node:24-alpine AS runner
-RUN apk add --no-cache dumb-init
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3001
-
-RUN addgroup --system --gid 1001 nodejs \
- && adduser  --system --uid 1001 nestjs
-
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules                       ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/dist         ./pasarelapagos-backend/dist
-COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/prisma       ./pasarelapagos-backend/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/package.json ./pasarelapagos-backend/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto               ./packages/proto/proto
-
-WORKDIR /app/pasarelapagos-backend
-USER nestjs
-EXPOSE 3001 5002
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
-</file>
-
 <file path="pasarelapagos-backend/nest-cli.json">
 {
   "$schema": "https://json.schemastore.org/nest-cli",
@@ -1915,44 +1745,6 @@ model Campaign {
   @@index([organizationId, status])
   @@index([scheduledAt])
 }
-</file>
-
-<file path="workers-backend/Dockerfile">
-# Dockerfile — workers-backend
-# Railway: Root Directory = /  |  Dockerfile Path = workers-backend/Dockerfile
-FROM node:24-alpine AS base
-RUN npm install -g pnpm@10
-WORKDIR /app
-FROM base AS deps
-COPY pnpm-workspace.yaml package.json .npmrc ./
-COPY packages/proto/package.json       ./packages/proto/package.json
-COPY packages/auth-server/package.json ./packages/auth-server/package.json
-COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
-COPY workers-backend/package.json      ./workers-backend/package.json
-RUN pnpm install --frozen-lockfile
-FROM deps AS builder
-COPY tsconfig.base.json ./
-COPY packages/proto/        ./packages/proto/
-COPY packages/auth-server/  ./packages/auth-server/
-COPY packages/grpc-client/  ./packages/grpc-client/
-COPY workers-backend/        ./workers-backend/
-RUN pnpm --filter workers-backend build
-RUN test -f workers-backend/dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
-FROM node:24-alpine AS runner
-RUN apk add --no-cache dumb-init
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=3004
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules                 ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/dist         ./workers-backend/dist
-COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/prisma       ./workers-backend/prisma
-COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./workers-backend/package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto          ./packages/proto/proto
-WORKDIR /app/workers-backend
-USER nestjs
-EXPOSE 3004 5005
-CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node --max-old-space-size=2048 dist/main"]
 </file>
 
 <file path="workers-backend/nest-cli.json">
@@ -2548,9 +2340,9 @@ catalog:
   "@nestjs/schematics": "^11.0.0"
   "@nestjs/testing": "^11.0.1"
   # ── Prisma ────────────────────────────────────────────
-  "@prisma/client": "^7.4.2"
-  "@prisma/adapter-pg": "^7.4.2"
-  prisma: "^7.4.2"
+  "@prisma/client": "^7.8.0"
+  "@prisma/adapter-pg": "^7.8.0"
+  prisma: "^7.8.0"
   # ── DB / Cache ────────────────────────────────────────
   pg: "^8.16.3"
   ioredis: "^5.6.1"
@@ -2614,6 +2406,241 @@ catalog:
     "typeRoots": []
   }
 }
+</file>
+
+<file path="analytics-backend/Dockerfile">
+# Dockerfile — analytics-backend
+# Railway: Root Directory = /  |  Dockerfile Path = analytics-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY analytics-backend/package.json                 ./analytics-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY analytics-backend/                  ./analytics-backend/
+RUN pnpm --filter analytics-backend build
+RUN test -f analytics-backend/dist/main.js || \
+    (echo "ERROR: analytics-backend/dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3003
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/dist         ./analytics-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma       ./analytics-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json ./analytics-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
+
+WORKDIR /app/analytics-backend
+USER nestjs
+EXPOSE 3003 5004
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="chatia-backend/Dockerfile">
+# Dockerfile — chatia-backend
+# Railway: Root Directory = /  |  Dockerfile Path = chatia-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY chatia-backend/package.json                 ./chatia-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY chatia-backend/                  ./chatia-backend/
+RUN pnpm --filter chatia-backend build
+RUN test -f chatia-backend/dist/main.js || \
+    (echo "ERROR: chatia-backend/dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/dist         ./chatia-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/prisma       ./chatia-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/package.json ./chatia-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
+
+WORKDIR /app/chatia-backend
+USER nestjs
+EXPOSE 3000 5001
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="notificaciones-backend/Dockerfile">
+# Dockerfile — notificaciones-backend
+# Railway: Root Directory = /  |  Dockerfile Path = notificaciones-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY notificaciones-backend/package.json                 ./notificaciones-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY notificaciones-backend/                  ./notificaciones-backend/
+RUN pnpm --filter notificaciones-backend build
+RUN test -f notificaciones-backend/dist/main.js || \
+    (echo "ERROR: notificaciones-backend/dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3002
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/dist         ./notificaciones-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/prisma       ./notificaciones-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/package.json ./notificaciones-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
+
+WORKDIR /app/notificaciones-backend
+USER nestjs
+EXPOSE 3002 5003
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="pasarelapagos-backend/Dockerfile">
+# Dockerfile — pasarelapagos-backend
+# Railway: Root Directory = /  |  Dockerfile Path = pasarelapagos-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY pasarelapagos-backend/package.json                 ./pasarelapagos-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY pasarelapagos-backend/                  ./pasarelapagos-backend/
+RUN pnpm --filter pasarelapagos-backend build
+RUN test -f pasarelapagos-backend/dist/main.js || \
+    (echo "ERROR: pasarelapagos-backend/dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3001
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/dist         ./pasarelapagos-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/prisma       ./pasarelapagos-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/package.json ./pasarelapagos-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
+
+WORKDIR /app/pasarelapagos-backend
+USER nestjs
+EXPOSE 3001 5002
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
+</file>
+
+<file path="workers-backend/Dockerfile">
+# Dockerfile — workers-backend
+# Railway: Root Directory = /  |  Dockerfile Path = workers-backend/Dockerfile
+
+FROM node:24-alpine AS base
+RUN npm install -g pnpm@10
+WORKDIR /app
+
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json .npmrc pnpm-lock.yaml ./
+COPY packages/proto/package.json       ./packages/proto/package.json
+COPY packages/auth-server/package.json ./packages/auth-server/package.json
+COPY packages/grpc-client/package.json ./packages/grpc-client/package.json
+COPY workers-backend/package.json                 ./workers-backend/package.json
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY tsconfig.base.json     ./
+COPY packages/proto/        ./packages/proto/
+COPY packages/auth-server/  ./packages/auth-server/
+COPY packages/grpc-client/  ./packages/grpc-client/
+COPY workers-backend/                  ./workers-backend/
+RUN pnpm --filter workers-backend build
+RUN test -f workers-backend/dist/main.js || \
+    (echo "ERROR: workers-backend/dist/main.js no generado" && exit 1)
+
+FROM node:24-alpine AS runner
+RUN apk add --no-cache dumb-init
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3004
+
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+
+COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
+COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/dist         ./workers-backend/dist
+COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/prisma       ./workers-backend/prisma
+COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./workers-backend/package.json
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./packages/proto/proto
+
+WORKDIR /app/workers-backend
+USER nestjs
+EXPOSE 3004 5005
+CMD ["dumb-init", "sh", "-c", "npx prisma migrate deploy && node dist/main"]
 </file>
 
 </files>

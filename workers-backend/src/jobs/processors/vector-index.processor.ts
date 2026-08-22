@@ -8,7 +8,7 @@
 
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger, Inject }        from '@nestjs/common';
-import { ClientGrpc }            from '@nestjs/microservices';
+import type { ClientGrpc } from '@nestjs/microservices';
 import type { Job }              from 'bullmq';
 import { firstValueFrom }        from 'rxjs';
 

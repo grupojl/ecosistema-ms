@@ -3,13 +3,14 @@
 // CLI (migrate/generate): lee url del datasource + .env del directorio
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "./client"
+  provider   = "prisma-client-js"
+  engineType = "client"
 }
 
 datasource db {
   provider = "postgresql"
 }
+
 
 enum JobStatus {
   PENDING

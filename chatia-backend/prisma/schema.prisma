@@ -13,13 +13,13 @@
 
 generator client {
   provider   = "prisma-client-js"
-  output     = "../node_modules/.prisma/client"
   engineType = "client"
 }
 
 datasource db {
   provider = "postgresql"
 }
+
 
 // ─────────────────────────────────────────────
 // ENUMS

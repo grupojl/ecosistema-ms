@@ -1,13 +1,10 @@
 // workers-backend/src/jobs/services/chunking.service.ts
-//
-// Extrae texto de documentos y divide en chunks con overlap.
-// Soporta: TEXT (plano), URL (fetch + content-type), BASE64 (decodifica + mime).
-// PDF y DOCX via dynamic import de pdf-parse y mammoth (sin Python).
-
 import { Injectable, Logger } from '@nestjs/common';
-import type { FaqDocumentSource } from '../dto/faq-ingest-job.dto.js';
 
-const CHUNK_SIZE    = 500;  // tokens ≈ chars / 4
+// Definido localmente — evita dep circular con faq-ingest-job.dto
+export type FaqDocumentSource = 'URL' | 'BASE64' | 'TEXT';
+
+const CHUNK_SIZE    = 500;
 const CHUNK_OVERLAP = 50;
 const CHARS_PER_TOK = 4;
 
@@ -30,7 +27,11 @@ export class ChunkingService {
     return this.chunkText(text);
   }
 
-  private async extractText(content: string, source: FaqDocumentSource, fileName?: string): Promise<string> {
+  private async extractText(
+    content:   string,
+    source:    FaqDocumentSource,
+    fileName?: string,
+  ): Promise<string> {
     switch (source) {
       case 'TEXT': return content;
       case 'URL': {
@@ -52,10 +53,15 @@ export class ChunkingService {
     }
   }
 
-  private async extractFromBuffer(buffer: Buffer, mimeType: string, fileName?: string): Promise<string> {
+  private async extractFromBuffer(
+    buffer:    Buffer,
+    mimeType:  string,
+    fileName?: string,
+  ): Promise<string> {
     if (mimeType.includes('pdf')) {
       try {
-        const pdfParse = (await import('pdf-parse')).default;
+        // @ts-expect-error — pdf-parse puede no tener tipos en todos los entornos
+        const pdfParse = (await import('pdf-parse')).default as (b: Buffer) => Promise<{ text: string }>;
         return (await pdfParse(buffer)).text;
       } catch {
         throw new Error('pdf-parse no instalado. Agregar a workers-backend/package.json');
@@ -63,7 +69,8 @@ export class ChunkingService {
     }
     if (mimeType.includes('wordprocessingml') || (fileName ?? '').endsWith('.docx')) {
       try {
-        const mammoth = await import('mammoth');
+        // @ts-expect-error — mammoth puede no tener tipos en todos los entornos
+        const mammoth = await import('mammoth') as { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> };
         return (await mammoth.extractRawText({ buffer })).value;
       } catch {
         throw new Error('mammoth no instalado. Agregar a workers-backend/package.json');

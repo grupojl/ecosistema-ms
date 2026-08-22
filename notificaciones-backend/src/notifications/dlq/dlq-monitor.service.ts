@@ -10,7 +10,7 @@ import { Injectable, Logger, Inject, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression }                      from '@nestjs/schedule';
 import { InjectQueue }                               from '@nestjs/bullmq';
 import { Queue }                                     from 'bullmq';
-import { ClientGrpc }                                from '@nestjs/microservices';
+import type { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom }                            from 'rxjs';
 import { QUEUES }                                    from '../notifications.constants.js';
 

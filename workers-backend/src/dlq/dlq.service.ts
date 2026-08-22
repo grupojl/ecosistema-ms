@@ -1,12 +1,4 @@
 // workers-backend/src/dlq/dlq.service.ts
-//
-// W-3.1: DLQ management hardening.
-// - listAll: retorna jobs fallidos por queue con razón de fallo
-// - retryJob: re-encola job con payload original
-// - discardJob: marca como descartado y archiva en JobLog
-// - getStats: tamaño de DLQ por queue + alerta si supera threshold
-// - Límite: DLQ máx 1000 jobs — alerta si supera 500
-
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                           from '@nestjs/bullmq';
 import { Queue }                                 from 'bullmq';
@@ -15,6 +7,22 @@ import { WORKER_QUEUES }                         from '../jobs/jobs.constants.js
 
 const DLQ_WARN_THRESHOLD = 500;
 const DLQ_MAX_THRESHOLD  = 1_000;
+
+interface DlqJobEntry {
+  queue:        string;
+  jobId:        string;
+  failedReason: string;
+  attempts:     number;
+  failedAt:     number;
+  data:         unknown;
+}
+
+interface QueueStats {
+  queue:    string;
+  failed:   number;
+  warning:  boolean;
+  critical: boolean;
+}
 
 @Injectable()
 export class DlqService {
@@ -27,18 +35,11 @@ export class DlqService {
     private readonly prisma: PrismaService,
   ) {}
 
-  async listAll(): Promise<{
-    queue:        string;
-    jobId:        string;
-    failedReason: string;
-    attempts:     number;
-    failedAt:     number;
-    data:         unknown;
-  }[]> {
-    const results = [];
+  async listAll(): Promise<DlqJobEntry[]> {
+    const results: DlqJobEntry[] = [];
 
     for (const [queueName, queue] of this.getQueues()) {
-      const failed = await queue.getFailed(0, 99); // máx 100 por queue
+      const failed = await queue.getFailed(0, 99);
       for (const job of failed) {
         results.push({
           queue:        queueName,
@@ -57,15 +58,14 @@ export class DlqService {
   async retryJob(queueName: string, jobId: string): Promise<{ success: boolean }> {
     const queue = this.resolveQueue(queueName);
     const job   = await queue.getJob(jobId);
-
-    if (!job) throw new NotFoundException(`Job ${jobId} no encontrado en ${queueName}.dlq`);
+    if (!job) throw new NotFoundException(`Job ${jobId} no encontrado en ${queueName}`);
 
     await job.retry('failed');
     this.logger.log(`DLQ retry: job ${jobId} en ${queueName}`);
 
     await this.prisma.jobLog.updateMany({
-      where:  { jobId },
-      data:   { status: 'PENDING', error: null },
+      where: { jobId },
+      data:  { status: 'PENDING', error: null },
     });
 
     return { success: true };
@@ -74,26 +74,21 @@ export class DlqService {
   async discardJob(queueName: string, jobId: string): Promise<{ success: boolean }> {
     const queue = this.resolveQueue(queueName);
     const job   = await queue.getJob(jobId);
-
-    if (!job) throw new NotFoundException(`Job ${jobId} no encontrado en ${queueName}.dlq`);
+    if (!job) throw new NotFoundException(`Job ${jobId} no encontrado en ${queueName}`);
 
     await job.remove();
     this.logger.log(`DLQ discard: job ${jobId} eliminado de ${queueName}`);
 
     await this.prisma.jobLog.updateMany({
       where: { jobId },
-      data:  { status: 'CANCELLED', error: `Descartado manualmente desde DLQ` },
+      data:  { status: 'CANCELLED', error: 'Descartado manualmente desde DLQ' },
     });
 
     return { success: true };
   }
 
-  async getStats(): Promise<{
-    queues:   Array<{ queue: string; failed: number; warning: boolean; critical: boolean }>;
-    totalFailed: number;
-    healthy:  boolean;
-  }> {
-    const stats = [];
+  async getStats(): Promise<{ queues: QueueStats[]; totalFailed: number; healthy: boolean }> {
+    const stats: QueueStats[] = [];
     let totalFailed = 0;
 
     for (const [queueName, queue] of this.getQueues()) {
@@ -101,10 +96,10 @@ export class DlqService {
       totalFailed  += failed;
 
       if (failed >= DLQ_WARN_THRESHOLD) {
-        this.logger.warn(`DLQ ${queueName}: ${failed} jobs fallidos (threshold: ${DLQ_WARN_THRESHOLD})`);
+        this.logger.warn(`DLQ ${queueName}: ${failed} jobs fallidos`);
       }
       if (failed >= DLQ_MAX_THRESHOLD) {
-        this.logger.error(`DLQ ${queueName}: ${failed} jobs — CRÍTICO (máx: ${DLQ_MAX_THRESHOLD})`);
+        this.logger.error(`DLQ ${queueName}: ${failed} jobs — CRÍTICO`);
       }
 
       stats.push({
@@ -115,28 +110,22 @@ export class DlqService {
       });
     }
 
-    return {
-      queues:      stats,
-      totalFailed,
-      healthy:     totalFailed < DLQ_WARN_THRESHOLD,
-    };
+    return { queues: stats, totalFailed, healthy: totalFailed < DLQ_WARN_THRESHOLD };
   }
-
-  // ── Helpers ───────────────────────────────────────────────────────────────
 
   private getQueues(): Array<[string, Queue]> {
     return [
-      [WORKER_QUEUES.FAQ_INGEST,     this.faqDlq],
-      [WORKER_QUEUES.VECTOR_INDEX,   this.vectorDlq],
-      [WORKER_QUEUES.CAMPAIGN_EMAIL, this.campaignDlq],
+      [WORKER_QUEUES.DLQ_FAQ_INGEST,     this.faqDlq],
+      [WORKER_QUEUES.DLQ_VECTOR_INDEX,   this.vectorDlq],
+      [WORKER_QUEUES.DLQ_CAMPAIGN_EMAIL, this.campaignDlq],
     ];
   }
 
   private resolveQueue(queueName: string): Queue {
     const map: Record<string, Queue> = {
-      [WORKER_QUEUES.FAQ_INGEST]:     this.faqDlq,
-      [WORKER_QUEUES.VECTOR_INDEX]:   this.vectorDlq,
-      [WORKER_QUEUES.CAMPAIGN_EMAIL]: this.campaignDlq,
+      [WORKER_QUEUES.DLQ_FAQ_INGEST]:     this.faqDlq,
+      [WORKER_QUEUES.DLQ_VECTOR_INDEX]:   this.vectorDlq,
+      [WORKER_QUEUES.DLQ_CAMPAIGN_EMAIL]: this.campaignDlq,
     };
     const queue = map[queueName];
     if (!queue) throw new NotFoundException(`Queue ${queueName} no existe en DLQ`);
