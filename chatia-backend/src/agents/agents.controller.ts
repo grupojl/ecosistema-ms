@@ -19,13 +19,13 @@ import type { TenantContext } from '../common/types/tenant-context';
 
 class RegisterAgentDto {
   @IsString()
-  firebaseUid: string;
+  firebaseUid!: string;
 
   @IsString() @MaxLength(100)
-  name: string;
+  name!: string;
 
   @IsEmail()
-  email: string;
+  email!: string;
 
   @IsString() @IsOptional()
   organizationId?: string;

@@ -6,22 +6,22 @@ export class InternalChatDto {
   @ApiProperty({ description: 'ID de la organización (multi-tenant)' })
   @IsString()
   @IsNotEmpty()
-  organizationId: string;
+  organizationId!: string;
 
   @ApiProperty({ description: 'Slug del proyecto de chat' })
   @IsString()
   @IsNotEmpty()
-  projectSlug: string;
+  projectSlug!: string;
 
   @ApiProperty({ description: 'ID del usuario final (cliente)' })
   @IsString()
   @IsNotEmpty()
-  userId: string;
+  userId!: string;
 
   @ApiProperty({ description: 'Mensaje del usuario' })
   @IsString()
   @IsNotEmpty()
-  message: string;
+  message!: string;
 
   @ApiPropertyOptional({
     description: 'Canal de origen',
@@ -37,12 +37,12 @@ export class InternalProjectDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  organizationId: string;
+  organizationId!: string;
 
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional()
   @IsOptional()

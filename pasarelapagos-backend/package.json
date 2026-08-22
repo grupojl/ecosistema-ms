@@ -58,6 +58,13 @@
     "uuid": "catalog:",
     "zod": "catalog:",
     "@ecosistema-ms/proto": "workspace:*",
+    "@types/cookie-parser": "^1.4.8",
+    "@types/compression": "^1.7.5",
+    "nanoid": "^5.1.5",
+    "opossum": "^8.1.4",
+    "cookie-parser": "^1.4.7",
+    "compression": "^1.7.5",
+    "@nestjs/terminus": "catalog:",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*"
   },

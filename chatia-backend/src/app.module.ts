@@ -2,7 +2,7 @@
 import { Module }           from '@nestjs/common';
 import { ConfigModule }     from '@nestjs/config';
 import { BullModule }       from '@nestjs/bullmq';
-import { ScheduleModule }   from '@nestjs/schedule';
+
 
 // Analytics events — ADR-003 A-1.4
 import { AnalyticsEventsModule } from './analytics-events/analytics-events.module.js';
@@ -24,7 +24,7 @@ import { AgentsModule }         from './agents/agents.module.js';
 import { ContactsModule }       from './contacts/contacts.module.js';
 import { ConversationsModule }  from './conversations/conversations.module.js';
 import { MessagesModule }       from './messages/messages.module.js';
-import { ChannelModule }        from './channels/channel.module.js';
+import { ChannelsModule }        from './channels/channel.module.js';
 import { ChannelAccountsModule } from './channel-accounts/channel-accounts.module.js';
 import { AssistantModule }      from './assistant/assistant.module.js';
 import { FaqModule }            from './faq/faq.module.js';
@@ -38,7 +38,7 @@ import { AiConfigModule }       from './ai-config/ai-config.module.js';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ScheduleModule.forRoot(),
+
     BullModule.forRootAsync({
       useFactory: () => ({
         connection: {
@@ -69,7 +69,7 @@ import { AiConfigModule }       from './ai-config/ai-config.module.js';
     ContactsModule,
     ConversationsModule,
     MessagesModule,
-    ChannelModule,
+    ChannelsModule,
     ChannelAccountsModule,
     AssistantModule,
     FaqModule,

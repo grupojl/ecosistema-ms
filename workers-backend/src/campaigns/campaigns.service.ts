@@ -1,3 +1,4 @@
+import { CampaignStatus } from '@prisma/client';
 // workers-backend/src/campaigns/campaigns.service.ts
 //
 // W-2.3: CRUD de campañas + scheduler.
@@ -75,7 +76,7 @@ export class CampaignsService {
     return this.prisma.campaign.update({
       where: { id },
       data: {
-        ...(dto.status      && { status: dto.status }),
+        ...(dto.status      && { status: dto.status as CampaignStatus | undefined }),
         ...(dto.scheduledAt && { scheduledAt: new Date(dto.scheduledAt) }),
       },
     });

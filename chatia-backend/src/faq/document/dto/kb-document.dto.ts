@@ -15,7 +15,7 @@ export enum KbSourceTypeDto {
 export class CreateKbDocumentDto {
   @ApiProperty({ example: 'Guía de instalación' })
   @IsString() @MinLength(2) @MaxLength(200)
-  title: string;
+  title!: string;
 
   @ApiPropertyOptional({ enum: KbSourceTypeDto, default: 'TEXT' })
   @IsEnum(KbSourceTypeDto) @IsOptional()

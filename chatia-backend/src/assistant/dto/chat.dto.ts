@@ -9,13 +9,13 @@ export class ChatDto {
   @IsString()
   @MinLength(1)
   @MaxLength(4000)
-  message: string;
+  message!: string;
 
   @ApiProperty({ example: 'user-abc123', description: 'ID externo del usuario final' })
   @IsString()
   @MinLength(1)
   @MaxLength(200)
-  userId: string;
+  userId!: string;
 
   @ApiPropertyOptional({
     example: 'widget',

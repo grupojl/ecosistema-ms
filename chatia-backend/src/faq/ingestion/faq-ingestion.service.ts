@@ -45,7 +45,7 @@ export class FaqIngestionService {
     const { ecosystemId, organizationId, documentId, knowledgeBaseId } = input;
 
     // Marcar documento como PENDING en DB de chatia
-    await this.prisma.kBDocument.update({
+    await this.prisma.kbDocument.update({
       where: { id: documentId },
       data:  { status: 'PROCESSING' },
     });
@@ -89,7 +89,7 @@ export class FaqIngestionService {
     chunksIndexed?: number;
     error?:         string;
   }): Promise<void> {
-    await this.prisma.kBDocument.update({
+    await this.prisma.kbDocument.update({
       where: { id: params.documentId },
       data: {
         status:    params.status,
@@ -120,12 +120,12 @@ export class FaqIngestionService {
     }>;
   }): Promise<{ chunksStored: number }> {
     // Eliminar chunks anteriores del documento (re-indexación)
-    await this.prisma.kBChunk.deleteMany({
+    await this.prisma.kbChunk.deleteMany({
       where: { documentId: params.documentId },
     });
 
     // Insertar nuevos chunks
-    await this.prisma.kBChunk.createMany({
+    await this.prisma.kbChunk.createMany({
       data: params.chunks.map(c => ({
         documentId:     params.documentId,
         knowledgeBaseId: params.knowledgeBaseId,

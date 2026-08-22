@@ -11,7 +11,7 @@ import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
 
 class ToggleAiDto {
   @IsBoolean()
-  enabled: boolean;
+  enabled!: boolean;
 }
 
 @Controller('channel-accounts/:accountId/ai-config')

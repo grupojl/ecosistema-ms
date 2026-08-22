@@ -5,11 +5,11 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class FaqQueryDto {
   @ApiProperty({ example: '¿Cómo instalo el producto?' })
   @IsString() @MinLength(3)
-  question: string;
+  question!: string;
 
   @ApiProperty({ example: 'kb-abc123' })
   @IsString()
-  kbId: string;
+  kbId!: string;
 
   @ApiPropertyOptional({ default: 5 })
   @IsInt() @IsOptional() @Min(1) @Max(20)

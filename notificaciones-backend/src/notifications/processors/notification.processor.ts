@@ -103,7 +103,7 @@ abstract class BaseNotificationProcessor extends WorkerHost {
     return this.prisma.notification.upsert({
       where:  { idempotencyKey },
       update: { status },
-      create: { idempotencyKey, ecosystemId, organizationId, contactId, channel: channel as 'WHATSAPP' | 'EMAIL' | 'PUSH', templateKey, payload, status },
+      create: { idempotencyKey, ecosystemId, organizationId, contactId, channel: channel as 'WHATSAPP' | 'EMAIL' | 'PUSH', templateKey, payload: payload as import("@prisma/client").Prisma.InputJsonValue, status },
     });
   }
 }

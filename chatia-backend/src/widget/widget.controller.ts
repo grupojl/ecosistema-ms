@@ -12,10 +12,10 @@ import { AssistantSessionService } from '../assistant/session/assistant-session.
 
 class WidgetChatDto {
   @IsString() @MinLength(1) @MaxLength(4000)
-  message: string;
+  message!: string;
 
   @IsString() @MinLength(1) @MaxLength(200)
-  userId: string;
+  userId!: string;
 }
 
 @ApiTags('Widget (público)')

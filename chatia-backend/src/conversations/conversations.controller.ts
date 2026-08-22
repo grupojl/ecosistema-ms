@@ -13,7 +13,7 @@ class TagDto {
   @IsString()
   @MinLength(1)
   @MaxLength(50)
-  tag: string;
+  tag!: string;
 }
 
 @Controller('conversations')

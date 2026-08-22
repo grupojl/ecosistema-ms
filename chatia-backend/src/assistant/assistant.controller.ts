@@ -17,7 +17,7 @@ import { UpdateAssistantConfigDto } from './config/dto/assistant-config.dto';
 
 class ToggleDto {
   @IsBoolean()
-  enabled: boolean;
+  enabled!: boolean;
 }
 
 @ApiTags('Assistant')

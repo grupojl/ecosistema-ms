@@ -5,7 +5,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 export class CreateKnowledgeBaseDto {
   @ApiProperty({ example: 'Documentación del producto' })
   @IsString() @MinLength(2) @MaxLength(100)
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional()
   @IsString() @IsOptional() @MaxLength(500)

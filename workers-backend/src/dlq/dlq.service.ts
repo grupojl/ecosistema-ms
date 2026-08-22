@@ -8,7 +8,7 @@ import { WORKER_QUEUES }                         from '../jobs/jobs.constants.js
 const DLQ_WARN_THRESHOLD = 500;
 const DLQ_MAX_THRESHOLD  = 1_000;
 
-interface DlqJobEntry {
+export interface DlqJobEntry {
   queue:        string;
   jobId:        string;
   failedReason: string;
@@ -17,7 +17,7 @@ interface DlqJobEntry {
   data:         unknown;
 }
 
-interface QueueStats {
+export interface QueueStats {
   queue:    string;
   failed:   number;
   warning:  boolean;

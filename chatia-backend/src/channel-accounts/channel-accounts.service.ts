@@ -7,16 +7,16 @@ import { randomUUID } from 'crypto';
 
 export class CreateChannelAccountDto {
   @IsEnum(ChannelType)
-  channelType: ChannelType;
+  channelType!: ChannelType;
 
   @IsString()
-  name: string;
+  name!: string;
 
   @IsString()
-  externalId: string;
+  externalId!: string;
 
   @IsString()
-  accessToken: string;
+  accessToken!: string;
 
   @IsOptional()
   extraConfig?: Record<string, unknown>;

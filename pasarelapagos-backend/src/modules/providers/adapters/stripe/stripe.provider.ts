@@ -56,7 +56,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
     }
 
     this.stripe = new Stripe(secretKey, {
-      apiVersion:        '2026-03-25.dahlia',
+      apiVersion:        '2025-08-27.basil',
       typescript:        true,
       maxNetworkRetries: 2,
       timeout:           10_000,

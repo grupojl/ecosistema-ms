@@ -6,12 +6,12 @@ export class RegisterEcosystemDto {
   @ApiProperty({ example: 'welver-firebase-project-id' })
   @IsString()
   @IsNotEmpty()
-  firebaseProjectId: string;
+  firebaseProjectId!: string;
 
   @ApiProperty({ example: 'Welver' })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  name!: string;
 
   @ApiPropertyOptional({
     example: { maxProjects: 50, features: { faq: true, channels: true } },

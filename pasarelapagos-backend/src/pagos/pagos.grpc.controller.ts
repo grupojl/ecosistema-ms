@@ -39,7 +39,7 @@ export class PagosGrpcController {
     return {
       found:       true,
       status:      payment.status,
-      amount_cents: payment.amountCents,
+      amount_cents: payment.amountMinor,
       currency:    payment.currency,
     };
   }

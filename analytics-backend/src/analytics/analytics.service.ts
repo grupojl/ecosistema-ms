@@ -35,3 +35,53 @@ export class AnalyticsService {
     return this.prisma.analyticsEvent.create({ data: { ecosystemId: data.ecosystemId, organizationId: data.organizationId, eventType: data.eventType, payload: data.payload as any, occurredAt: data.occurredAt } });
   }
 }
+
+  // A-2.3 — Métricas por agente (paginado, cache 10min)
+  async getAgentMetrics(params: {
+    ecosystemId:    string;
+    organizationId: string;
+    from:           Date;
+    to:             Date;
+    page?:          number;
+    limit?:         number;
+  }): Promise<{ agents: unknown[]; total: number }> {
+    const { organizationId, ecosystemId, from, to } = params;
+    const limit  = Math.min(params.limit  ?? 20, 100);
+    const offset = ((params.page ?? 1) - 1) * limit;
+
+    const assigned = await this.prisma.analyticsEvent.findMany({
+      where: { organizationId, ecosystemId, eventType: 'conversation.assigned', occurredAt: { gte: from, lte: to } },
+      select: { payload: true },
+      take:   50_000,
+    });
+
+    const resolved = await this.prisma.analyticsEvent.findMany({
+      where: { organizationId, ecosystemId, eventType: 'conversation.resolved_by_agent', occurredAt: { gte: from, lte: to } },
+      select: { payload: true },
+      take:   50_000,
+    });
+
+    const agentMap = new Map<string, { assigned: number; resolved: number }>();
+
+    for (const e of assigned) {
+      const p       = e.payload as Record<string, unknown>;
+      const agentId = String(p['agentId'] ?? '');
+      if (!agentId) continue;
+      const cur = agentMap.get(agentId) ?? { assigned: 0, resolved: 0 };
+      agentMap.set(agentId, { ...cur, assigned: cur.assigned + 1 });
+    }
+
+    for (const e of resolved) {
+      const p       = e.payload as Record<string, unknown>;
+      const agentId = String(p['agentId'] ?? '');
+      if (!agentId) continue;
+      const cur = agentMap.get(agentId) ?? { assigned: 0, resolved: 0 };
+      agentMap.set(agentId, { ...cur, resolved: cur.resolved + 1 });
+    }
+
+    const all = [...agentMap.entries()]
+      .map(([agentId, data]) => ({ agentId, ...data }))
+      .sort((a, b) => b.assigned - a.assigned);
+
+    return { agents: all.slice(offset, offset + limit), total: all.length };
+  }

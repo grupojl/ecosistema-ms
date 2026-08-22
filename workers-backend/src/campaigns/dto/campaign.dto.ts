@@ -1,3 +1,4 @@
+import { CampaignStatus } from '@prisma/client';
 // workers-backend/src/campaigns/dto/campaign.dto.ts
 
 import {
