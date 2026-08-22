@@ -36,7 +36,6 @@ export class AnalyticsService {
   }
 }
 
-  // A-2.3 — Métricas por agente (paginado, cache 10min)
   async getAgentMetrics(params: {
     ecosystemId:    string;
     organizationId: string;
@@ -49,22 +48,23 @@ export class AnalyticsService {
     const limit  = Math.min(params.limit  ?? 20, 100);
     const offset = ((params.page ?? 1) - 1) * limit;
 
-    const assigned = await this.prisma.analyticsEvent.findMany({
-      where: { organizationId, ecosystemId, eventType: 'conversation.assigned', occurredAt: { gte: from, lte: to } },
-      select: { payload: true },
-      take:   50_000,
-    });
-
-    const resolved = await this.prisma.analyticsEvent.findMany({
-      where: { organizationId, ecosystemId, eventType: 'conversation.resolved_by_agent', occurredAt: { gte: from, lte: to } },
-      select: { payload: true },
-      take:   50_000,
-    });
+    const [assigned, resolved] = await Promise.all([
+      this.prisma.analyticsEvent.findMany({
+        where: { organizationId, ecosystemId, eventType: 'conversation.assigned', occurredAt: { gte: from, lte: to } },
+        select: { payload: true },
+        take: 50_000,
+      }),
+      this.prisma.analyticsEvent.findMany({
+        where: { organizationId, ecosystemId, eventType: 'conversation.resolved_by_agent', occurredAt: { gte: from, lte: to } },
+        select: { payload: true },
+        take: 50_000,
+      }),
+    ]);
 
     const agentMap = new Map<string, { assigned: number; resolved: number }>();
 
     for (const e of assigned) {
-      const p       = e.payload as Record<string, unknown>;
+      const p = e.payload as Record<string, unknown>;
       const agentId = String(p['agentId'] ?? '');
       if (!agentId) continue;
       const cur = agentMap.get(agentId) ?? { assigned: 0, resolved: 0 };
@@ -72,7 +72,7 @@ export class AnalyticsService {
     }
 
     for (const e of resolved) {
-      const p       = e.payload as Record<string, unknown>;
+      const p = e.payload as Record<string, unknown>;
       const agentId = String(p['agentId'] ?? '');
       if (!agentId) continue;
       const cur = agentMap.get(agentId) ?? { assigned: 0, resolved: 0 };
@@ -85,3 +85,4 @@ export class AnalyticsService {
 
     return { agents: all.slice(offset, offset + limit), total: all.length };
   }
+}

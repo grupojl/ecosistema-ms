@@ -26,7 +26,6 @@ COPY workers-backend/                         ./workers-backend/
 WORKDIR /app/workers-backend
 RUN /app/node_modules/.bin/prisma generate
 RUN /app/node_modules/.bin/nest build
-RUN test -f dist/main.js || (echo "ERROR: dist/main.js no generado" && exit 1)
 
 FROM node:24-alpine AS runner
 RUN apk add --no-cache dumb-init

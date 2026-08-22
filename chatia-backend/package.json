@@ -62,6 +62,7 @@
     "@types/express": "catalog:",
     "@types/jest": "catalog:",
     "@types/node": "catalog:",
+    "@types/multer": "^1.4.12",
     "@types/supertest": "catalog:",
     "@types/uuid": "catalog:",
     "eslint": "catalog:",
