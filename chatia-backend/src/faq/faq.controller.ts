@@ -1,3 +1,4 @@
+import type { Multer } from "multer";
 // src/faq/faq.controller.ts
 import {
   Controller, Get, Post, Put, Delete, Param, Body,
@@ -89,7 +90,7 @@ export class FaqController {
   uploadPdf(
     @Param('kbId') kbId: string,
     @Tenant() t: TenantContext,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
   ) {
     const base64 = file.buffer.toString('base64');
     return this.docService.create(kbId, t.organizationId, {
