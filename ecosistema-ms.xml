@@ -801,17 +801,6 @@ import { GrpcModule }      from './grpc/grpc.module.js';
 export class AppModule {}
 </file>
 
-<file path="analytics-backend/src/main.ts">
-import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger } from "@nestjs/common";
-import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE } from "@ecosistema-ms/proto";
-import { AppModule } from "./app.module.js";
-import helmet from "helmet";
-async function bootstrap()
-</file>
-
 <file path="analytics-backend/package.json">
 {
   "name": "analytics-backend",
@@ -3306,17 +3295,6 @@ import { MetricsModule }        from './metrics/metrics.module.js';
 export class AppModule {}
 </file>
 
-<file path="notificaciones-backend/src/main.ts">
-import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger } from "@nestjs/common";
-import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { NOTIF_PROTO_PATH, NOTIF_PACKAGE } from "@ecosistema-ms/proto";
-import { AppModule } from "./app.module.js";
-import helmet from "helmet";
-async function bootstrap()
-</file>
-
 <file path="notificaciones-backend/package.json">
 {
   "name": "notificaciones-backend",
@@ -3447,20 +3425,6 @@ import type { TenantContext } from "../types/tenant-context";
     "firebase-admin": ">=13.0.0"
   }
 }
-</file>
-
-<file path="packages/grpc-client/src/analytics/analytics-grpc.module.ts">
-// packages/grpc-client/src/analytics/analytics-grpc.module.ts
-//
-// Módulo cliente gRPC para analytics-backend.
-// Exporta ANALYTICS_GRPC_CLIENT para inyección en otros servicios.
-⋮----
-import { Module }              from '@nestjs/common';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE } from '@ecosistema-ms/proto';
-⋮----
-export class AnalyticsGrpcModule {}
 </file>
 
 <file path="packages/grpc-client/src/chatia/chatia-grpc.module.ts">
@@ -5807,6 +5771,17 @@ import { PrismaModule }     from '../prisma/prisma.module.js';
 export class HealthModule {}
 </file>
 
+<file path="analytics-backend/src/main.ts">
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
+⋮----
+async function bootstrap()
+</file>
+
 <file path="chatia-backend/prisma/schema.prisma">
 // =============================================================================
 // prisma/schema.prisma
@@ -7246,6 +7221,31 @@ export class EmailProcessor extends BaseNotificationProcessor {
 export class PushProcessor extends BaseNotificationProcessor {
 </file>
 
+<file path="notificaciones-backend/src/main.ts">
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
+⋮----
+async function bootstrap()
+</file>
+
+<file path="packages/grpc-client/src/analytics/analytics-grpc.module.ts">
+import { join } from 'path';
+// packages/grpc-client/src/analytics/analytics-grpc.module.ts
+//
+// Módulo cliente gRPC para analytics-backend.
+// Exporta ANALYTICS_GRPC_CLIENT para inyección en otros servicios.
+⋮----
+import { Module }              from '@nestjs/common';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+⋮----
+export class AnalyticsGrpcModule
+</file>
+
 <file path="pasarelapagos-backend/src/pagos/pagos.grpc.controller.ts">
 import { Controller } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
@@ -7824,18 +7824,6 @@ private async extractFromBuffer(
 private chunkText(text: string): TextChunk[]
 </file>
 
-<file path="workers-backend/src/main.ts">
-import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger } from "@nestjs/common";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { WORKERS_PROTO_PATH, WORKERS_PACKAGE } from "@ecosistema-ms/proto";
-import { AppModule } from "./app.module.js";
-import helmet from "helmet";
-async function bootstrap()
-⋮----
-//hola
-</file>
-
 <file path="tsconfig.base.json">
 {
   "compilerOptions": {
@@ -7917,20 +7905,6 @@ async getAgentMetrics(data: AgentMetricsRequest)
 ping(data:
 </file>
 
-<file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
-// notificaciones-backend/src/notifications/dlq/dlq.module.ts
-⋮----
-import { Module }           from '@nestjs/common';
-import { BullModule }       from '@nestjs/bullmq';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
-import { QUEUES }           from '../notifications.constants.js';
-import { DlqMonitorService } from './dlq-monitor.service.js';
-⋮----
-export class DlqModule
-</file>
-
 <file path="workers-backend/src/dlq/dlq.service.ts">
 // workers-backend/src/dlq/dlq.service.ts
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -7972,33 +7946,15 @@ private getQueues(): Array<[string, Queue]>
 private resolveQueue(queueName: string): Queue
 </file>
 
-<file path="workers-backend/src/app.module.ts">
-// workers-backend/src/app.module.ts
-import { Module }         from '@nestjs/common';
-import { ConfigModule }   from '@nestjs/config';
-import { BullModule }     from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+<file path="workers-backend/src/main.ts">
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
 ⋮----
-import {
-  NOTIF_PROTO_PATH, NOTIF_PACKAGE,
-  CHATIA_PROTO_PATH, CHATIA_PACKAGE,
-  ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE,
-} from '@ecosistema-ms/proto';
-⋮----
-import { PrismaModule }    from './prisma/prisma.module.js';
-import { HealthModule }    from './health/health.module.js';
-import { MetricsModule }   from './metrics/metrics.module.js';
-import { JobsModule }      from './jobs/jobs.module.js';
-import { DlqModule }       from './dlq/dlq.module.js';
-import { GrpcModule }      from './grpc/grpc.module.js';
-import { CampaignsModule } from './campaigns/campaigns.module.js';
-⋮----
-// gRPC clients globales — disponibles en todos los processors via @Inject
-⋮----
-MetricsModule,   // global — CircuitBreakerService + WorkersMetricsService
-⋮----
-export class AppModule
+async function bootstrap()
 </file>
 
 <file path="pnpm-workspace.yaml">
@@ -8167,6 +8123,43 @@ async removeTag(conversationId: string, organizationId: string, tag: string)
 // ── Helper ────────────────────────────────────────────────────────────────
 ⋮----
 private async verifyOwnership(conversationId: string, organizationId: string)
+</file>
+
+<file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
+import { join } from 'path';
+// notificaciones-backend/src/notifications/dlq/dlq.module.ts
+⋮----
+import { Module }           from '@nestjs/common';
+import { BullModule }       from '@nestjs/bullmq';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { QUEUES }           from '../notifications.constants.js';
+import { DlqMonitorService } from './dlq-monitor.service.js';
+⋮----
+export class DlqModule
+</file>
+
+<file path="workers-backend/src/app.module.ts">
+import { join } from 'path';
+// workers-backend/src/app.module.ts
+import { Module }         from '@nestjs/common';
+import { ConfigModule }   from '@nestjs/config';
+import { BullModule }     from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+⋮----
+import { HealthModule }    from './health/health.module.js';
+import { MetricsModule }   from './metrics/metrics.module.js';
+import { JobsModule }      from './jobs/jobs.module.js';
+import { DlqModule }       from './dlq/dlq.module.js';
+import { GrpcModule }      from './grpc/grpc.module.js';
+import { CampaignsModule } from './campaigns/campaigns.module.js';
+⋮----
+// gRPC clients globales — disponibles en todos los processors via @Inject
+⋮----
+MetricsModule,   // global — CircuitBreakerService + WorkersMetricsService
+⋮----
+export class AppModule
 </file>
 
 <file path="analytics-backend/src/analytics/analytics.service.ts">

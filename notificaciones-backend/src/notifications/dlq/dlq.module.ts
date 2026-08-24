@@ -1,6 +1,5 @@
-import { join } from 'path';
 // notificaciones-backend/src/notifications/dlq/dlq.module.ts
-
+import { join }             from 'path';
 import { Module }           from '@nestjs/common';
 import { BullModule }       from '@nestjs/bullmq';
 import { ClientsModule, Transport } from '@nestjs/microservices';
