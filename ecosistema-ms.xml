@@ -468,7 +468,7 @@ import { AnalyticsService } from "../analytics.service.js";
 import { ANALYTICS_EVENTS_QUEUE } from "../analytics.constants.js";
 export interface AnalyticsEventJobData { ecosystemId: string; organizationId: string; eventType: string; payload: Record<string, unknown>; occurredAt: string; }
 ⋮----
-export class AnalyticsEventProcessor extends WorkerHost
+export class AnalyticsEventProcessor extends WorkerHost {
 ⋮----
 constructor(private readonly svc: AnalyticsService)
 async process(job: Job<AnalyticsEventJobData>)
@@ -495,7 +495,7 @@ import { Redis }                            from 'ioredis';
 const LOCK_TTL_S  = 3_600; // 1 hora — duración máxima del cron
 const ROLLING_DAYS = 2;    // recalcular los últimos 2 días
 ⋮----
-export class ProjectionsService implements OnModuleInit
+export class ProjectionsService implements OnModuleInit {
 ⋮----
 constructor(
     private readonly prisma:  PrismaService,
@@ -543,7 +543,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response }               from 'express';
 import { SseService }                           from './sse.service.js';
 ⋮----
-export class SseController implements OnModuleDestroy
+export class SseController implements OnModuleDestroy {
 ⋮----
 constructor(private readonly sse: SseService)
 ⋮----
@@ -568,7 +568,7 @@ sseStats()
 import { Module }     from '@nestjs/common';
 import { SseService } from './sse.service.js';
 ⋮----
-export class SseModule
+export class SseModule {}
 </file>
 
 <file path="analytics-backend/src/analytics/sse/sse.service.ts">
@@ -602,7 +602,7 @@ interface SseClient {
   heartbeat:      NodeJS.Timeout;
 }
 ⋮----
-export class SseService implements OnModuleDestroy
+export class SseService implements OnModuleDestroy {
 ⋮----
 private readonly clients = new Map<string, SseClient>(); // clientId → client
 ⋮----
@@ -675,9 +675,9 @@ import { IsEnum, IsString, IsDateString } from 'class-validator';
 import { AnalyticsService } from './analytics.service.js';
 import { ExportService }    from './export.service.js';
 ⋮----
-class ExportDto
+class ExportDto {
 ⋮----
-export class AnalyticsController
+export class AnalyticsController {
 ⋮----
 constructor(
 ⋮----
@@ -723,7 +723,7 @@ import { ExportService }           from './export.service.js';
 import { AnalyticsEventProcessor } from './processors/analytics-event.processor.js';
 import { ProjectionsService }      from './projections/projections.service.js';
 ⋮----
-export class AnalyticsModule
+export class AnalyticsModule {}
 </file>
 
 <file path="analytics-backend/src/analytics/export.service.ts">
@@ -746,7 +746,7 @@ export interface ExportJobData {
   reportType:     string;
 }
 ⋮----
-export class ExportService
+export class ExportService {
 ⋮----
 constructor(
 ⋮----
@@ -755,35 +755,19 @@ async enqueue(data: ExportJobData): Promise<
 async getStatus(jobId: string): Promise<
 </file>
 
-<file path="analytics-backend/src/grpc/analytics-grpc.controller.ts">
-import { Controller, Logger } from "@nestjs/common";
-import { GrpcMethod } from "@nestjs/microservices";
-import { AnalyticsService } from "../analytics/analytics.service.js";
-⋮----
-export class AnalyticsGrpcController
-⋮----
-constructor(private readonly svc: AnalyticsService)
-⋮----
-async trackEvent(data:
-⋮----
-async getOverview(data:
-⋮----
-ping(data:
-</file>
-
 <file path="analytics-backend/src/grpc/grpc.module.ts">
 import { Module } from "@nestjs/common";
 import { AnalyticsModule } from "../analytics/analytics.module.js";
 import { AnalyticsGrpcController } from "./analytics-grpc.controller.js";
 ⋮----
-export class GrpcModule
+export class GrpcModule {}
 </file>
 
 <file path="analytics-backend/src/prisma/prisma.module.ts">
 import { Global, Module } from "@nestjs/common";
 import { PrismaService } from "./prisma.service.js";
 ⋮----
-export class PrismaModule
+export class PrismaModule {}
 </file>
 
 <file path="analytics-backend/src/prisma/prisma.service.ts">
@@ -792,7 +776,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
 ⋮----
 constructor()
 ⋮----
@@ -814,7 +798,7 @@ import { HealthModule }    from './health/health.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { GrpcModule }      from './grpc/grpc.module.js';
 ⋮----
-export class AppModule
+export class AppModule {}
 </file>
 
 <file path="analytics-backend/src/main.ts">
@@ -983,7 +967,7 @@ import { Controller, Get, Query, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags }                                  from '@nestjs/swagger';
 import type { Response }                            from 'express';
 ⋮----
-export class AnalyticsController
+export class AnalyticsController {
 ⋮----
 gone(@Res() res: Response, @Query() q: Record<string, string>): void
 ⋮----
@@ -999,7 +983,7 @@ import { Module }             from '@nestjs/common';
 import { AnalyticsController } from './analytics.controller.js';
 import { AnalyticsService }    from './analytics.service.js';
 ⋮----
-export class AnalyticsModule
+export class AnalyticsModule {}
 </file>
 
 <file path="chatia-backend/src/analytics/analytics.service.ts">
@@ -1020,7 +1004,7 @@ export class AnalyticsModule
 ⋮----
 import { Injectable, Logger } from '@nestjs/common';
 ⋮----
-export class AnalyticsService
+export class AnalyticsService {
 ⋮----
 constructor()
 </file>
@@ -1031,7 +1015,7 @@ import { Module }       from '@nestjs/common';
 import { BullModule }   from '@nestjs/bullmq';
 import { ANALYTICS_QUEUE, AnalyticsEventsService } from './analytics-events.service.js';
 ⋮----
-export class AnalyticsEventsModule
+export class AnalyticsEventsModule {}
 </file>
 
 <file path="chatia-backend/src/analytics-events/analytics-events.service.ts">
@@ -1063,7 +1047,7 @@ export interface AnalyticsEventJob {
   occurredAtUnix: number;
 }
 ⋮----
-export class AnalyticsEventsService
+export class AnalyticsEventsService {
 ⋮----
 constructor(
 ⋮----
@@ -1637,7 +1621,7 @@ import { QUEUES }                  from '../queue/queue.constants';
 ⋮----
 AnalyticsEventsModule,   // ADR-003 A-1.4
 ⋮----
-export class ConversationsModule
+export class ConversationsModule {}
 </file>
 
 <file path="chatia-backend/src/core/strategies/project-context.interface.ts">
@@ -1930,7 +1914,7 @@ private async enqueueIngest(documentId: string, organizationId: string): Promise
 ⋮----
 import { Injectable, Logger } from '@nestjs/common';
 ⋮----
-export class FaqIngestionProcessor
+export class FaqIngestionProcessor {
 ⋮----
 constructor()
 </file>
@@ -2031,77 +2015,6 @@ async answer(
 // 3. Llamar a Groq con prompt aumentado
 </file>
 
-<file path="chatia-backend/src/faq/faq.controller.ts">
-// src/faq/faq.controller.ts
-import {
-  Controller, Get, Post, Put, Delete, Param, Body,
-  Query, UseGuards, HttpCode, HttpStatus,
-  UseInterceptors, UploadedFile, NotFoundException,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { PrismaService } from '../prisma/prisma.service';
-import { KnowledgeBaseService } from './knowledge-base/knowledge-base.service';
-import { KbDocumentService } from './document/kb-document.service';
-import { FaqQueryService } from './query/faq-query.service';
-import { RagService } from './rag/rag.service';
-import { CacheService } from '../common/services/cache.service';
-import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from './knowledge-base/dto/knowledge-base.dto';
-import { CreateKbDocumentDto } from './document/dto/kb-document.dto';
-import { FaqQueryDto } from './query/dto/faq-query.dto';
-⋮----
-export class FaqController {
-⋮----
-constructor(
-⋮----
-// ── Knowledge Bases ───────────────────────────────────────────────────────
-⋮----
-async createKb(@Param('slug') slug: string, @Tenant() t: TenantContext, @Body() dto: CreateKnowledgeBaseDto)
-⋮----
-async findAllKbs(@Param('slug') slug: string, @Tenant() t: TenantContext)
-⋮----
-findOneKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext)
-⋮----
-updateKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Body() dto: UpdateKnowledgeBaseDto)
-⋮----
-removeKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext)
-⋮----
-statsKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext)
-⋮----
-// ── Documentos ────────────────────────────────────────────────────────────
-⋮----
-createDoc(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Body() dto: CreateKbDocumentDto)
-⋮----
-uploadPdf(
-    @Param('kbId') kbId: string,
-    @Tenant() t: TenantContext,
-    @UploadedFile() file: Express.Multer.File,
-)
-⋮----
-findAllDocs(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Query('status') status?: string)
-⋮----
-async reindexDoc(@Param('kbId') kbId: string, @Param('docId') docId: string, @Tenant() t: TenantContext)
-⋮----
-// Invalidar cache del KB al re-indexar
-⋮----
-async removeDoc(@Param('kbId') kbId: string, @Param('docId') docId: string, @Tenant() t: TenantContext)
-⋮----
-// ── Query / RAG ───────────────────────────────────────────────────────────
-⋮----
-async query(@Tenant() t: TenantContext, @Body() dto: FaqQueryDto)
-⋮----
-// Con cache Redis (TTL 1 hora)
-⋮----
-// Solo chunks sin generar respuesta
-⋮----
-// ── Helper ────────────────────────────────────────────────────────────────
-⋮----
-private async resolveProject(slug: string, organizationId: string)
-</file>
-
 <file path="chatia-backend/src/faq/faq.module.ts">
 // chatia-backend/src/faq/faq.module.ts
 //
@@ -2130,7 +2043,7 @@ import { QUEUES }                from '../queue/queue.constants.js';
 ⋮----
 FaqIngestionProcessor, // deprecated — eliminar semana 7
 ⋮----
-export class FaqModule
+export class FaqModule {}
 </file>
 
 <file path="chatia-backend/src/firebase/firebase.module.ts">
@@ -3017,7 +2930,7 @@ import { NotificationsModule } from "../notifications/notifications.module.js";
 import { PreferencesModule } from "../preferences/preferences.module.js";
 import { NotificacionesGrpcController } from "./notificaciones-grpc.controller.js";
 ⋮----
-export class GrpcModule
+export class GrpcModule {}
 </file>
 
 <file path="notificaciones-backend/src/metrics/metrics.module.ts">
@@ -3025,7 +2938,7 @@ export class GrpcModule
 import { Global, Module } from '@nestjs/common';
 import { MetricsService }  from './metrics.service.js';
 ⋮----
-export class MetricsModule
+export class MetricsModule {}
 </file>
 
 <file path="notificaciones-backend/src/metrics/metrics.service.ts">
@@ -3040,7 +2953,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { metrics }     from '@opentelemetry/api';
 import type { Counter, Histogram, UpDownCounter } from '@opentelemetry/api';
 ⋮----
-export class MetricsService implements OnModuleInit
+export class MetricsService implements OnModuleInit {
 ⋮----
 onModuleInit(): void
 ⋮----
@@ -3057,7 +2970,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
 ⋮----
-export class EmailAdapter implements INotificationChannel, OnModuleInit
+export class EmailAdapter implements INotificationChannel, OnModuleInit {
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -3089,7 +3002,7 @@ import type { INotificationChannel, SendPayload } from '../../interfaces/notific
 ⋮----
 const FCM_BATCH_SIZE = 500; // límite de la API de FCM
 ⋮----
-export class PushAdapter implements INotificationChannel, OnModuleInit
+export class PushAdapter implements INotificationChannel, OnModuleInit {
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -3135,7 +3048,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
 ⋮----
-export class WhatsappAdapter implements INotificationChannel, OnModuleInit
+export class WhatsappAdapter implements INotificationChannel, OnModuleInit {
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -3169,7 +3082,7 @@ import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
 import { QUEUES }           from '../notifications.constants.js';
 import { DlqMonitorService } from './dlq-monitor.service.js';
 ⋮----
-export class DlqModule
+export class DlqModule {}
 </file>
 
 <file path="notificaciones-backend/src/notifications/interfaces/notification-channel.interface.ts">
@@ -3232,9 +3145,9 @@ import { IsEnum, IsString, IsOptional, IsObject } from 'class-validator';
 import { NotificationsService }    from './notifications.service.js';
 import type { EnqueueNotificationDto } from './notifications.service.js';
 ⋮----
-class EnqueueDto implements EnqueueNotificationDto
+class EnqueueDto implements EnqueueNotificationDto {
 ⋮----
-export class NotificationsController
+export class NotificationsController {
 ⋮----
 constructor(private readonly svc: NotificationsService)
 ⋮----
@@ -3274,7 +3187,7 @@ import { DlqModule }                 from './dlq/dlq.module.js';
 ⋮----
 // Processors BullMQ
 ⋮----
-export class NotificationsModule
+export class NotificationsModule {}
 </file>
 
 <file path="notificaciones-backend/src/notifications/notifications.service.ts">
@@ -3304,7 +3217,7 @@ export interface StatsQuery {
   channel?:       'WHATSAPP' | 'EMAIL' | 'PUSH';
 }
 ⋮----
-export class NotificationsService
+export class NotificationsService {
 ⋮----
 constructor(
 ⋮----
@@ -3340,7 +3253,7 @@ import { Controller, Get, Put, Param, Body } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 import { PreferencesService } from "./preferences.service.js";
 ⋮----
-export class PreferencesController
+export class PreferencesController {
 ⋮----
 constructor(private readonly svc: PreferencesService)
 ⋮----
@@ -3355,14 +3268,14 @@ import { Module } from "@nestjs/common";
 import { PreferencesController } from "./preferences.controller.js";
 import { PreferencesService } from "./preferences.service.js";
 ⋮----
-export class PreferencesModule
+export class PreferencesModule {}
 </file>
 
 <file path="notificaciones-backend/src/preferences/preferences.service.ts">
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 ⋮----
-export class PreferencesService
+export class PreferencesService {
 ⋮----
 constructor(private readonly prisma: PrismaService)
 getPreferences(organizationId: string, contactId: string)
@@ -3373,7 +3286,7 @@ upsertPreference(ecosystemId: string, organizationId: string, contactId: string,
 import { Global, Module } from "@nestjs/common";
 import { PrismaService } from "./prisma.service.js";
 ⋮----
-export class PrismaModule
+export class PrismaModule {}
 </file>
 
 <file path="notificaciones-backend/src/prisma/prisma.service.ts">
@@ -3382,7 +3295,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
 ⋮----
 constructor()
 ⋮----
@@ -3404,7 +3317,7 @@ import { PreferencesModule }    from './preferences/preferences.module.js';
 import { GrpcModule }           from './grpc/grpc.module.js';
 import { MetricsModule }        from './metrics/metrics.module.js';
 ⋮----
-export class AppModule
+export class AppModule {}
 </file>
 
 <file path="notificaciones-backend/src/main.ts">
@@ -3561,7 +3474,7 @@ import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE } from '@ecosistema-ms/proto';
 ⋮----
-export class AnalyticsGrpcModule
+export class AnalyticsGrpcModule {}
 </file>
 
 <file path="packages/grpc-client/src/chatia/chatia-grpc.module.ts">
@@ -3576,7 +3489,7 @@ import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from "@ecosistema-ms/proto";
  * URL interna Railway: CHATIA_GRPC_URL (ej: chatia-backend.railway.internal:5001)
  */
 ⋮----
-export class ChatiaGrpcModule
+export class ChatiaGrpcModule {}
 </file>
 
 <file path="packages/grpc-client/src/notificaciones/notificaciones-grpc.module.ts">
@@ -3584,7 +3497,7 @@ import { Module } from "@nestjs/common";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { NOTIF_PROTO_PATH, NOTIF_PACKAGE } from "@ecosistema-ms/proto";
 ⋮----
-export class NotificacionesGrpcModule
+export class NotificacionesGrpcModule {}
 </file>
 
 <file path="packages/grpc-client/src/pagos/pagos-grpc.module.ts">
@@ -3599,7 +3512,7 @@ import { PAGOS_PROTO_PATH, PAGOS_PACKAGE } from "@ecosistema-ms/proto";
  * URL interna Railway: PAGOS_GRPC_URL (ej: pasarelapagos-backend.railway.internal:5002)
  */
 ⋮----
-export class PagosGrpcModule
+export class PagosGrpcModule {}
 </file>
 
 <file path="packages/grpc-client/src/workers/workers-grpc.module.ts">
@@ -3607,7 +3520,7 @@ import { Module } from "@nestjs/common";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { WORKERS_PROTO_PATH, WORKERS_PACKAGE } from "@ecosistema-ms/proto";
 ⋮----
-export class WorkersGrpcModule
+export class WorkersGrpcModule {}
 </file>
 
 <file path="packages/grpc-client/src/index.ts">
@@ -4159,7 +4072,7 @@ export class SharedGuardsModule {}
 import { Controller, Get } from "@nestjs/common";
 import { ApiTags }          from "@nestjs/swagger";
 ⋮----
-export class HealthController
+export class HealthController {
 ⋮----
 check()
 </file>
@@ -4168,7 +4081,7 @@ check()
 import { Module }           from "@nestjs/common";
 import { HealthController }  from "./health.controller";
 ⋮----
-export class HealthModule
+export class HealthModule {}
 </file>
 
 <file path="pasarelapagos-backend/src/modules/audit/audit.module.ts">
@@ -5234,7 +5147,7 @@ import { Controller, Get, Post, Body, Param } from "@nestjs/common";
 import { ApiTags, ApiOperation }              from "@nestjs/swagger";
 import { PagosService }                       from "./pagos.service";
 ⋮----
-export class PagosController
+export class PagosController {
 ⋮----
 constructor(private readonly svc: PagosService)
 ⋮----
@@ -5249,14 +5162,14 @@ import { PagosService }    from "./pagos.service";
 import { PagosController } from "./pagos.controller";
 import { PagosGrpcController } from "./pagos.grpc.controller";
 ⋮----
-export class PagosModule
+export class PagosModule {}
 </file>
 
 <file path="pasarelapagos-backend/src/pagos/pagos.service.ts">
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService }      from "../prisma/prisma.service";
 ⋮----
-export class PagosService
+export class PagosService {
 ⋮----
 constructor(private readonly prisma: PrismaService)
 ⋮----
@@ -5278,14 +5191,14 @@ async getPaymentStatus(paymentId: string, organizationId: string)
 import { Global, Module } from "@nestjs/common";
 import { PrismaService }  from "./prisma.service";
 ⋮----
-export class PrismaModule
+export class PrismaModule {}
 </file>
 
 <file path="pasarelapagos-backend/src/prisma/prisma.service.ts">
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
 ⋮----
 async onModuleInit()
 ⋮----
@@ -5363,7 +5276,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { CampaignsService }    from './campaigns.service.js';
 import { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
 ⋮----
-export class CampaignsController
+export class CampaignsController {
 ⋮----
 constructor(private readonly svc: CampaignsService)
 ⋮----
@@ -5402,7 +5315,7 @@ import { WORKER_QUEUES } from '../jobs/jobs.constants.js';
 import { CampaignsController } from './campaigns.controller.js';
 import { CampaignsService }    from './campaigns.service.js';
 ⋮----
-export class CampaignsModule
+export class CampaignsModule {}
 </file>
 
 <file path="workers-backend/src/dlq/dlq.controller.ts">
@@ -5413,7 +5326,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { DlqService } from './dlq.service.js';
 ⋮----
-export class DlqController
+export class DlqController {
 ⋮----
 constructor(private readonly svc: DlqService)
 ⋮----
@@ -5430,7 +5343,7 @@ discard(@Param('queue') queue: string, @Param('jobId') jobId: string)
 import { Module } from "@nestjs/common";
 import { JobsModule } from "../jobs/jobs.module.js";
 import { WorkersGrpcController } from "./workers-grpc.controller.js";
-@Module(
+@Module({ imports: [JobsModule], controllers: [WorkersGrpcController] }) export class GrpcModule {}
 </file>
 
 <file path="workers-backend/src/grpc/workers-grpc.controller.ts">
@@ -5438,7 +5351,7 @@ import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { JobsService } from "../jobs/jobs.service.js";
 ⋮----
-export class WorkersGrpcController
+export class WorkersGrpcController {
 ⋮----
 constructor(private readonly jobs: JobsService)
 ⋮----
@@ -5511,7 +5424,7 @@ export interface FaqIngestJobData {
   chunkSize: number; chunkOverlap: number; embeddingModel: string;
 }
 ⋮----
-export class FaqIngestProcessor extends WorkerHost
+export class FaqIngestProcessor extends WorkerHost {
 ⋮----
 constructor(private readonly jobs: JobsService)
 async process(job: Job<FaqIngestJobData>): Promise<void>
@@ -5549,7 +5462,7 @@ interface BreakerConfig {
 ⋮----
 successThreshold: number; // éxitos en HALF_OPEN para cerrar
 ⋮----
-export class CircuitBreakerService
+export class CircuitBreakerService {
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -5592,7 +5505,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import { CircuitBreakerService }            from './circuit-breaker.service.js';
 ⋮----
-export class EmbeddingService implements OnModuleInit
+export class EmbeddingService implements OnModuleInit {
 ⋮----
 constructor(
 ⋮----
@@ -5628,7 +5541,7 @@ import { Controller, Get, Param } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { JobsService } from "./jobs.service.js";
 ⋮----
-export class JobsController
+export class JobsController {
 ⋮----
 constructor(private readonly svc: JobsService)
 @Get(":jobId/status") status(@Param("jobId") jobId: string)
@@ -5650,14 +5563,14 @@ import { VectorIndexProcessor }              from './processors/vector-index.pro
 import { CampaignEmailProcessor }            from './processors/campaign-email.processor.js';
 import { AnalyticsExportProcessor }          from './processors/analytics-export.processor.js';
 ⋮----
-export class JobsModule
+export class JobsModule {}
 </file>
 
 <file path="workers-backend/src/jobs/jobs.service.ts">
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 ⋮----
-export class JobsService
+export class JobsService {
 ⋮----
 constructor(private readonly prisma: PrismaService)
 async getJobStatus(jobId: string)
@@ -5671,7 +5584,7 @@ import { Global, Module } from '@nestjs/common';
 import { WorkersMetricsService } from './metrics.service.js';
 import { CircuitBreakerService } from '../jobs/services/circuit-breaker.service.js';
 ⋮----
-export class MetricsModule
+export class MetricsModule {}
 </file>
 
 <file path="workers-backend/src/metrics/metrics.service.ts">
@@ -5688,7 +5601,7 @@ import { metrics }     from '@opentelemetry/api';
 import type { Counter, Histogram, UpDownCounter, ObservableGauge } from '@opentelemetry/api';
 import { CircuitBreakerService }            from '../jobs/services/circuit-breaker.service.js';
 ⋮----
-export class WorkersMetricsService implements OnModuleInit
+export class WorkersMetricsService implements OnModuleInit {
 ⋮----
 constructor(private readonly breaker: CircuitBreakerService)
 ⋮----
@@ -5706,7 +5619,7 @@ recordDlqChange(queue: string, delta: number): void
 <file path="workers-backend/src/prisma/prisma.module.ts">
 import { Global, Module } from "@nestjs/common";
 import { PrismaService } from "./prisma.service.js";
-@Global() @Module(
+@Global() @Module({ providers: [PrismaService], exports: [PrismaService] }) export class PrismaModule {}
 </file>
 
 <file path="workers-backend/src/prisma/prisma.service.ts">
@@ -5715,7 +5628,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
 ⋮----
 constructor()
 ⋮----
@@ -5750,17 +5663,7 @@ import { CampaignsModule } from './campaigns/campaigns.module.js';
 ⋮----
 MetricsModule,   // global — CircuitBreakerService + WorkersMetricsService
 ⋮----
-export class AppModule
-</file>
-
-<file path="workers-backend/src/main.ts">
-import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger } from "@nestjs/common";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { WORKERS_PROTO_PATH, WORKERS_PACKAGE } from "@ecosistema-ms/proto";
-import { AppModule } from "./app.module.js";
-import helmet from "helmet";
-async function bootstrap()
+export class AppModule {}
 </file>
 
 <file path="workers-backend/package.json">
@@ -5876,21 +5779,6 @@ async function bootstrap()
 }
 </file>
 
-<file path="tsconfig.base.json">
-{
-  "compilerOptions": {
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "incremental": false,
-    "typeRoots": []
-  }
-}
-</file>
-
 <file path="analytics-backend/prisma/schema.prisma">
 // schema.prisma — analytics-backend
 // Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
@@ -5946,7 +5834,7 @@ import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicat
 import { PrismaService }  from '../prisma/prisma.service.js';
 import { Public }         from '@ecosistema-ms/auth-server';
 ⋮----
-export class HealthController
+export class HealthController {
 ⋮----
 constructor(
 ⋮----
@@ -5959,7 +5847,7 @@ import { TerminusModule }   from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 import { PrismaModule }     from '../prisma/prisma.module.js';
 ⋮----
-export class HealthModule
+export class HealthModule {}
 </file>
 
 <file path="chatia-backend/prisma/schema.prisma">
@@ -6502,11 +6390,11 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
 ⋮----
-class RegisterAgentDto
+class RegisterAgentDto {
 ⋮----
-class UpdateAgentDto
+class UpdateAgentDto {
 ⋮----
-export class AgentsController
+export class AgentsController {
 ⋮----
 constructor(private readonly prisma: PrismaService)
 ⋮----
@@ -6553,9 +6441,9 @@ import type { TenantContext } from '../common/types/tenant-context';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
 ⋮----
-class ToggleAiDto
+class ToggleAiDto {
 ⋮----
-export class AiConfigController
+export class AiConfigController {
 ⋮----
 constructor(private readonly aiConfigService: AiConfigService)
 ⋮----
@@ -6581,7 +6469,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class ChatDto
+export class ChatDto {
 </file>
 
 <file path="chatia-backend/src/assistant/assistant.controller.ts">
@@ -6602,9 +6490,9 @@ import { AssistantSessionService } from './session/assistant-session.service';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateAssistantConfigDto } from './config/dto/assistant-config.dto';
 ⋮----
-class ToggleDto
+class ToggleDto {
 ⋮----
-export class AssistantController
+export class AssistantController {
 ⋮----
 constructor(
 ⋮----
@@ -6649,11 +6537,11 @@ import { ChannelType, Prisma } from '@prisma/client';
 import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { randomUUID } from 'crypto';
 ⋮----
-export class CreateChannelAccountDto
+export class CreateChannelAccountDto {
 ⋮----
-export class UpdateChannelAccountDto
+export class UpdateChannelAccountDto {
 ⋮----
-export class ChannelAccountsService
+export class ChannelAccountsService {
 ⋮----
 constructor(private readonly prisma: PrismaService)
 ⋮----
@@ -6680,9 +6568,9 @@ import { TenantGuard } from '../common/guards/tenant.guard';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
 ⋮----
-class TagDto
+class TagDto {
 ⋮----
-export class ConversationsController
+export class ConversationsController {
 ⋮----
 constructor(private readonly svc: ConversationsService)
 ⋮----
@@ -6731,20 +6619,12 @@ removeTag(
 )
 </file>
 
-<file path="chatia-backend/src/conversations/conversations.service.ts">
-// chatia-backend/src/conversations/conversations.service.ts
-// NOTA: Este archivo fue restaurado. La integración con AnalyticsEventsService
-// se hace via el interceptor en conversations-analytics.interceptor.ts
-// para no interferir con la lógica existente del servicio.
-// Ver: ADR-003 A-1.4
-</file>
-
 <file path="chatia-backend/src/ecosystem/dto/register-ecosystem.dto.ts">
 // src/ecosystem/dto/register-ecosystem.dto.ts
 import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class RegisterEcosystemDto
+export class RegisterEcosystemDto {
 </file>
 
 <file path="chatia-backend/src/faq/document/dto/kb-document.dto.ts">
@@ -6762,7 +6642,7 @@ export enum KbSourceTypeDto {
   JSON     = 'JSON',
 }
 ⋮----
-export class CreateKbDocumentDto
+export class CreateKbDocumentDto {
 </file>
 
 <file path="chatia-backend/src/faq/ingestion/faq-ingestion.service.ts">
@@ -6794,7 +6674,7 @@ export interface EnqueueFaqIngestInput {
   embeddingModel?: string;
 }
 ⋮----
-export class FaqIngestionService
+export class FaqIngestionService {
 ⋮----
 constructor(
 ⋮----
@@ -6846,9 +6726,9 @@ async upsertChunks(params: {
 import { IsString, IsOptional, IsBoolean, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class CreateKnowledgeBaseDto
+export class CreateKnowledgeBaseDto {
 ⋮----
-export class UpdateKnowledgeBaseDto
+export class UpdateKnowledgeBaseDto {
 </file>
 
 <file path="chatia-backend/src/faq/query/dto/faq-query.dto.ts">
@@ -6856,7 +6736,79 @@ export class UpdateKnowledgeBaseDto
 import { IsString, IsOptional, IsInt, IsBoolean, Min, Max, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class FaqQueryDto
+export class FaqQueryDto {
+</file>
+
+<file path="chatia-backend/src/faq/faq.controller.ts">
+import type { Multer } from "multer";
+// src/faq/faq.controller.ts
+import {
+  Controller, Get, Post, Put, Delete, Param, Body,
+  Query, UseGuards, HttpCode, HttpStatus,
+  UseInterceptors, UploadedFile, NotFoundException,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
+import { TenantGuard } from '../common/guards/tenant.guard';
+import { Tenant } from '../common/decorators/tenant.decorator';
+import type { TenantContext } from '../common/types/tenant-context';
+import { PrismaService } from '../prisma/prisma.service';
+import { KnowledgeBaseService } from './knowledge-base/knowledge-base.service';
+import { KbDocumentService } from './document/kb-document.service';
+import { FaqQueryService } from './query/faq-query.service';
+import { RagService } from './rag/rag.service';
+import { CacheService } from '../common/services/cache.service';
+import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from './knowledge-base/dto/knowledge-base.dto';
+import { CreateKbDocumentDto } from './document/dto/kb-document.dto';
+import { FaqQueryDto } from './query/dto/faq-query.dto';
+⋮----
+export class FaqController {
+⋮----
+constructor(
+⋮----
+// ── Knowledge Bases ───────────────────────────────────────────────────────
+⋮----
+async createKb(@Param('slug') slug: string, @Tenant() t: TenantContext, @Body() dto: CreateKnowledgeBaseDto)
+⋮----
+async findAllKbs(@Param('slug') slug: string, @Tenant() t: TenantContext)
+⋮----
+findOneKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext)
+⋮----
+updateKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Body() dto: UpdateKnowledgeBaseDto)
+⋮----
+removeKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext)
+⋮----
+statsKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext)
+⋮----
+// ── Documentos ────────────────────────────────────────────────────────────
+⋮----
+createDoc(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Body() dto: CreateKbDocumentDto)
+⋮----
+uploadPdf(
+    @Param('kbId') kbId: string,
+    @Tenant() t: TenantContext,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+)
+⋮----
+findAllDocs(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Query('status') status?: string)
+⋮----
+async reindexDoc(@Param('kbId') kbId: string, @Param('docId') docId: string, @Tenant() t: TenantContext)
+⋮----
+// Invalidar cache del KB al re-indexar
+⋮----
+async removeDoc(@Param('kbId') kbId: string, @Param('docId') docId: string, @Tenant() t: TenantContext)
+⋮----
+// ── Query / RAG ───────────────────────────────────────────────────────────
+⋮----
+async query(@Tenant() t: TenantContext, @Body() dto: FaqQueryDto)
+⋮----
+// Con cache Redis (TTL 1 hora)
+⋮----
+// Solo chunks sin generar respuesta
+⋮----
+// ── Helper ────────────────────────────────────────────────────────────────
+⋮----
+private async resolveProject(slug: string, organizationId: string)
 </file>
 
 <file path="chatia-backend/src/internal/dto/internal-chat.dto.ts">
@@ -6864,9 +6816,9 @@ export class FaqQueryDto
 import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class InternalChatDto
+export class InternalChatDto {
 ⋮----
-export class InternalProjectDto
+export class InternalProjectDto {
 </file>
 
 <file path="chatia-backend/src/projects/dto/create-project.dto.ts">
@@ -6877,7 +6829,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class CreateProjectDto
+export class CreateProjectDto {
 </file>
 
 <file path="chatia-backend/src/widget/widget.controller.ts">
@@ -6893,9 +6845,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
 import { AssistantSessionService } from '../assistant/session/assistant-session.service';
 ⋮----
-class WidgetChatDto
+class WidgetChatDto {
 ⋮----
-export class WidgetController
+export class WidgetController {
 ⋮----
 constructor(
 ⋮----
@@ -6988,7 +6940,7 @@ AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
 ⋮----
 // Negocio
 ⋮----
-export class AppModule
+export class AppModule {}
 </file>
 
 <file path="chatia-backend/package.json">
@@ -7178,7 +7130,7 @@ interface UpdatePreferenceRequest {
   optedOut:       boolean;
 }
 ⋮----
-export class NotificacionesGrpcController
+export class NotificacionesGrpcController {
 ⋮----
 constructor(
 ⋮----
@@ -7200,7 +7152,7 @@ import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicat
 import { PrismaService }  from '../prisma/prisma.service.js';
 import { Public }         from '@ecosistema-ms/auth-server';
 ⋮----
-export class HealthController
+export class HealthController {
 ⋮----
 constructor(
 ⋮----
@@ -7213,7 +7165,7 @@ import { TerminusModule }   from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 import { PrismaModule }     from '../prisma/prisma.module.js';
 ⋮----
-export class HealthModule
+export class HealthModule {}
 </file>
 
 <file path="notificaciones-backend/src/notifications/dlq/dlq-monitor.service.ts">
@@ -7250,7 +7202,7 @@ interface ChatiaInternalClient {
 ⋮----
 notifySystem(req: ChatiaNotifyRequest):
 ⋮----
-export class DlqMonitorService implements OnModuleInit
+export class DlqMonitorService implements OnModuleInit {
 ⋮----
 constructor(
 ⋮----
@@ -7301,7 +7253,7 @@ export interface NotificationJobData {
 }
 ⋮----
 // Tres processors registrados — uno por queue — comparten la lógica de BaseProcessor
-abstract class BaseNotificationProcessor extends WorkerHost
+abstract class BaseNotificationProcessor extends WorkerHost {
 ⋮----
 async process(job: Job<NotificationJobData>): Promise<void>
 ⋮----
@@ -7328,13 +7280,13 @@ private async upsert(
     status:         'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED',
 )
 ⋮----
-export class WhatsappProcessor extends BaseNotificationProcessor
+export class WhatsappProcessor extends BaseNotificationProcessor {
 ⋮----
 constructor(
 ⋮----
-export class EmailProcessor extends BaseNotificationProcessor
+export class EmailProcessor extends BaseNotificationProcessor {
 ⋮----
-export class PushProcessor extends BaseNotificationProcessor
+export class PushProcessor extends BaseNotificationProcessor {
 </file>
 
 <file path="packages/proto/src/index.ts">
@@ -7350,7 +7302,7 @@ import { PagosService } from "./pagos.service";
 ⋮----
 // Implementa el contrato definido en packages/proto/proto/pagos.proto
 ⋮----
-export class PagosGrpcController
+export class PagosGrpcController {
 ⋮----
 constructor(private readonly svc: PagosService)
 ⋮----
@@ -7564,9 +7516,9 @@ import {
   IsDateString, IsArray, IsObject,
 } from 'class-validator';
 ⋮----
-export class CreateCampaignDto
+export class CreateCampaignDto {
 ⋮----
-export class PatchCampaignDto
+export class PatchCampaignDto {
 </file>
 
 <file path="workers-backend/src/campaigns/campaigns.service.ts">
@@ -7587,7 +7539,7 @@ import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js'
 ⋮----
 const LOCK_TTL_MS        = 55_000; // 55s — un poco menos que el cron interval
 ⋮----
-export class CampaignsService
+export class CampaignsService {
 ⋮----
 constructor(
 ⋮----
@@ -7643,7 +7595,7 @@ import { WORKER_QUEUES }   from '../jobs/jobs.constants.js';
 import { DlqController }   from './dlq.controller.js';
 import { DlqService }      from './dlq.service.js';
 ⋮----
-export class DlqModule
+export class DlqModule {}
 </file>
 
 <file path="workers-backend/src/health/health.controller.ts">
@@ -7654,7 +7606,7 @@ import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicat
 import { PrismaService }  from '../prisma/prisma.service.js';
 import { Public }         from '@ecosistema-ms/auth-server';
 ⋮----
-export class HealthController
+export class HealthController {
 ⋮----
 constructor(
 ⋮----
@@ -7667,7 +7619,7 @@ import { TerminusModule }   from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 import { PrismaModule }     from '../prisma/prisma.module.js';
 ⋮----
-export class HealthModule
+export class HealthModule {}
 </file>
 
 <file path="workers-backend/src/jobs/processors/analytics-export.processor.ts">
@@ -7712,7 +7664,7 @@ getOverview(req: object):
 getConversationsByDay(req: object):
 getAgentMetrics(req: object):
 ⋮----
-export class AnalyticsExportProcessor extends WorkerHost
+export class AnalyticsExportProcessor extends WorkerHost {
 ⋮----
 constructor(
     private readonly jobs: JobsService,
@@ -7794,7 +7746,7 @@ interface NotifGrpcClient {
 ⋮----
 getPreferences(req:
 ⋮----
-export class CampaignEmailProcessor extends WorkerHost
+export class CampaignEmailProcessor extends WorkerHost {
 ⋮----
 constructor(
     private readonly jobs: JobsService,
@@ -7856,7 +7808,7 @@ interface ChatiaGrpcClient {
 ⋮----
 upsertChunks(req: object):
 ⋮----
-export class VectorIndexProcessor extends WorkerHost
+export class VectorIndexProcessor extends WorkerHost {
 ⋮----
 constructor(
     private readonly jobs:      JobsService,
@@ -7894,7 +7846,7 @@ export interface TextChunk {
   tokenCount: number;
 }
 ⋮----
-export class ChunkingService
+export class ChunkingService {
 ⋮----
 async extractAndChunk(
     content:   string,
@@ -7921,21 +7873,97 @@ private async extractFromBuffer(
 private chunkText(text: string): TextChunk[]
 </file>
 
-<file path="analytics-backend/src/analytics/analytics.service.ts">
-import { Injectable, Logger, Inject } from "@nestjs/common";
-import { CACHE_MANAGER } from "@nestjs/cache-manager";
-import type { Cache } from "cache-manager";
-import { PrismaService } from "../prisma/prisma.service.js";
+<file path="workers-backend/src/main.ts">
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe, Logger } from "@nestjs/common";
+import { MicroserviceOptions, Transport } from "@nestjs/microservices";
+import { WORKERS_PROTO_PATH, WORKERS_PACKAGE } from "@ecosistema-ms/proto";
+import { AppModule } from "./app.module.js";
+import helmet from "helmet";
+async function bootstrap()
 ⋮----
-export class AnalyticsService
+//hola
+</file>
+
+<file path="tsconfig.base.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="analytics-backend/src/grpc/analytics-grpc.controller.ts">
+// analytics-backend/src/grpc/analytics-grpc.controller.ts
+import { Controller, Logger } from '@nestjs/common';
+import { GrpcMethod }         from '@nestjs/microservices';
+import { AnalyticsService }   from '../analytics/analytics.service.js';
 ⋮----
-constructor(private readonly prisma: PrismaService, @Inject(CACHE_MANAGER) private readonly cache: Cache)
-async getOverview(params:
+interface TrackEventRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  event_type:      string;
+  occurred_at:     number;
+  payload_json:    Buffer | string;
+}
 ⋮----
-const where = (eventType: string) => (
+interface OverviewRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  from_unix:       number;
+  to_unix:         number;
+}
 ⋮----
-async getConversationsByDay(organizationId: string, from: Date, to: Date)
-async persistEvent(data:
+interface AgentMetricsRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  from_unix:       number;
+  to_unix:         number;
+  page?:           number;
+  page_size?:      number;
+}
+⋮----
+interface ConvByDayRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  from_unix:       number;
+  to_unix:         number;
+}
+⋮----
+export class AnalyticsGrpcController {
+⋮----
+constructor(private readonly svc: AnalyticsService)
+⋮----
+async trackEvent(data: TrackEventRequest)
+⋮----
+async getOverview(data: OverviewRequest)
+⋮----
+async getConversationsByDay(data: ConvByDayRequest)
+⋮----
+async getAgentMetrics(data: AgentMetricsRequest)
+⋮----
+ping(data:
 </file>
 
 <file path="workers-backend/src/dlq/dlq.service.ts">
@@ -7962,7 +7990,7 @@ export interface QueueStats {
   critical: boolean;
 }
 ⋮----
-export class DlqService
+export class DlqService {
 ⋮----
 constructor(
 ⋮----
@@ -8070,6 +8098,121 @@ catalog:
   ts-loader: "^9.5.2"
   tsconfig-paths: "^4.2.0"
   source-map-support: "^0.5.21"
+</file>
+
+<file path="chatia-backend/src/conversations/conversations.service.ts">
+// chatia-backend/src/conversations/conversations.service.ts
+// Versión limpia — usa solo métodos y campos que existen en el schema real.
+// Ver: chatia-backend/prisma/schema.prisma para la definición de Message, Conversation, etc.
+import {
+  Injectable, NotFoundException, Logger, Optional,
+} from '@nestjs/common';
+import { InjectQueue }        from '@nestjs/bullmq';
+import { Queue }              from 'bullmq';
+import { PrismaService }      from '../prisma/prisma.service';
+import {
+  ConversationStatus, ChannelType,
+  MessageDirection, MessageType, MessageStatus,
+} from '@prisma/client';
+import type { IncomingMessage }       from '../channels/channel.interface';
+import { QUEUES, JOBS }               from '../queue/queue.constants';
+import { AnalyticsEventsService }     from '../analytics-events/analytics-events.service';
+⋮----
+export class ConversationsService {
+⋮----
+constructor(
+⋮----
+// ── Mensaje entrante desde webhook ───────────────────────────────────────
+⋮----
+async handleIncomingMessage(
+    channelAccountId: string,
+    channelType: ChannelType,
+    msg: IncomingMessage,
+): Promise<void>
+⋮----
+// Upsert contacto
+⋮----
+// Buscar o crear conversación
+⋮----
+// Persistir mensaje — Message solo tiene createdAt, NO sentAt
+⋮----
+// ── Listado y detalle ─────────────────────────────────────────────────────
+⋮----
+async list(organizationId: string, filters: {
+    status?:           ConversationStatus;
+    channelAccountId?: string;
+    tag?:              string;
+    archived?:         boolean;
+    page?:             number;
+})
+⋮----
+async findOne(conversationId: string, organizationId: string)
+⋮----
+// ── Acciones ──────────────────────────────────────────────────────────────
+⋮----
+async sendManualMessage(conversationId: string, organizationId: string, text: string)
+⋮----
+// Message NO tiene sentAt — solo createdAt (automático)
+⋮----
+// JOBS.SEND_MESSAGE existe en queue.constants, no SEND_OUTGOING_MESSAGE
+⋮----
+async takeover(conversationId: string, organizationId: string, agentId: string)
+⋮----
+async release(conversationId: string, organizationId: string)
+⋮----
+async resolve(conversationId: string, organizationId: string)
+⋮----
+async softDelete(conversationId: string, organizationId: string)
+⋮----
+async restore(conversationId: string, organizationId: string)
+⋮----
+async addTag(conversationId: string, organizationId: string, tag: string)
+⋮----
+async removeTag(conversationId: string, organizationId: string, tag: string)
+⋮----
+// ── Helper ────────────────────────────────────────────────────────────────
+⋮----
+private async verifyOwnership(conversationId: string, organizationId: string)
+</file>
+
+<file path="analytics-backend/src/analytics/analytics.service.ts">
+// analytics-backend/src/analytics/analytics.service.ts
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { CACHE_MANAGER }              from '@nestjs/cache-manager';
+import type { Cache }                 from 'cache-manager';
+import { PrismaService }              from '../prisma/prisma.service.js';
+⋮----
+export class AnalyticsService {
+⋮----
+constructor(
+⋮----
+async getOverview(params: {
+    ecosystemId:    string;
+    organizationId: string;
+    from:           Date;
+    to:             Date;
+})
+⋮----
+const where = (eventType: string) => (
+⋮----
+async getConversationsByDay(organizationId: string, from: Date, to: Date)
+⋮----
+async getAgentMetrics(params: {
+    ecosystemId:    string;
+    organizationId: string;
+    from:           Date;
+    to:             Date;
+    page?:          number;
+    limit?:         number;
+}): Promise<
+⋮----
+async persistEvent(data: {
+    ecosystemId:    string;
+    organizationId: string;
+    eventType:      string;
+    payload:        Record<string, unknown>;
+    occurredAt:     Date;
+}): Promise<
 </file>
 
 </files>

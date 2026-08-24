@@ -38,6 +38,9 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
+COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
+COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
 USER nestjs
 EXPOSE 3001 5002
 CMD ["dumb-init", "sh", "-c", "node dist/src/main"]

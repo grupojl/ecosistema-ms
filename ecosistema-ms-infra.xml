@@ -948,23 +948,6 @@ model AuditLog {
 }
 </file>
 
-<file path="workers-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext", "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true, "esModuleInterop": true,
-    "isolatedModules": true, "declaration": true, "removeComments": true,
-    "emitDecoratorMetadata": true, "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true, "target": "ES2023",
-    "sourceMap": true, "outDir": "./dist", "baseUrl": "./",
-    "incremental": true, "skipLibCheck": true, "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false, "strictBindCallApply": false, "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
 <file path=".npmrc">
 enable-pre-post-scripts=true
 shamefully-hoist=true
@@ -1390,21 +1373,6 @@ setup: install docker-up migrate-all
   },
   "devDependencies": {
     "typescript": "catalog:"
-  }
-}
-</file>
-
-<file path="tsconfig.base.json">
-{
-  "compilerOptions": {
-    "strict": true,
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "forceConsistentCasingInFileNames": true,
-    "isolatedModules": true,
-    "incremental": false,
-    "typeRoots": []
   }
 }
 </file>
@@ -2325,6 +2293,64 @@ model Campaign {
 }
 </file>
 
+<file path="workers-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="tsconfig.base.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
 <file path="pnpm-workspace.yaml">
 packages:
   - "chatia-backend"
@@ -2461,7 +2487,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json ./
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3003 5004
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 </file>
 
 <file path="chatia-backend/Dockerfile">
@@ -2507,7 +2533,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/chatia-backend/package.json ./pac
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3000 5001
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 </file>
 
 <file path="notificaciones-backend/Dockerfile">
@@ -2553,7 +2579,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/package.js
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3002 5003
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 </file>
 
 <file path="pasarelapagos-backend/Dockerfile">
@@ -2599,7 +2625,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/pasarelapagos-backend/package.jso
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3001 5002
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 </file>
 
 <file path="workers-backend/Dockerfile">
@@ -2645,7 +2671,7 @@ COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./pa
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3004 5005
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 </file>
 
 </files>
