@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# x.sh — Fix: Dockerfiles de los 3 nuevos servicios = mismo patrón que chatia
-# Chatia funciona — copiamos su mismo patrón exacto
+# x.sh — Fix: Dockerfiles idénticos a chatia y pagos (que funcionan)
+# Eliminar el COPY de packages/ al runner — causa el crash de auth-server
 # =============================================================================
 set -euo pipefail
 
@@ -12,7 +12,7 @@ ok()  { echo -e "${GREEN}[OK]${NC} $*"; }
 
 [ -f "$ROOT/pnpm-workspace.yaml" ] || { echo "Correr desde raíz de ecosistema-ms/"; exit 1; }
 
-log "Reescribiendo Dockerfiles con el patrón exacto de chatia-backend (que funciona)"
+log "Copiando Dockerfile de chatia-backend a los 3 servicios nuevos (cambiando solo puerto y nombre)"
 
 rewrite_dockerfile() {
   local SVC="$1"
@@ -60,15 +60,12 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/$SVC/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/$SVC/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
 USER nestjs
 EXPOSE $PORT_HTTP $PORT_GRPC
 CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 DEOF
 
-  ok "$SVC/Dockerfile — patrón chatia"
+  ok "$SVC/Dockerfile"
 }
 
 rewrite_dockerfile "notificaciones-backend" 3002 5003
@@ -77,7 +74,7 @@ rewrite_dockerfile "workers-backend"        3004 5005
 
 echo ""
 ok "════════════════════════════════════════════════════════"
-ok "  3 Dockerfiles actualizados — igual que chatia"
+ok "  3 Dockerfiles = patrón exacto de chatia (sin COPY packages al runner)"
 ok "════════════════════════════════════════════════════════"
 echo ""
 echo "Próximo: make g → push → Railway redeploy"
