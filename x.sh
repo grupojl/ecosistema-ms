@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# x.sh — Fix: buildear packages internos en el builder stage
-# auth-server/src/*.ts no compila en runtime — necesita dist/
+# x.sh — Fix: Dockerfiles de los 3 nuevos servicios = mismo patrón que chatia
+# Chatia funciona — copiamos su mismo patrón exacto
 # =============================================================================
 set -euo pipefail
 
@@ -12,7 +12,7 @@ ok()  { echo -e "${GREEN}[OK]${NC} $*"; }
 
 [ -f "$ROOT/pnpm-workspace.yaml" ] || { echo "Correr desde raíz de ecosistema-ms/"; exit 1; }
 
-log "Fix: buildear packages internos con tsc desde /app (donde está tsconfig.base.json)"
+log "Reescribiendo Dockerfiles con el patrón exacto de chatia-backend (que funciona)"
 
 rewrite_dockerfile() {
   local SVC="$1"
@@ -45,11 +45,6 @@ COPY tsconfig.base.json            ./tsconfig.base.json
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/                     ./packages/
 COPY $SVC/                         ./$SVC/
-# Buildear packages internos desde /app donde tsconfig.base.json está disponible
-RUN /app/node_modules/.bin/tsc -p packages/proto/tsconfig.json       --outDir packages/proto/dist
-RUN /app/node_modules/.bin/tsc -p packages/auth-server/tsconfig.json  --outDir packages/auth-server/dist
-RUN /app/node_modules/.bin/tsc -p packages/grpc-client/tsconfig.json  --outDir packages/grpc-client/dist 2>/dev/null || true
-# Buildear el servicio
 WORKDIR /app/$SVC
 RUN /app/node_modules/.bin/prisma generate
 RUN /app/node_modules/.bin/nest build
@@ -64,18 +59,16 @@ COPY --from=builder --chown=nestjs:nodejs /app/$SVC/dist         ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/$SVC/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/$SVC/package.json ./package.json
-# Packages internos — copiar el dist compilado (no el src)
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/dist       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server/dist ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client/dist ./node_modules/@ecosistema-ms/grpc-client
-# Protos para gRPC runtime — process.cwd() + '/proto/'
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
+COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
+COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
 USER nestjs
 EXPOSE $PORT_HTTP $PORT_GRPC
 CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
 DEOF
 
-  ok "$SVC/Dockerfile"
+  ok "$SVC/Dockerfile — patrón chatia"
 }
 
 rewrite_dockerfile "notificaciones-backend" 3002 5003
@@ -84,10 +77,7 @@ rewrite_dockerfile "workers-backend"        3004 5005
 
 echo ""
 ok "════════════════════════════════════════════════════════"
-ok "  Dockerfiles actualizados"
+ok "  3 Dockerfiles actualizados — igual que chatia"
 ok "════════════════════════════════════════════════════════"
-echo ""
-echo "  builder: tsc compila packages/ desde /app (donde está tsconfig.base.json)"
-echo "  runner:  copia packages/*/dist/ → node_modules/@ecosistema-ms/*"
 echo ""
 echo "Próximo: make g → push → Railway redeploy"

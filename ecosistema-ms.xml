@@ -3071,20 +3071,6 @@ export function buildIdempotencyKey(params: {
 }): string
 </file>
 
-<file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
-// notificaciones-backend/src/notifications/dlq/dlq.module.ts
-⋮----
-import { Module }           from '@nestjs/common';
-import { BullModule }       from '@nestjs/bullmq';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
-import { QUEUES }           from '../notifications.constants.js';
-import { DlqMonitorService } from './dlq-monitor.service.js';
-⋮----
-export class DlqModule {}
-</file>
-
 <file path="notificaciones-backend/src/notifications/interfaces/notification-channel.interface.ts">
 // notificaciones-backend/src/notifications/interfaces/notification-channel.interface.ts
 ⋮----
@@ -5637,35 +5623,6 @@ async onModuleInit()
 async onModuleDestroy()
 </file>
 
-<file path="workers-backend/src/app.module.ts">
-// workers-backend/src/app.module.ts
-import { Module }         from '@nestjs/common';
-import { ConfigModule }   from '@nestjs/config';
-import { BullModule }     from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-⋮----
-import {
-  NOTIF_PROTO_PATH, NOTIF_PACKAGE,
-  CHATIA_PROTO_PATH, CHATIA_PACKAGE,
-  ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE,
-} from '@ecosistema-ms/proto';
-⋮----
-import { PrismaModule }    from './prisma/prisma.module.js';
-import { HealthModule }    from './health/health.module.js';
-import { MetricsModule }   from './metrics/metrics.module.js';
-import { JobsModule }      from './jobs/jobs.module.js';
-import { DlqModule }       from './dlq/dlq.module.js';
-import { GrpcModule }      from './grpc/grpc.module.js';
-import { CampaignsModule } from './campaigns/campaigns.module.js';
-⋮----
-// gRPC clients globales — disponibles en todos los processors via @Inject
-⋮----
-MetricsModule,   // global — CircuitBreakerService + WorkersMetricsService
-⋮----
-export class AppModule {}
-</file>
-
 <file path="workers-backend/package.json">
 {
   "name": "workers-backend",
@@ -7289,12 +7246,6 @@ export class EmailProcessor extends BaseNotificationProcessor {
 export class PushProcessor extends BaseNotificationProcessor {
 </file>
 
-<file path="packages/proto/src/index.ts">
-// packages/proto/src/index.ts
-// Compatible con NodeNext/CJS — NO usa import.meta
-import { join } from 'path';
-</file>
-
 <file path="pasarelapagos-backend/src/pagos/pagos.grpc.controller.ts">
 import { Controller } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
@@ -7966,6 +7917,20 @@ async getAgentMetrics(data: AgentMetricsRequest)
 ping(data:
 </file>
 
+<file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
+// notificaciones-backend/src/notifications/dlq/dlq.module.ts
+⋮----
+import { Module }           from '@nestjs/common';
+import { BullModule }       from '@nestjs/bullmq';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
+import { QUEUES }           from '../notifications.constants.js';
+import { DlqMonitorService } from './dlq-monitor.service.js';
+⋮----
+export class DlqModule
+</file>
+
 <file path="workers-backend/src/dlq/dlq.service.ts">
 // workers-backend/src/dlq/dlq.service.ts
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -8005,6 +7970,35 @@ async getStats(): Promise<
 private getQueues(): Array<[string, Queue]>
 ⋮----
 private resolveQueue(queueName: string): Queue
+</file>
+
+<file path="workers-backend/src/app.module.ts">
+// workers-backend/src/app.module.ts
+import { Module }         from '@nestjs/common';
+import { ConfigModule }   from '@nestjs/config';
+import { BullModule }     from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+⋮----
+import {
+  NOTIF_PROTO_PATH, NOTIF_PACKAGE,
+  CHATIA_PROTO_PATH, CHATIA_PACKAGE,
+  ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE,
+} from '@ecosistema-ms/proto';
+⋮----
+import { PrismaModule }    from './prisma/prisma.module.js';
+import { HealthModule }    from './health/health.module.js';
+import { MetricsModule }   from './metrics/metrics.module.js';
+import { JobsModule }      from './jobs/jobs.module.js';
+import { DlqModule }       from './dlq/dlq.module.js';
+import { GrpcModule }      from './grpc/grpc.module.js';
+import { CampaignsModule } from './campaigns/campaigns.module.js';
+⋮----
+// gRPC clients globales — disponibles en todos los processors via @Inject
+⋮----
+MetricsModule,   // global — CircuitBreakerService + WorkersMetricsService
+⋮----
+export class AppModule
 </file>
 
 <file path="pnpm-workspace.yaml">
@@ -8213,6 +8207,17 @@ async persistEvent(data: {
     payload:        Record<string, unknown>;
     occurredAt:     Date;
 }): Promise<
+</file>
+
+<file path="packages/proto/src/index.ts">
+// packages/proto/src/index.ts
+// Usa process.cwd() — funciona en CJS, ESM, dev y prod sin cambios.
+// En Railway runner (WORKDIR=/app): protos en /app/proto/
+// En desarrollo (cwd = raíz monorepo): protos en packages/proto/proto/
+import { join } from 'path';
+⋮----
+// Detectar si los protos están en ./proto (runner) o en packages/proto/proto (dev)
+// El Dockerfile copia los protos a {WORKDIR}/proto/
 </file>
 
 </files>
