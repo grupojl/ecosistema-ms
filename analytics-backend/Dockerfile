@@ -23,11 +23,6 @@ COPY tsconfig.base.json            ./tsconfig.base.json
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/                     ./packages/
 COPY analytics-backend/                         ./analytics-backend/
-# Buildear packages internos primero para que sus dist/ estén disponibles
-RUN cd /app/packages/proto       && /app/node_modules/.bin/tsc -p tsconfig.json 2>/dev/null || true
-RUN cd /app/packages/auth-server && /app/node_modules/.bin/tsc -p tsconfig.json 2>/dev/null || true
-RUN cd /app/packages/grpc-client && /app/node_modules/.bin/tsc -p tsconfig.json 2>/dev/null || true
-# Buildear el servicio
 WORKDIR /app/analytics-backend
 RUN /app/node_modules/.bin/prisma generate
 RUN /app/node_modules/.bin/nest build
@@ -42,11 +37,11 @@ COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/dist         ./
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json ./package.json
-# Copiar packages internos buildeados (resuelve Cannot find module '@ecosistema-ms/proto')
+# Packages internos — sobreescribir los symlinks de pnpm con el código real
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
 COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
 COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
-# Protos para gRPC en runtime
+# Protos en ./proto/ — process.cwd() + '/proto/' los resuelve en runtime
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3003 5004

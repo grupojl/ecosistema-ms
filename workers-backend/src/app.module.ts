@@ -9,7 +9,7 @@ import {
   NOTIF_PROTO_PATH, NOTIF_PACKAGE,
   CHATIA_PROTO_PATH, CHATIA_PACKAGE,
   ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE,
-} from 'configproto-paths.js';
+} from '@ecosistema-ms/proto';
 
 import { PrismaModule }    from './prisma/prisma.module.js';
 import { HealthModule }    from './health/health.module.js';

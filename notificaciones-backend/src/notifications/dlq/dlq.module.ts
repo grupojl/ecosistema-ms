@@ -4,7 +4,7 @@ import { Module }           from '@nestjs/common';
 import { BullModule }       from '@nestjs/bullmq';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '....nfigproto-paths.js';
+import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
 import { QUEUES }           from '../notifications.constants.js';
 import { DlqMonitorService } from './dlq-monitor.service.js';
 
