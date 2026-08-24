@@ -1,21 +1,16 @@
 // packages/proto/src/index.ts
-// ESM — module:nodenext → usar import.meta.url, NO __dirname
-import { fileURLToPath } from 'url';
-import { dirname, join }  from 'path';
+// Sin import.meta ni __dirname — incompatibles entre ESM y CJS.
+// Los servicios resuelven el path absoluto con path.join(protoDir, PROTO_FILE).
+// Ver: cada servicio tiene PROTO_DIR configurado en su app.module o grpc.module.
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname  = dirname(__filename);
+// Nombres de los archivos .proto
+export const CHATIA_PROTO_FILE    = 'chatia.proto';
+export const NOTIF_PROTO_FILE     = 'notificaciones.proto';
+export const ANALYTICS_PROTO_FILE = 'analytics.proto';
+export const WORKERS_PROTO_FILE   = 'workers.proto';
+export const PAGOS_PROTO_FILE     = 'pagos.proto';
 
-// En runtime el proto package se copia a node_modules/@ecosistema-ms/proto/
-// Los .proto files están en ./proto/ relativo al package
-const PROTO_DIR = join(__dirname, '..', 'proto');
-
-export const CHATIA_PROTO_PATH    = join(PROTO_DIR, 'chatia.proto');
-export const NOTIF_PROTO_PATH     = join(PROTO_DIR, 'notificaciones.proto');
-export const ANALYTICS_PROTO_PATH = join(PROTO_DIR, 'analytics.proto');
-export const WORKERS_PROTO_PATH   = join(PROTO_DIR, 'workers.proto');
-export const PAGOS_PROTO_PATH     = join(PROTO_DIR, 'pagos.proto');
-
+// Nombres de packages gRPC (campo `package` en cada .proto)
 export const CHATIA_PACKAGE    = 'chatia';
 export const NOTIF_PACKAGE     = 'notificaciones';
 export const ANALYTICS_PACKAGE = 'analytics';
