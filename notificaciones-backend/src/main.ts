@@ -1,24 +1,29 @@
-import { NestFactory } from "@nestjs/core";
-import { ValidationPipe, Logger } from "@nestjs/common";
-import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
-import { MicroserviceOptions, Transport } from "@nestjs/microservices";
-import { NOTIF_PROTO_PATH, NOTIF_PACKAGE } from "@ecosistema-ms/proto";
-import { AppModule } from "./app.module.js";
-import helmet from "helmet";
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
+
 async function bootstrap() {
-  const logger = new Logger("Bootstrap");
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  app.use(helmet());
-  app.enableCors({ origin: (process.env["CORS_ORIGINS"] ?? "").split(",").filter(Boolean), methods: ["GET","POST","PUT","PATCH","DELETE","OPTIONS"] });
-  app.setGlobalPrefix("api/v1");
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
-  if (process.env["NODE_ENV"] !== "production") {
-    const cfg = new DocumentBuilder().setTitle("notificaciones-backend").setDescription("Despacho multi-canal: WhatsApp, Email, Push").setVersion("1.0").addBearerAuth().build();
-    SwaggerModule.setup("api/docs", app, SwaggerModule.createDocument(app, cfg));
-  }
-  app.connectMicroservice<MicroserviceOptions>({ transport: Transport.GRPC, options: { package: NOTIF_PACKAGE, protoPath: NOTIF_PROTO_PATH, url: `0.0.0.0:${process.env["GRPC_PORT"] ?? 5003}` } });
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'notificaciones',
+      protoPath:  join(process.cwd(), 'proto', 'notificaciones.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? 5003}`,
+    },
+  });
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  const config = new DocumentBuilder()
+    .setTitle('Notificaciones API').setVersion('1.0').addBearerAuth().build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+
   await app.startAllMicroservices();
-  await app.listen(process.env["PORT"] ?? 3002);
-  logger.log(`HTTP :${process.env["PORT"] ?? 3002} | gRPC :${process.env["GRPC_PORT"] ?? 5003}`);
+  await app.listen(process.env['PORT'] ?? 3002);
 }
-bootstrap();
+void bootstrap();

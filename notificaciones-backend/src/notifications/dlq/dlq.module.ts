@@ -1,10 +1,10 @@
+import { join } from 'path';
 // notificaciones-backend/src/notifications/dlq/dlq.module.ts
 
 import { Module }           from '@nestjs/common';
 import { BullModule }       from '@nestjs/bullmq';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
 import { QUEUES }           from '../notifications.constants.js';
 import { DlqMonitorService } from './dlq-monitor.service.js';
 
@@ -20,8 +20,8 @@ import { DlqMonitorService } from './dlq-monitor.service.js';
         useFactory: (config: ConfigService) => ({
           transport: Transport.GRPC,
           options: {
-            package:   CHATIA_PACKAGE,
-            protoPath: CHATIA_PROTO_PATH,
+            package:   'chatia',
+            protoPath: join(process.cwd(), 'proto', 'chatia.proto'),
             url: config.get<string>('CHATIA_GRPC_URL', 'localhost:5001'),
           },
         }),

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# x.sh — Fix: Dockerfiles idénticos a chatia y pagos (que funcionan)
-# Eliminar el COPY de packages/ al runner — causa el crash de auth-server
+# x.sh — Fix proto paths inline en los 3 servicios nuevos
+# Compatible con Git Bash Windows (sin subshells en while read)
 # =============================================================================
 set -euo pipefail
 
@@ -12,69 +12,169 @@ ok()  { echo -e "${GREEN}[OK]${NC} $*"; }
 
 [ -f "$ROOT/pnpm-workspace.yaml" ] || { echo "Correr desde raíz de ecosistema-ms/"; exit 1; }
 
-log "Copiando Dockerfile de chatia-backend a los 3 servicios nuevos (cambiando solo puerto y nombre)"
+# Función que elimina @ecosistema-ms/proto de un archivo y reemplaza constantes
+fix_proto_imports() {
+  local FILE="$1"
+  [ -f "$FILE" ] || return
 
-rewrite_dockerfile() {
-  local SVC="$1"
-  local PORT_HTTP="$2"
-  local PORT_GRPC="$3"
+  # Agregar import de path si no está y el archivo usa join(process.cwd()...)
+  if ! grep -q "from 'path'" "$FILE" && ! grep -q 'from "path"' "$FILE"; then
+    # Solo agregar si necesitamos path (si usa alguna constante de proto)
+    grep -q "PROTO_PATH\|_PACKAGE" "$FILE" && \
+      sed -i "1s|^|import { join } from 'path';\n|" "$FILE" || true
+  fi
 
-  cat > "$ROOT/$SVC/Dockerfile" << DEOF
-# syntax=docker/dockerfile:1.7
-# Dockerfile — $SVC
-# Railway: Root Directory = /  |  Dockerfile Path = $SVC/Dockerfile
+  # Eliminar líneas de import de @ecosistema-ms/proto
+  sed -i "s|.*from '@ecosistema-ms/proto'.*||g" "$FILE"
+  sed -i "s|.*from \"@ecosistema-ms/proto\".*||g" "$FILE"
 
-FROM node:24-alpine AS deps
-RUN corepack enable && corepack prepare pnpm@10 --activate
-WORKDIR /app
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
-COPY packages/proto/package.json       ./packages/proto/
-COPY packages/auth-server/package.json ./packages/auth-server/
-COPY packages/grpc-client/package.json ./packages/grpc-client/
-COPY $SVC/package.json                 ./$SVC/
-RUN pnpm install --frozen-lockfile --ignore-scripts
+  # Reemplazar constantes de PATH por valores inline
+  sed -i "s|NOTIF_PROTO_PATH|join(process.cwd(), 'proto', 'notificaciones.proto')|g" "$FILE"
+  sed -i "s|CHATIA_PROTO_PATH|join(process.cwd(), 'proto', 'chatia.proto')|g"        "$FILE"
+  sed -i "s|ANALYTICS_PROTO_PATH|join(process.cwd(), 'proto', 'analytics.proto')|g" "$FILE"
+  sed -i "s|WORKERS_PROTO_PATH|join(process.cwd(), 'proto', 'workers.proto')|g"      "$FILE"
+  sed -i "s|PAGOS_PROTO_PATH|join(process.cwd(), 'proto', 'pagos.proto')|g"          "$FILE"
 
-FROM node:24-alpine AS builder
-RUN corepack enable && corepack prepare pnpm@10 --activate
-WORKDIR /app
-ARG DATABASE_URL="postgresql://build:build@localhost:5432/build"
-ENV DATABASE_URL=\$DATABASE_URL
-ENV NODE_ENV=development
-COPY --from=deps /app/node_modules ./node_modules
-COPY tsconfig.base.json            ./tsconfig.base.json
-COPY package.json pnpm-workspace.yaml ./
-COPY packages/                     ./packages/
-COPY $SVC/                         ./$SVC/
-WORKDIR /app/$SVC
-RUN /app/node_modules/.bin/prisma generate
-RUN /app/node_modules/.bin/nest build
-
-FROM node:24-alpine AS runner
-RUN apk add --no-cache dumb-init
-WORKDIR /app
-ENV NODE_ENV=production
-ENV PORT=$PORT_HTTP
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
-COPY --from=builder --chown=nestjs:nodejs /app/$SVC/dist         ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
-COPY --from=builder --chown=nestjs:nodejs /app/$SVC/prisma       ./prisma
-COPY --from=builder --chown=nestjs:nodejs /app/$SVC/package.json ./package.json
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
-USER nestjs
-EXPOSE $PORT_HTTP $PORT_GRPC
-CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
-DEOF
-
-  ok "$SVC/Dockerfile"
+  # Reemplazar constantes de PACKAGE por strings literales
+  sed -i "s|NOTIF_PACKAGE|'notificaciones'|g"  "$FILE"
+  sed -i "s|CHATIA_PACKAGE|'chatia'|g"         "$FILE"
+  sed -i "s|ANALYTICS_PACKAGE|'analytics'|g"   "$FILE"
+  sed -i "s|WORKERS_PACKAGE|'workers'|g"        "$FILE"
+  sed -i "s|PAGOS_PACKAGE|'pagos'|g"            "$FILE"
 }
 
-rewrite_dockerfile "notificaciones-backend" 3002 5003
-rewrite_dockerfile "analytics-backend"      3003 5004
-rewrite_dockerfile "workers-backend"        3004 5005
+# =============================================================================
+# main.ts — reescribir los 3 (más limpio que sed)
+# =============================================================================
+log "[1/4] notificaciones-backend/src/main.ts"
+cat > "$ROOT/notificaciones-backend/src/main.ts" << 'EOF'
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'notificaciones',
+      protoPath:  join(process.cwd(), 'proto', 'notificaciones.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? 5003}`,
+    },
+  });
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  const config = new DocumentBuilder()
+    .setTitle('Notificaciones API').setVersion('1.0').addBearerAuth().build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+
+  await app.startAllMicroservices();
+  await app.listen(process.env['PORT'] ?? 3002);
+}
+void bootstrap();
+EOF
+ok "notificaciones-backend/src/main.ts"
+
+log "[2/4] analytics-backend/src/main.ts"
+cat > "$ROOT/analytics-backend/src/main.ts" << 'EOF'
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'analytics',
+      protoPath:  join(process.cwd(), 'proto', 'analytics.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? 5004}`,
+    },
+  });
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  const config = new DocumentBuilder()
+    .setTitle('Analytics API').setVersion('1.0').addBearerAuth().build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+
+  await app.startAllMicroservices();
+  await app.listen(process.env['PORT'] ?? 3003);
+}
+void bootstrap();
+EOF
+ok "analytics-backend/src/main.ts"
+
+log "[3/4] workers-backend/src/main.ts"
+cat > "$ROOT/workers-backend/src/main.ts" << 'EOF'
+import { NestFactory }        from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }     from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { join }               from 'path';
+import { AppModule }          from './app.module.js';
+
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'workers',
+      protoPath:  join(process.cwd(), 'proto', 'workers.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? 5005}`,
+    },
+  });
+
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+
+  const config = new DocumentBuilder()
+    .setTitle('Workers API').setVersion('1.0').addBearerAuth().build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, config));
+
+  await app.startAllMicroservices();
+  await app.listen(process.env['PORT'] ?? 3004);
+}
+void bootstrap();
+EOF
+ok "workers-backend/src/main.ts"
+
+# =============================================================================
+# Fix archivos que usan constantes de @ecosistema-ms/proto — lista explícita
+# Evitar find+xargs+while que falla en Git Bash Windows
+# =============================================================================
+log "[4/4] Fix proto imports en archivos restantes"
+
+# Lista explícita de archivos que sabemos que usan @ecosistema-ms/proto
+PROTO_FILES=(
+  "$ROOT/workers-backend/src/app.module.ts"
+  "$ROOT/notificaciones-backend/src/notifications/dlq/dlq.module.ts"
+  "$ROOT/notificaciones-backend/src/grpc/grpc.module.ts"
+  "$ROOT/analytics-backend/src/grpc/grpc.module.ts"
+  "$ROOT/analytics-backend/src/analytics/export.service.ts"
+  "$ROOT/packages/grpc-client/src/analytics/analytics-grpc.module.ts"
+  "$ROOT/packages/grpc-client/src/index.ts"
+)
+
+for FILE in "${PROTO_FILES[@]}"; do
+  if [ -f "$FILE" ] && grep -q "ecosistema-ms/proto" "$FILE" 2>/dev/null; then
+    fix_proto_imports "$FILE"
+    ok "  $(basename $FILE)"
+  fi
+done
 
 echo ""
 ok "════════════════════════════════════════════════════════"
-ok "  3 Dockerfiles = patrón exacto de chatia (sin COPY packages al runner)"
+ok "  Fix aplicado"
 ok "════════════════════════════════════════════════════════"
 echo ""
 echo "Próximo: make g → push → Railway redeploy"

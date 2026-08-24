@@ -1,3 +1,4 @@
+import { join } from 'path';
 // workers-backend/src/app.module.ts
 import { Module }         from '@nestjs/common';
 import { ConfigModule }   from '@nestjs/config';
@@ -6,10 +7,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 import {
-  NOTIF_PROTO_PATH, NOTIF_PACKAGE,
-  CHATIA_PROTO_PATH, CHATIA_PACKAGE,
-  ANALYTICS_PROTO_PATH, ANALYTICS_PACKAGE,
-} from '@ecosistema-ms/proto';
+  join(process.cwd(), 'proto', 'notificaciones.proto'), 'notificaciones',
+  join(process.cwd(), 'proto', 'chatia.proto'), 'chatia',
+  join(process.cwd(), 'proto', 'analytics.proto'), 'analytics',
 
 import { PrismaModule }    from './prisma/prisma.module.js';
 import { HealthModule }    from './health/health.module.js';
@@ -40,8 +40,8 @@ import { CampaignsModule } from './campaigns/campaigns.module.js';
         name:      'CHATIA_GRPC_CLIENT',
         transport: Transport.GRPC,
         options: {
-          package:   CHATIA_PACKAGE,
-          protoPath: CHATIA_PROTO_PATH,
+          package:   'chatia',
+          protoPath: join(process.cwd(), 'proto', 'chatia.proto'),
           url: process.env['CHATIA_GRPC_URL'] ?? 'localhost:5001',
         },
       },
@@ -49,8 +49,8 @@ import { CampaignsModule } from './campaigns/campaigns.module.js';
         name:      'NOTIF_GRPC_CLIENT',
         transport: Transport.GRPC,
         options: {
-          package:   NOTIF_PACKAGE,
-          protoPath: NOTIF_PROTO_PATH,
+          package:   'notificaciones',
+          protoPath: join(process.cwd(), 'proto', 'notificaciones.proto'),
           url: process.env['NOTIF_GRPC_URL'] ?? 'localhost:5003',
         },
       },
@@ -58,8 +58,8 @@ import { CampaignsModule } from './campaigns/campaigns.module.js';
         name:      'ANALYTICS_GRPC_CLIENT',
         transport: Transport.GRPC,
         options: {
-          package:   ANALYTICS_PACKAGE,
-          protoPath: ANALYTICS_PROTO_PATH,
+          package:   'analytics',
+          protoPath: join(process.cwd(), 'proto', 'analytics.proto'),
           url: process.env['ANALYTICS_GRPC_URL'] ?? 'localhost:5004',
         },
       },
