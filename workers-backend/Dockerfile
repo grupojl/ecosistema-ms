@@ -40,4 +40,4 @@ COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./pa
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3004 5005
-CMD ["dumb-init", "sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/src/main"]
+CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
