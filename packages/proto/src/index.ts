@@ -1,7 +1,13 @@
 // packages/proto/src/index.ts
-// Compatible con NodeNext/CJS — NO usa import.meta
-import { join } from 'path';
+// ESM — module:nodenext → usar import.meta.url, NO __dirname
+import { fileURLToPath } from 'url';
+import { dirname, join }  from 'path';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname  = dirname(__filename);
+
+// En runtime el proto package se copia a node_modules/@ecosistema-ms/proto/
+// Los .proto files están en ./proto/ relativo al package
 const PROTO_DIR = join(__dirname, '..', 'proto');
 
 export const CHATIA_PROTO_PATH    = join(PROTO_DIR, 'chatia.proto');
