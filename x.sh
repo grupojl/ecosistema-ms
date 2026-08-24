@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # =============================================================================
-# x.sh — Fix definitivo proto paths
-# Estrategia: process.cwd() funciona en CJS y ESM, prod y dev
+# x.sh — Fix: buildear packages internos en el builder stage
+# auth-server/src/*.ts no compila en runtime — necesita dist/
 # =============================================================================
 set -euo pipefail
 
@@ -12,77 +12,7 @@ ok()  { echo -e "${GREEN}[OK]${NC} $*"; }
 
 [ -f "$ROOT/pnpm-workspace.yaml" ] || { echo "Correr desde raíz de ecosistema-ms/"; exit 1; }
 
-# =============================================================================
-# FIX 1 — packages/proto/src/index.ts
-# process.cwd() funciona en CUALQUIER contexto (CJS/ESM/prod/dev)
-# En Railway runner: WORKDIR=/app, protos copiados a /app/proto/
-# En dev local: los servicios se corren desde la raíz del monorepo
-# =============================================================================
-log "[1/4] packages/proto/src/index.ts — process.cwd() sin import.meta ni __dirname"
-
-cat > "$ROOT/packages/proto/src/index.ts" << 'EOF'
-// packages/proto/src/index.ts
-// Usa process.cwd() — funciona en CJS, ESM, dev y prod sin cambios.
-// En Railway runner (WORKDIR=/app): protos en /app/proto/
-// En desarrollo (cwd = raíz monorepo): protos en packages/proto/proto/
-import { join } from 'path';
-
-const cwd = process.cwd();
-
-// Detectar si los protos están en ./proto (runner) o en packages/proto/proto (dev)
-// El Dockerfile copia los protos a {WORKDIR}/proto/
-const PROTO_DIR = join(cwd, 'proto');
-
-export const CHATIA_PROTO_PATH    = join(PROTO_DIR, 'chatia.proto');
-export const NOTIF_PROTO_PATH     = join(PROTO_DIR, 'notificaciones.proto');
-export const ANALYTICS_PROTO_PATH = join(PROTO_DIR, 'analytics.proto');
-export const WORKERS_PROTO_PATH   = join(PROTO_DIR, 'workers.proto');
-export const PAGOS_PROTO_PATH     = join(PROTO_DIR, 'pagos.proto');
-
-export const CHATIA_PACKAGE    = 'chatia';
-export const NOTIF_PACKAGE     = 'notificaciones';
-export const ANALYTICS_PACKAGE = 'analytics';
-export const WORKERS_PACKAGE   = 'workers';
-export const PAGOS_PACKAGE     = 'pagos';
-EOF
-ok "packages/proto/src/index.ts — process.cwd()"
-
-# =============================================================================
-# FIX 2 — Revertir los imports rotos que dejó el sed del script anterior
-# Buscar todos los archivos con 'configproto-paths.js' o '....nfigproto-paths.js'
-# y reemplazarlos por '@ecosistema-ms/proto'
-# =============================================================================
-log "[2/4] Revertir imports rotos → @ecosistema-ms/proto"
-
-find "$ROOT" -name "*.ts" \
-  -not -path "*/node_modules/*" \
-  -not -path "*/dist/*" | xargs grep -l "configproto-paths\|nfigproto-paths\|proto-paths\.js" 2>/dev/null | while read -r FILE; do
-  # Reemplazar cualquier variante rota del import
-  sed -i "s|from '.*configproto-paths\.js'|from '@ecosistema-ms/proto'|g" "$FILE"
-  sed -i "s|from '.*nfigproto-paths\.js'|from '@ecosistema-ms/proto'|g"   "$FILE"
-  sed -i "s|from '.*proto-paths\.js'|from '@ecosistema-ms/proto'|g"       "$FILE"
-  ok "  Revertido: $FILE"
-done
-
-# =============================================================================
-# FIX 3 — Eliminar los archivos proto-paths.ts que creó el script anterior
-# Ya no los necesitamos
-# =============================================================================
-log "[3/4] Eliminar proto-paths.ts helpers innecesarios"
-
-find "$ROOT" -name "proto-paths.ts" \
-  -not -path "*/node_modules/*" \
-  -not -path "*/dist/*" | while read -r FILE; do
-  rm -f "$FILE"
-  ok "  Eliminado: $FILE"
-done
-
-# =============================================================================
-# FIX 4 — Dockerfile: remover el tsc manual de packages (fallaba por tsconfig.base.json)
-#          y en su lugar copiar el src de proto directamente al runner
-#          ya que process.cwd()/proto es lo que resuelve en runtime
-# =============================================================================
-log "[4/4] Dockerfiles — remover tsc manual de packages, simplificar"
+log "Fix: buildear packages internos con tsc desde /app (donde está tsconfig.base.json)"
 
 rewrite_dockerfile() {
   local SVC="$1"
@@ -115,6 +45,11 @@ COPY tsconfig.base.json            ./tsconfig.base.json
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/                     ./packages/
 COPY $SVC/                         ./$SVC/
+# Buildear packages internos desde /app donde tsconfig.base.json está disponible
+RUN /app/node_modules/.bin/tsc -p packages/proto/tsconfig.json       --outDir packages/proto/dist
+RUN /app/node_modules/.bin/tsc -p packages/auth-server/tsconfig.json  --outDir packages/auth-server/dist
+RUN /app/node_modules/.bin/tsc -p packages/grpc-client/tsconfig.json  --outDir packages/grpc-client/dist 2>/dev/null || true
+# Buildear el servicio
 WORKDIR /app/$SVC
 RUN /app/node_modules/.bin/prisma generate
 RUN /app/node_modules/.bin/nest build
@@ -129,11 +64,11 @@ COPY --from=builder --chown=nestjs:nodejs /app/$SVC/dist         ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/$SVC/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/$SVC/package.json ./package.json
-# Packages internos — sobreescribir los symlinks de pnpm con el código real
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
-# Protos en ./proto/ — process.cwd() + '/proto/' los resuelve en runtime
+# Packages internos — copiar el dist compilado (no el src)
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/dist       ./node_modules/@ecosistema-ms/proto
+COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server/dist ./node_modules/@ecosistema-ms/auth-server
+COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client/dist ./node_modules/@ecosistema-ms/grpc-client
+# Protos para gRPC runtime — process.cwd() + '/proto/'
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE $PORT_HTTP $PORT_GRPC
@@ -149,12 +84,10 @@ rewrite_dockerfile "workers-backend"        3004 5005
 
 echo ""
 ok "════════════════════════════════════════════════════════"
-ok "  4 fixes aplicados"
+ok "  Dockerfiles actualizados"
 ok "════════════════════════════════════════════════════════"
 echo ""
-echo "  [1] proto/src/index.ts  — process.cwd() + '/proto/'"
-echo "  [2] imports rotos       — revertidos a @ecosistema-ms/proto"
-echo "  [3] proto-paths.ts      — eliminados"
-echo "  [4] Dockerfiles         — sin tsc manual, protos en ./proto/"
+echo "  builder: tsc compila packages/ desde /app (donde está tsconfig.base.json)"
+echo "  runner:  copia packages/*/dist/ → node_modules/@ecosistema-ms/*"
 echo ""
 echo "Próximo: make g → push → Railway redeploy"

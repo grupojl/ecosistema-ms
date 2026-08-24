@@ -23,6 +23,11 @@ COPY tsconfig.base.json            ./tsconfig.base.json
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/                     ./packages/
 COPY workers-backend/                         ./workers-backend/
+# Buildear packages internos desde /app donde tsconfig.base.json está disponible
+RUN /app/node_modules/.bin/tsc -p packages/proto/tsconfig.json       --outDir packages/proto/dist
+RUN /app/node_modules/.bin/tsc -p packages/auth-server/tsconfig.json  --outDir packages/auth-server/dist
+RUN /app/node_modules/.bin/tsc -p packages/grpc-client/tsconfig.json  --outDir packages/grpc-client/dist 2>/dev/null || true
+# Buildear el servicio
 WORKDIR /app/workers-backend
 RUN /app/node_modules/.bin/prisma generate
 RUN /app/node_modules/.bin/nest build
@@ -37,11 +42,11 @@ COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/dist         ./di
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./package.json
-# Packages internos — sobreescribir los symlinks de pnpm con el código real
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
-# Protos en ./proto/ — process.cwd() + '/proto/' los resuelve en runtime
+# Packages internos — copiar el dist compilado (no el src)
+COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/dist       ./node_modules/@ecosistema-ms/proto
+COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server/dist ./node_modules/@ecosistema-ms/auth-server
+COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client/dist ./node_modules/@ecosistema-ms/grpc-client
+# Protos para gRPC runtime — process.cwd() + '/proto/'
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
 USER nestjs
 EXPOSE 3004 5005
