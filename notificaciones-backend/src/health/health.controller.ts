@@ -1,10 +1,14 @@
+import { SetMetadata } from '@nestjs/common';
+const Public = () => SetMetadata('isPublic', true);
+import { SetMetadata } from '@nestjs/common';
+const Public = () => SetMetadata('isPublic', true);
 // notificaciones-backend/src/health/health.controller.ts
 // @nestjs/terminus v11 — sin PrismaHealthIndicator
 import { Controller, Get }                          from '@nestjs/common';
 import { ApiTags }                                  from '@nestjs/swagger';
 import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
 import { PrismaService }  from '../prisma/prisma.service.js';
-import { Public }         from '@ecosistema-ms/auth-server';
+
 
 @ApiTags('health')
 @Controller('api/v1/health')
