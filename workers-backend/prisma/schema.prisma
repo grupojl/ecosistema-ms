@@ -11,7 +11,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum JobStatus {
   PENDING
   PROCESSING
@@ -27,6 +26,13 @@ enum CampaignStatus {
   PAUSED
   COMPLETED
   FAILED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 /// Trazabilidad de todos los jobs async del ecosistema
@@ -68,6 +74,29 @@ model Campaign {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  recipients CampaignRecipient[]
+
   @@index([organizationId, status])
   @@index([scheduledAt])
+  @@index([ecosystemId, organizationId])
+}
+
+/// Destinatarios de cada campana — fuente de verdad para el dispatcher
+/// ADR-003: recipientIds ahora viene de esta tabla, no de []
+model CampaignRecipient {
+  id          String          @id @default(cuid())
+  campaignId  String
+  contactId   String
+  email       String?         // cache del email al momento de enqueue (PII — cifrar en S3)
+  status      RecipientStatus @default(PENDING)
+  sentAt      DateTime?
+  failureMsg  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@index([contactId])
 }

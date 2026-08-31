@@ -82,6 +82,8 @@ chatia-backend/
     schema.prisma
   src/
     agents/
+      dto/
+        register-agent.dto.ts
       agents.controller.ts
       agents.module.ts
     ai-config/
@@ -127,16 +129,22 @@ chatia-backend/
         dashboard-user.interface.ts
       services/
         cache.service.ts
+        circuit-breaker.service.ts
         embedding.service.ts
       common.module.ts
     contacts/
       dto/
         create-contact.dto.ts
+        list-contacts.dto.ts
         update-contact.dto.ts
+      types/
+        contact.types.ts
       contacts.controller.ts
       contacts.module.ts
       contacts.service.ts
     conversations/
+      types/
+        conversation.types.ts
       conversations.controller.ts
       conversations.module.ts
       conversations.service.ts
@@ -177,6 +185,7 @@ chatia-backend/
       firebase.module.ts
       firebase.service.ts
     groq/
+      groq-cb.service.ts
       groq.module.ts
       groq.service.ts
     health/
@@ -228,6 +237,10 @@ chatia-backend/
       projects.module.ts
       projects.service.ts
     queue/
+      dlq/
+        dlq.controller.ts
+        dlq.module.ts
+        dlq.service.ts
       processors/
         incoming-message.processor.ts
         outgoing-message.processor.ts
@@ -270,12 +283,14 @@ notificaciones-backend/
       dedup/
         idempotency.helper.ts
       dlq/
+        chatia-internal.interface.ts
         dlq-monitor.service.ts
         dlq.module.ts
       interfaces/
         notification-channel.interface.ts
       processors/
         notification.processor.ts
+      circuit-breaker.service.ts
       notifications.constants.ts
       notifications.controller.ts
       notifications.module.ts
@@ -355,6 +370,8 @@ pasarelapagos-backend/
         dto/
           create-payment.dto.ts
           list-payments.dto.ts
+        types/
+          payment.types.ts
         payments.controller.ts
         payments.module.ts
         payments.service.ts
@@ -459,6 +476,362 @@ tsconfig.base.json
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="chatia-backend/src/agents/dto/register-agent.dto.ts">
+// chatia-backend/src/agents/dto/register-agent.dto.ts
+// Extraido de agents.controller.ts donde estaba definido inline
+import { IsString, IsOptional, IsEmail, IsBoolean, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class RegisterAgentDto
+⋮----
+export class UpdateAgentDto
+</file>
+
+<file path="chatia-backend/src/common/services/circuit-breaker.service.ts">
+// chatia-backend/src/common/services/circuit-breaker.service.ts
+// Mismo patron que pasarelapagos y notificaciones-backend. ADR-005.
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import CircuitBreaker from 'opossum';
+⋮----
+export interface CircuitBreakerOptions {
+  timeout?:         number;
+  errorThreshold?:  number;
+  resetTimeout?:    number;
+  volumeThreshold?: number;
+}
+⋮----
+export class CircuitOpenError extends Error
+⋮----
+constructor(key: string)
+⋮----
+export class CircuitBreakerService implements OnModuleDestroy
+⋮----
+/**
+   * Parametros recomendados por integración:
+   *   groq-llm:        timeout:15000, errorThreshold:30, resetTimeout:120000
+   *   whatsapp-send:   timeout:10000, errorThreshold:40, resetTimeout:60000
+   *   instagram-send:  timeout:10000, errorThreshold:40, resetTimeout:60000
+   */
+async execute<T>(
+    key: string,
+    fn: () => Promise<T>,
+    options: CircuitBreakerOptions = {},
+): Promise<T>
+⋮----
+healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown'
+⋮----
+onModuleDestroy()
+⋮----
+private getOrCreate<T>(
+    key: string,
+    fn: () => Promise<T>,
+    opts: CircuitBreakerOptions,
+): CircuitBreaker<unknown[], T>
+</file>
+
+<file path="chatia-backend/src/contacts/dto/list-contacts.dto.ts">
+// chatia-backend/src/contacts/dto/list-contacts.dto.ts
+import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
+import { ContactStatus } from '@prisma/client';
+⋮----
+export class ListContactsDto
+</file>
+
+<file path="chatia-backend/src/contacts/types/contact.types.ts">
+// chatia-backend/src/contacts/types/contact.types.ts
+// Tipos de salida del ContactsService. — ADR-007
+import type { ContactStatus, ChannelType } from '@prisma/client';
+⋮----
+export interface ContactOutput {
+  id:             string;
+  organizationId: string;
+  channelType:    ChannelType;
+  externalId:     string;
+  name:           string | null;
+  email:          string | null;
+  phone:          string | null;
+  avatarUrl:      string | null;
+  username:       string | null;
+  status:         ContactStatus;
+  optedOut:       boolean;
+  tags:           string[];
+  firstSeenAt:    Date;
+  lastSeenAt:     Date;
+  createdAt:      Date;
+}
+⋮----
+export interface ContactStatsOutput {
+  total:    number;
+  active:   number;
+  blocked:  number;
+  optedOut: number;
+}
+</file>
+
+<file path="chatia-backend/src/conversations/types/conversation.types.ts">
+// chatia-backend/src/conversations/types/conversation.types.ts
+// Tipos de salida del ConversationsService hacia controllers y gRPC.
+// Nunca exponer tipos Prisma crudos fuera del service. — ADR-007
+import type {
+  ConversationStatus,
+  ConversationStage,
+  ChannelType,
+} from '@prisma/client';
+⋮----
+export interface ConversationOutput {
+  id:               string;
+  status:           ConversationStatus;
+  stage:            ConversationStage;
+  isAiActive:       boolean;
+  assignedAgentId:  string | null;
+  lastMessageAt:    Date | null;
+  resolvedAt:       Date | null;
+  createdAt:        Date;
+  updatedAt:        Date;
+  // relaciones opcionales — solo cuando se piden con include
+  contact?: {
+    id:          string;
+    externalId:  string;
+    name:        string | null;
+    channelType: ChannelType;
+  };
+  lastMessage?: {
+    id:        string;
+    content:   string;
+    direction: 'INBOUND' | 'OUTBOUND';
+    createdAt: Date;
+  } | null;
+}
+⋮----
+// relaciones opcionales — solo cuando se piden con include
+⋮----
+export interface ConversationListOutput {
+  items: ConversationOutput[];
+  total: number;
+  page:  number;
+  limit: number;
+}
+</file>
+
+<file path="chatia-backend/src/groq/groq-cb.service.ts">
+// chatia-backend/src/groq/groq-cb.service.ts
+// Wrapper de GroqService con CircuitBreaker. ADR-005.
+// Si Groq cae: CircuitOpenError → fallback a AssistantConfig.fallbackMessage.
+// El AssistantChatService debe capturar CircuitOpenError y devolver el fallback.
+import { Injectable, Logger }         from '@nestjs/common';
+import { GroqService, GroqMessage }   from './groq.service.js';
+import { CircuitBreakerService, CircuitOpenError } from '../common/services/circuit-breaker.service.js';
+⋮----
+// LLM es el componente mas fragil — timeout alto, threshold bajo, recuperacion lenta
+⋮----
+export class GroqCbService
+⋮----
+constructor(
+⋮----
+/**
+   * Llama a Groq protegido por CB.
+   * Lanza CircuitOpenError si el breaker esta abierto.
+   * El caller (AssistantChatService) captura el error y devuelve fallbackMessage.
+   */
+async chat(messages: GroqMessage[], model?: string, temperature?: number): Promise<string>
+⋮----
+healthOf(): 'closed' | 'open' | 'halfOpen' | 'unknown'
+</file>
+
+<file path="chatia-backend/src/queue/dlq/dlq.controller.ts">
+// chatia-backend/src/queue/dlq/dlq.controller.ts
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation }    from '@nestjs/swagger';
+import { DlqService }                              from './dlq.service.js';
+import { TenantGuard }                             from '../../common/guards/tenant.guard.js';
+import { RolesGuard }                              from '../../common/guards/roles.guard.js';
+import { Roles }                                   from '../../common/decorators/roles.decorator.js';
+⋮----
+export class DlqController
+⋮----
+constructor(private readonly dlq: DlqService)
+⋮----
+getStats()
+⋮----
+retryJob(
+    @Param('queue') queue: 'incoming' | 'outgoing',
+    @Param('jobId') jobId: string,
+)
+⋮----
+retryAll(@Param('queue') queue: 'incoming' | 'outgoing')
+</file>
+
+<file path="chatia-backend/src/queue/dlq/dlq.module.ts">
+// chatia-backend/src/queue/dlq/dlq.module.ts
+import { Module }      from '@nestjs/common';
+import { BullModule }  from '@nestjs/bullmq';
+import { DlqService }  from './dlq.service.js';
+import { DlqController } from './dlq.controller.js';
+import { QUEUES }      from '../queue.constants.js';
+⋮----
+export class DlqModule
+</file>
+
+<file path="chatia-backend/src/queue/dlq/dlq.service.ts">
+// chatia-backend/src/queue/dlq/dlq.service.ts
+// Monitor y replay de la DLQ de mensajes de chatia.
+// ADR-003: jobs criticos (mensajes entrantes/salientes) necesitan DLQ propia.
+import { Injectable, Logger }    from '@nestjs/common';
+import { InjectQueue }           from '@nestjs/bullmq';
+import { Queue }                 from 'bullmq';
+import { QUEUES }                from '../queue.constants.js';
+⋮----
+export class DlqService
+⋮----
+constructor(
+⋮----
+async getStats()
+⋮----
+async retryJob(queue: 'incoming' | 'outgoing', jobId: string)
+⋮----
+async retryAll(queue: 'incoming' | 'outgoing')
+⋮----
+async clearDlq(queue: 'incoming' | 'outgoing')
+</file>
+
+<file path="notificaciones-backend/src/notifications/dlq/chatia-internal.interface.ts">
+// notificaciones-backend/src/notifications/dlq/chatia-internal.interface.ts
+// Tipado correcto del cliente gRPC de chatia para el DlqMonitorService.
+// Reemplaza el @ts-expect-error — rxjs interop de dlq-monitor.service.ts
+// ADR-007: sin @ts-expect-error en produccion.
+import type { Observable } from 'rxjs';
+⋮----
+export interface ChatiaNotifyRequest {
+  organizationId: string;
+  ecosystemId:    string;
+  type:           string;
+  title:          string;
+  body:           string;
+}
+⋮----
+export interface ChatiaNotifyResponse {
+  success: boolean;
+}
+⋮----
+/**
+ * Interface tipada del cliente gRPC de chatia.
+ * Los metodos gRPC retornan Observable<T> — usar firstValueFrom() para await.
+ *
+ * Uso correcto:
+ *   const result = await firstValueFrom(this.chatiaClient.notifySystem(req));
+ *
+ * Incorrecto (deprecated rxjs, causa el @ts-expect-error):
+ *   await this.chatiaClient.notifySystem(req).toPromise();
+ */
+export interface ChatiaInternalGrpcClient {
+  notifySystem(req: ChatiaNotifyRequest): Observable<ChatiaNotifyResponse>;
+}
+⋮----
+notifySystem(req: ChatiaNotifyRequest): Observable<ChatiaNotifyResponse>;
+</file>
+
+<file path="notificaciones-backend/src/notifications/circuit-breaker.service.ts">
+// notificaciones-backend/src/notifications/circuit-breaker.service.ts
+// Copiado del patron de pasarelapagos-backend — opossum como estandar. ADR-005.
+// El mismo servicio funciona para cualquier llamada a proveedor externo.
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import CircuitBreaker from 'opossum';
+⋮----
+export interface CircuitBreakerOptions {
+  timeout?:        number; // ms antes de considerar fallido (default: 8000)
+  errorThreshold?: number; // % de errores para abrir (default: 40)
+  resetTimeout?:   number; // ms hasta intentar half-open (default: 60000)
+  volumeThreshold?: number; // minimo de requests para evaluar (default: 5)
+}
+⋮----
+timeout?:        number; // ms antes de considerar fallido (default: 8000)
+errorThreshold?: number; // % de errores para abrir (default: 40)
+resetTimeout?:   number; // ms hasta intentar half-open (default: 60000)
+volumeThreshold?: number; // minimo de requests para evaluar (default: 5)
+⋮----
+export class CircuitOpenError extends Error
+⋮----
+constructor(key: string)
+⋮----
+export class CircuitBreakerService implements OnModuleDestroy
+⋮----
+/**
+   * Ejecuta fn protegida por un circuit breaker identificado por key.
+   * Si el breaker esta abierto lanza CircuitOpenError inmediatamente.
+   *
+   * Parametros recomendados por canal:
+   *   sendgrid:          timeout:8000, errorThreshold:40, resetTimeout:60000
+   *   whatsapp-biz-api:  timeout:8000, errorThreshold:40, resetTimeout:60000
+   *   fcm:               timeout:5000, errorThreshold:50, resetTimeout:30000
+   */
+async execute<T>(
+    key: string,
+    fn: () => Promise<T>,
+    options: CircuitBreakerOptions = {},
+): Promise<T>
+⋮----
+healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown'
+⋮----
+statsOf(key: string)
+⋮----
+onModuleDestroy()
+⋮----
+private getOrCreate<T>(
+    key: string,
+    fn: () => Promise<T>,
+    opts: CircuitBreakerOptions,
+): CircuitBreaker<unknown[], T>
+⋮----
+// Actualizar la accion si el fn cambio
+</file>
+
+<file path="pasarelapagos-backend/src/modules/payments/types/payment.types.ts">
+// pasarelapagos-backend/src/modules/payments/types/payment.types.ts
+// PaymentOutput — tipo de salida del PaymentsService. — ADR-007
+// El service ya tenia private serialize() haciendo este trabajo.
+// Este archivo formaliza el tipo para que el controller lo use con inference.
+import type { PaymentStatus, PaymentMethodKind } from '@prisma/client';
+⋮----
+export interface PaymentOutput {
+  id:              string;
+  organizationId:  string;
+  status:          PaymentStatus;
+  amountMinor:     string;   // BigInt serializado como string — contrato del ecosistema
+  currency:        string;
+  country:         string;
+  method:          PaymentMethodKind;
+  providerId:      string;
+  externalId:      string | null;
+  description:     string | null;
+  failureCode:     string | null;
+  failureMessage:  string | null;
+  idempotencyKey:  string;
+  customerId:      string | null;
+  createdAt:       Date;
+  updatedAt:       Date;
+}
+⋮----
+amountMinor:     string;   // BigInt serializado como string — contrato del ecosistema
+⋮----
+export interface PaymentListOutput {
+  items:  PaymentOutput[];
+  total:  number;
+  page:   number;
+  limit:  number;
+}
+⋮----
+export interface RefundOutput {
+  id:               string;
+  paymentId:        string;
+  amountMinor:      string;
+  status:           string;
+  externalRefundId: string | null;
+  createdAt:        Date;
+}
+</file>
 
 <file path="analytics-backend/src/analytics/processors/analytics-event.processor.ts">
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
@@ -1525,10 +1898,14 @@ export class CreateContactDto {}
 </file>
 
 <file path="chatia-backend/src/contacts/dto/update-contact.dto.ts">
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateContactDto } from './create-contact.dto';
+// chatia-backend/src/contacts/dto/update-contact.dto.ts
+import {
+  IsString, IsOptional, IsEmail, IsEnum, IsArray, IsBoolean,
+} from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ContactStatus } from '@prisma/client';
 ⋮----
-export class UpdateContactDto extends PartialType(CreateContactDto) {}
+export class UpdateContactDto
 </file>
 
 <file path="chatia-backend/src/contacts/contacts.controller.ts">
@@ -5497,25 +5874,6 @@ constructor(private readonly svc: JobsService)
 @Get(":jobId/status") status(@Param("jobId") jobId: string)
 </file>
 
-<file path="workers-backend/src/jobs/jobs.module.ts">
-// workers-backend/src/jobs/jobs.module.ts
-import { Module }          from '@nestjs/common';
-import { BullModule }      from '@nestjs/bullmq';
-import { ConfigModule }    from '@nestjs/config';
-⋮----
-import { WORKER_QUEUES, QUEUE_CONFIG }       from './jobs.constants.js';
-import { JobsService }                       from './jobs.service.js';
-import { JobsController }                    from './jobs.controller.js';
-import { EmbeddingService }                  from './services/embedding.service.js';
-import { ChunkingService }                   from './services/chunking.service.js';
-import { FaqIngestProcessor }                from './processors/faq-ingest.processor.js';
-import { VectorIndexProcessor }              from './processors/vector-index.processor.js';
-import { CampaignEmailProcessor }            from './processors/campaign-email.processor.js';
-import { AnalyticsExportProcessor }          from './processors/analytics-export.processor.js';
-⋮----
-export class JobsModule {}
-</file>
-
 <file path="workers-backend/src/jobs/jobs.service.ts">
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
@@ -5745,21 +6103,6 @@ model DailyConversationSummary {
   @@unique([organizationId, date, channel])
   @@index([organizationId, date])
 }
-</file>
-
-<file path="analytics-backend/src/health/health.controller.ts">
-// analytics-backend/src/health/health.controller.ts
-import { Controller, Get }                          from '@nestjs/common';
-import { ApiTags }                                  from '@nestjs/swagger';
-import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService }  from '../prisma/prisma.service.js';
-import { Public }         from '@ecosistema-ms/auth-server';
-⋮----
-export class HealthController {
-⋮----
-constructor(
-⋮----
-check(): Promise<HealthCheckResult>
 </file>
 
 <file path="analytics-backend/src/health/health.module.ts">
@@ -7075,22 +7418,6 @@ async updateContactPreference(req: UpdatePreferenceRequest)
 ping(req:
 </file>
 
-<file path="notificaciones-backend/src/health/health.controller.ts">
-// notificaciones-backend/src/health/health.controller.ts
-// @nestjs/terminus v11 — sin PrismaHealthIndicator
-import { Controller, Get }                          from '@nestjs/common';
-import { ApiTags }                                  from '@nestjs/swagger';
-import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService }  from '../prisma/prisma.service.js';
-import { Public }         from '@ecosistema-ms/auth-server';
-⋮----
-export class HealthController {
-⋮----
-constructor(
-⋮----
-check(): Promise<HealthCheckResult>
-</file>
-
 <file path="notificaciones-backend/src/health/health.module.ts">
 import { Module }           from '@nestjs/common';
 import { TerminusModule }   from '@nestjs/terminus';
@@ -7396,7 +7723,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum JobStatus {
   PENDING
   PROCESSING
@@ -7412,6 +7738,13 @@ enum CampaignStatus {
   PAUSED
   COMPLETED
   FAILED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 /// Trazabilidad de todos los jobs async del ecosistema
@@ -7453,8 +7786,31 @@ model Campaign {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  recipients CampaignRecipient[]
+
   @@index([organizationId, status])
   @@index([scheduledAt])
+  @@index([ecosystemId, organizationId])
+}
+
+/// Destinatarios de cada campana — fuente de verdad para el dispatcher
+/// ADR-003: recipientIds ahora viene de esta tabla, no de []
+model CampaignRecipient {
+  id          String          @id @default(cuid())
+  campaignId  String
+  contactId   String
+  email       String?         // cache del email al momento de enqueue (PII — cifrar en S3)
+  status      RecipientStatus @default(PENDING)
+  sentAt      DateTime?
+  failureMsg  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@index([contactId])
 }
 </file>
 
@@ -7473,24 +7829,26 @@ export class PatchCampaignDto {
 </file>
 
 <file path="workers-backend/src/campaigns/campaigns.service.ts">
-import { CampaignStatus } from '@prisma/client';
 // workers-backend/src/campaigns/campaigns.service.ts
 //
-// W-2.3: CRUD de campañas + scheduler.
-// El @Cron corre cada minuto y encola campañas con scheduledAt <= now.
-// Lock distribuido en Redis para evitar doble ejecución en instancias múltiples.
-⋮----
+// W-2.3: CRUD de campanas + scheduler.
+// El @Cron corre cada minuto y encola campanas con scheduledAt <= now.
+// Lock distribuido: SET NX EX sobre Redis (mismo patron que analytics projections).
+// ADR-003: recipientIds ahora viene de CampaignRecipient en DB.
+// ADR-006: lock con SET NX EX — no BullMQ como proxy.
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                            from '@nestjs/bullmq';
 import { Cron }                                   from '@nestjs/schedule';
+import { InjectRedis }                            from '@nestjs-modules/ioredis';
 import { Queue }                                  from 'bullmq';
+import Redis                                      from 'ioredis';
 import { PrismaService }                          from '../prisma/prisma.service.js';
 import { WORKER_QUEUES }                          from '../jobs/jobs.constants.js';
 import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
 ⋮----
-const LOCK_TTL_MS        = 55_000; // 55s — un poco menos que el cron interval
+const SCHEDULER_LOCK_TTL = 55; // segundos — menos que el intervalo del cron (60s)
 ⋮----
-export class CampaignsService {
+export class CampaignsService
 ⋮----
 constructor(
 ⋮----
@@ -7500,42 +7858,51 @@ async create(dto: CreateCampaignDto)
 ⋮----
 async findAll(organizationId: string, status?: string)
 ⋮----
+...(status ? { status: status as any } : {}), // @ecosistema-ms/jsonb-cast — enum cast
+⋮----
 async findOne(id: string, organizationId: string)
 ⋮----
 async patch(id: string, organizationId: string, dto: PatchCampaignDto)
 ⋮----
 await this.findOne(id, organizationId); // throws si no existe
 ⋮----
+async cancel(id: string, organizationId: string)
+⋮----
 // Cancelar jobs pendientes en BullMQ
 ⋮----
-// ── Scheduler ──────────────────────────────────────────────────────────────
+// ── Scheduler ─────────────────────────────────────────────────────────────
 ⋮----
 /**
-   * Corre cada minuto. Despacha campañas con scheduledAt <= now.
-   * Lock distribuido: si otra instancia ya está corriendo, se saltea.
+   * Corre cada minuto. Despacha campanas con scheduledAt <= now.
+   * Lock distribuido con SET NX EX sobre Redis — ADR-006.
+   * Solo un pod corre el dispatch a la vez.
    */
-@Cron('* * * * *') // cada minuto
+⋮----
 async dispatchScheduledCampaigns(): Promise<void>
 ⋮----
-// Intentar obtener lock (usando BullMQ Queue como proxy de Redis)
-// Lock simplificado: si el job "scheduler-lock" ya existe en la queue, saltar
+// SET NX EX — lock atomico. Si otro pod ya tiene el lock, retorna null.
 ⋮----
-if (lockJob) return; // otro pod ya está corriendo
+if (!lock) return; // otro pod esta corriendo el scheduler
 ⋮----
-// Crear lock temporal
-⋮----
-take: 20, // máx 20 por ciclo para no bloquear
+// Liberar el lock siempre — incluso si hubo error
 ⋮----
 async dispatchCampaign(campaignId: string): Promise<void>
 ⋮----
-// Actualizar estado a RUNNING
+// ADR-003: leer recipients reales de CampaignRecipient
 ⋮----
-// Encolar el job de campaña
-// NOTA: recipientIds no está en el modelo Campaign (es un input del create).
-// En producción: persistir recipientIds en tabla CampaignRecipient.
-// Por ahora: loguear y marcar como pendiente de implementación.
+// ── Recipients CRUD ────────────────────────────────────────────────────────
 ⋮----
-recipientIds:   [], // TODO: leer de CampaignRecipient
+async addRecipients(
+    campaignId:    string,
+    organizationId: string,
+    recipients: Array<{ contactId: string; email?: string }>,
+)
+⋮----
+// createMany ignora duplicados via skipDuplicates
+⋮----
+// Actualizar contador
+⋮----
+async getStats(id: string, organizationId: string)
 </file>
 
 <file path="workers-backend/src/dlq/dlq.module.ts">
@@ -7547,21 +7914,6 @@ import { DlqController }   from './dlq.controller.js';
 import { DlqService }      from './dlq.service.js';
 ⋮----
 export class DlqModule {}
-</file>
-
-<file path="workers-backend/src/health/health.controller.ts">
-// workers-backend/src/health/health.controller.ts
-import { Controller, Get }                          from '@nestjs/common';
-import { ApiTags }                                  from '@nestjs/swagger';
-import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService }  from '../prisma/prisma.service.js';
-import { Public }         from '@ecosistema-ms/auth-server';
-⋮----
-export class HealthController {
-⋮----
-constructor(
-⋮----
-check(): Promise<HealthCheckResult>
 </file>
 
 <file path="workers-backend/src/health/health.module.ts">
@@ -7824,6 +8176,30 @@ private async extractFromBuffer(
 private chunkText(text: string): TextChunk[]
 </file>
 
+<file path="workers-backend/src/jobs/jobs.module.ts">
+// workers-backend/src/jobs/jobs.module.ts
+import { join }          from 'path';
+import { Module }        from '@nestjs/common';
+import { BullModule }    from '@nestjs/bullmq';
+import { ConfigModule, ConfigService }   from '@nestjs/config';
+import { ClientsModule, Transport }      from '@nestjs/microservices';
+⋮----
+import { WORKER_QUEUES, QUEUE_CONFIG }       from './jobs.constants.js';
+import { JobsService }                       from './jobs.service.js';
+import { JobsController }                    from './jobs.controller.js';
+import { EmbeddingService }                  from './services/embedding.service.js';
+import { ChunkingService }                   from './services/chunking.service.js';
+import { CircuitBreakerService }             from './services/circuit-breaker.service.js';
+import { FaqIngestProcessor }                from './processors/faq-ingest.processor.js';
+import { VectorIndexProcessor }              from './processors/vector-index.processor.js';
+import { CampaignEmailProcessor }            from './processors/campaign-email.processor.js';
+import { AnalyticsExportProcessor }          from './processors/analytics-export.processor.js';
+⋮----
+// gRPC clients registrados aquí para que los processors los puedan inyectar
+⋮----
+export class JobsModule {}
+</file>
+
 <file path="tsconfig.base.json">
 {
   "compilerOptions": {
@@ -8050,6 +8426,21 @@ catalog:
   source-map-support: "^0.5.21"
 </file>
 
+<file path="analytics-backend/src/health/health.controller.ts">
+import { Controller, Get }                          from '@nestjs/common';
+import { SetMetadata }                              from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+⋮----
+const Public = ()
+⋮----
+export class HealthController {
+⋮----
+constructor(
+⋮----
+check(): Promise<HealthCheckResult>
+</file>
+
 <file path="chatia-backend/src/conversations/conversations.service.ts">
 // chatia-backend/src/conversations/conversations.service.ts
 // Versión limpia — usa solo métodos y campos que existen en el schema real.
@@ -8125,41 +8516,34 @@ async removeTag(conversationId: string, organizationId: string, tag: string)
 private async verifyOwnership(conversationId: string, organizationId: string)
 </file>
 
-<file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
-import { join } from 'path';
-// notificaciones-backend/src/notifications/dlq/dlq.module.ts
+<file path="notificaciones-backend/src/health/health.controller.ts">
+import { Controller, Get }                          from '@nestjs/common';
+import { SetMetadata }                              from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
 ⋮----
-import { Module }           from '@nestjs/common';
-import { BullModule }       from '@nestjs/bullmq';
-import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { QUEUES }           from '../notifications.constants.js';
-import { DlqMonitorService } from './dlq-monitor.service.js';
+const Public = ()
 ⋮----
-export class DlqModule
+export class HealthController {
+⋮----
+constructor(
+⋮----
+check(): Promise<HealthCheckResult>
 </file>
 
-<file path="workers-backend/src/app.module.ts">
-import { join } from 'path';
-// workers-backend/src/app.module.ts
-import { Module }         from '@nestjs/common';
-import { ConfigModule }   from '@nestjs/config';
-import { BullModule }     from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule, Transport } from '@nestjs/microservices';
+<file path="workers-backend/src/health/health.controller.ts">
+import { Controller, Get }                          from '@nestjs/common';
+import { SetMetadata }                              from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
 ⋮----
-import { HealthModule }    from './health/health.module.js';
-import { MetricsModule }   from './metrics/metrics.module.js';
-import { JobsModule }      from './jobs/jobs.module.js';
-import { DlqModule }       from './dlq/dlq.module.js';
-import { GrpcModule }      from './grpc/grpc.module.js';
-import { CampaignsModule } from './campaigns/campaigns.module.js';
+const Public = ()
 ⋮----
-// gRPC clients globales — disponibles en todos los processors via @Inject
+export class HealthController {
 ⋮----
-MetricsModule,   // global — CircuitBreakerService + WorkersMetricsService
+constructor(
 ⋮----
-export class AppModule
+check(): Promise<HealthCheckResult>
 </file>
 
 <file path="analytics-backend/src/analytics/analytics.service.ts">
@@ -8202,6 +8586,19 @@ async persistEvent(data: {
 }): Promise<
 </file>
 
+<file path="notificaciones-backend/src/notifications/dlq/dlq.module.ts">
+// notificaciones-backend/src/notifications/dlq/dlq.module.ts
+import { join }             from 'path';
+import { Module }           from '@nestjs/common';
+import { BullModule }       from '@nestjs/bullmq';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { QUEUES }           from '../notifications.constants.js';
+import { DlqMonitorService } from './dlq-monitor.service.js';
+⋮----
+export class DlqModule
+</file>
+
 <file path="packages/proto/src/index.ts">
 // packages/proto/src/index.ts
 // Usa process.cwd() — funciona en CJS, ESM, dev y prod sin cambios.
@@ -8211,6 +8608,26 @@ import { join } from 'path';
 ⋮----
 // Detectar si los protos están en ./proto (runner) o en packages/proto/proto (dev)
 // El Dockerfile copia los protos a {WORKDIR}/proto/
+</file>
+
+<file path="workers-backend/src/app.module.ts">
+// workers-backend/src/app.module.ts
+import { join }         from 'path';
+import { Module }       from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { BullModule }   from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+⋮----
+import { PrismaModule }    from './prisma/prisma.module.js';
+import { HealthModule }    from './health/health.module.js';
+import { MetricsModule }   from './metrics/metrics.module.js';
+import { JobsModule }      from './jobs/jobs.module.js';
+import { DlqModule }       from './dlq/dlq.module.js';
+import { GrpcModule }      from './grpc/grpc.module.js';
+import { CampaignsModule } from './campaigns/campaigns.module.js';
+⋮----
+export class AppModule
 </file>
 
 </files>

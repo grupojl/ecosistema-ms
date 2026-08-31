@@ -216,35 +216,6 @@ This section contains the contents of the repository's files.
 }
 </file>
 
-<file path="analytics-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
 <file path="chatia-backend/nest-cli.json">
 {
   "$schema": "https://json.schemastore.org/nest-cli",
@@ -404,35 +375,6 @@ This section contains the contents of the repository's files.
 {
   "extends": "./tsconfig.json",
   "exclude": ["node_modules", "test", "dist", "**/*spec.ts", "prisma/**"]
-}
-</file>
-
-<file path="notificaciones-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
 }
 </file>
 
@@ -1448,6 +1390,35 @@ model DailyConversationSummary {
 }
 </file>
 
+<file path="analytics-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
 <file path="chatia-backend/prisma/schema.prisma">
 // =============================================================================
 // prisma/schema.prisma
@@ -2130,6 +2101,35 @@ model ContactPreference {
 }
 </file>
 
+<file path="notificaciones-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
 <file path="pasarelapagos-backend/package.json">
 {
   "name": "pasarelapagos-backend",
@@ -2255,7 +2255,6 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum JobStatus {
   PENDING
   PROCESSING
@@ -2271,6 +2270,13 @@ enum CampaignStatus {
   PAUSED
   COMPLETED
   FAILED
+}
+
+enum RecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
 }
 
 /// Trazabilidad de todos los jobs async del ecosistema
@@ -2312,8 +2318,31 @@ model Campaign {
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
 
+  recipients CampaignRecipient[]
+
   @@index([organizationId, status])
   @@index([scheduledAt])
+  @@index([ecosystemId, organizationId])
+}
+
+/// Destinatarios de cada campana — fuente de verdad para el dispatcher
+/// ADR-003: recipientIds ahora viene de esta tabla, no de []
+model CampaignRecipient {
+  id          String          @id @default(cuid())
+  campaignId  String
+  contactId   String
+  email       String?         // cache del email al momento de enqueue (PII — cifrar en S3)
+  status      RecipientStatus @default(PENDING)
+  sentAt      DateTime?
+  failureMsg  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId, status])
+  @@index([contactId])
 }
 </file>
 
@@ -2607,9 +2636,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/analytics-backend/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
 USER nestjs
 EXPOSE 3003 5004
 CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
@@ -2656,9 +2682,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/notificaciones-backend/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
 USER nestjs
 EXPOSE 3002 5003
 CMD ["dumb-init", "sh", "-c", "node dist/src/main"]
@@ -2705,9 +2728,6 @@ COPY --from=builder --chown=nestjs:nodejs /app/node_modules      ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/prisma       ./prisma
 COPY --from=builder --chown=nestjs:nodejs /app/workers-backend/package.json ./package.json
 COPY --from=builder --chown=nestjs:nodejs /app/packages/proto/proto ./proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/proto       ./node_modules/@ecosistema-ms/proto
-COPY --from=builder --chown=nestjs:nodejs /app/packages/auth-server ./node_modules/@ecosistema-ms/auth-server
-COPY --from=builder --chown=nestjs:nodejs /app/packages/grpc-client ./node_modules/@ecosistema-ms/grpc-client
 USER nestjs
 EXPOSE 3004 5005
 CMD ["dumb-init", "sh", "-c", "node dist/src/main"]

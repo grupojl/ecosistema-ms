@@ -1,20 +1,23 @@
-import { CampaignStatus } from '@prisma/client';
 // workers-backend/src/campaigns/campaigns.service.ts
 //
-// W-2.3: CRUD de campañas + scheduler.
-// El @Cron corre cada minuto y encola campañas con scheduledAt <= now.
-// Lock distribuido en Redis para evitar doble ejecución en instancias múltiples.
-
+// W-2.3: CRUD de campanas + scheduler.
+// El @Cron corre cada minuto y encola campanas con scheduledAt <= now.
+// Lock distribuido: SET NX EX sobre Redis (mismo patron que analytics projections).
+// ADR-003: recipientIds ahora viene de CampaignRecipient en DB.
+// ADR-006: lock con SET NX EX — no BullMQ como proxy.
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                            from '@nestjs/bullmq';
 import { Cron }                                   from '@nestjs/schedule';
+import { InjectRedis }                            from '@nestjs-modules/ioredis';
 import { Queue }                                  from 'bullmq';
+import Redis                                      from 'ioredis';
 import { PrismaService }                          from '../prisma/prisma.service.js';
 import { WORKER_QUEUES }                          from '../jobs/jobs.constants.js';
 import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
 
-const SCHEDULER_LOCK_KEY = 'workers:campaign-scheduler:lock';
-const LOCK_TTL_MS        = 55_000; // 55s — un poco menos que el cron interval
+const SCHEDULER_LOCK_KEY = 'workers:scheduler:campaigns';
+const SCHEDULER_LOCK_TTL = 55; // segundos — menos que el intervalo del cron (60s)
+const MAX_DISPATCH_PER_CYCLE = 20;
 
 @Injectable()
 export class CampaignsService {
@@ -22,141 +25,171 @@ export class CampaignsService {
 
   constructor(
     private readonly prisma: PrismaService,
-    @InjectQueue(WORKER_QUEUES.CAMPAIGN_EMAIL) private readonly campaignQueue: Queue,
+    @InjectQueue(WORKER_QUEUES.CAMPAIGN_EMAIL) private readonly queue: Queue,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
   async create(dto: CreateCampaignDto) {
-    const campaign = await this.prisma.campaign.create({
-      data: {
-        ecosystemId:    dto.ecosystemId,
-        organizationId: dto.organizationId,
-        templateKey:    dto.templateKey,
-        status:         dto.scheduledAt ? 'SCHEDULED' : 'DRAFT',
-        scheduledAt:    dto.scheduledAt ? new Date(dto.scheduledAt) : null,
-        totalRecipients: dto.recipientIds.length,
-      },
-    });
-
-    this.logger.log(`Campaign creada: ${campaign.id} status:${campaign.status}`);
-    return campaign;
+    return this.prisma.campaign.create({ data: dto });
   }
 
   async findAll(organizationId: string, status?: string) {
     return this.prisma.campaign.findMany({
       where: {
         organizationId,
-        ...(status && { status: status as 'DRAFT' | 'SCHEDULED' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'FAILED' }),
+        ...(status ? { status: status as any } : {}), // @ecosistema-ms/jsonb-cast — enum cast
       },
+      include: { _count: { select: { recipients: true } } },
       orderBy: { createdAt: 'desc' },
-      take:    50,
     });
   }
 
   async findOne(id: string, organizationId: string) {
-    const c = await this.prisma.campaign.findFirst({
+    const campaign = await this.prisma.campaign.findFirst({
       where: { id, organizationId },
+      include: { _count: { select: { recipients: true } } },
     });
-    if (!c) throw new NotFoundException(`Campaign ${id} no encontrada`);
-    return c;
+    if (!campaign) throw new NotFoundException(`Campaign ${id} not found`);
+    return campaign;
   }
 
   async patch(id: string, organizationId: string, dto: PatchCampaignDto) {
     await this.findOne(id, organizationId); // throws si no existe
+    return this.prisma.campaign.update({ where: { id }, data: dto });
+  }
 
-    if (dto.status === 'PAUSED') {
-      // Cancelar jobs pendientes en BullMQ
-      const jobs = await this.campaignQueue.getJobs(['waiting', 'delayed']);
-      const toCancel = jobs.filter(j => (j.data as { campaignId?: string })?.campaignId === id);
-      await Promise.all(toCancel.map(j => j.remove()));
-      this.logger.log(`Campaign ${id} pausada — ${toCancel.length} jobs cancelados`);
-    }
-
+  async cancel(id: string, organizationId: string) {
+    await this.findOne(id, organizationId);
+    // Cancelar jobs pendientes en BullMQ
+    const jobs = await this.queue.getJobs(['waiting', 'delayed']);
+    const toCancel = jobs.filter(j => j.data?.campaignId === id);
+    await Promise.allSettled(toCancel.map(j => j.remove()));
     return this.prisma.campaign.update({
       where: { id },
-      data: {
-        ...(dto.status      && { status: dto.status as CampaignStatus | undefined }),
-        ...(dto.scheduledAt && { scheduledAt: new Date(dto.scheduledAt) }),
-      },
+      data: { status: 'FAILED' },
     });
   }
 
-  // ── Scheduler ──────────────────────────────────────────────────────────────
+  // ── Scheduler ─────────────────────────────────────────────────────────────
 
   /**
-   * Corre cada minuto. Despacha campañas con scheduledAt <= now.
-   * Lock distribuido: si otra instancia ya está corriendo, se saltea.
+   * Corre cada minuto. Despacha campanas con scheduledAt <= now.
+   * Lock distribuido con SET NX EX sobre Redis — ADR-006.
+   * Solo un pod corre el dispatch a la vez.
    */
-  @Cron('* * * * *') // cada minuto
+  @Cron('* * * * *')
   async dispatchScheduledCampaigns(): Promise<void> {
-    // Intentar obtener lock (usando BullMQ Queue como proxy de Redis)
-    // Lock simplificado: si el job "scheduler-lock" ya existe en la queue, saltar
-    const lockJob = await this.campaignQueue.getJob(SCHEDULER_LOCK_KEY);
-    if (lockJob) return; // otro pod ya está corriendo
+    // SET NX EX — lock atomico. Si otro pod ya tiene el lock, retorna null.
+    const lock = await this.redis.set(
+      SCHEDULER_LOCK_KEY,
+      '1',
+      'EX', SCHEDULER_LOCK_TTL,
+      'NX',
+    );
+    if (!lock) return; // otro pod esta corriendo el scheduler
 
     try {
-      // Crear lock temporal
-      await this.campaignQueue.add(
-        'scheduler-lock',
-        {},
-        { jobId: SCHEDULER_LOCK_KEY, delay: LOCK_TTL_MS, removeOnComplete: true },
-      );
-
       const due = await this.prisma.campaign.findMany({
         where: {
-          status:      'SCHEDULED',
+          status: 'SCHEDULED',
           scheduledAt: { lte: new Date() },
         },
-        take: 20, // máx 20 por ciclo para no bloquear
+        take: MAX_DISPATCH_PER_CYCLE,
+        orderBy: { scheduledAt: 'asc' },
       });
 
-      if (due.length === 0) return;
-
-      this.logger.log(`Scheduler: ${due.length} campañas para despachar`);
-
       for (const campaign of due) {
-        await this.dispatchCampaign(campaign.id);
+        await this.dispatchCampaign(campaign.id).catch(err =>
+          this.logger.error({ err, campaignId: campaign.id }, 'dispatch failed'),
+        );
       }
-    } catch (e: unknown) {
-      this.logger.error(`Scheduler error: ${String(e)}`);
+    } finally {
+      // Liberar el lock siempre — incluso si hubo error
+      await this.redis.del(SCHEDULER_LOCK_KEY).catch(() => {});
     }
   }
 
   async dispatchCampaign(campaignId: string): Promise<void> {
-    const campaign = await this.prisma.campaign.findUnique({
-      where: { id: campaignId },
-    });
-    if (!campaign) return;
-
-    // Actualizar estado a RUNNING
     await this.prisma.campaign.update({
       where: { id: campaignId },
-      data:  { status: 'RUNNING', startedAt: new Date() },
+      data: { status: 'RUNNING', startedAt: new Date() },
     });
 
-    // Encolar el job de campaña
-    // NOTA: recipientIds no está en el modelo Campaign (es un input del create).
-    // En producción: persistir recipientIds en tabla CampaignRecipient.
-    // Por ahora: loguear y marcar como pendiente de implementación.
-    this.logger.warn(
-      `Campaign ${campaignId} despachada — implementar CampaignRecipient para persistir recipients`,
-    );
+    // ADR-003: leer recipients reales de CampaignRecipient
+    const recipients = await this.prisma.campaignRecipient.findMany({
+      where: { campaignId, status: 'PENDING' },
+      select: { id: true, contactId: true, email: true },
+    });
 
-    await this.campaignQueue.add(
-      'campaign.email',
+    if (recipients.length === 0) {
+      this.logger.warn({ campaignId }, 'campaign has no pending recipients — marking COMPLETED');
+      await this.prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: 'COMPLETED', completedAt: new Date() },
+      });
+      return;
+    }
+
+    const campaign = await this.prisma.campaign.findUniqueOrThrow({
+      where: { id: campaignId },
+    });
+
+    await this.queue.add(
+      'send-campaign',
       {
+        campaignId,
         ecosystemId:    campaign.ecosystemId,
         organizationId: campaign.organizationId,
-        campaignId:     campaign.id,
-        recipientIds:   [], // TODO: leer de CampaignRecipient
         templateKey:    campaign.templateKey,
+        recipientIds:   recipients.map(r => r.contactId),
+        recipientCount: recipients.length,
       },
       {
-        jobId:    `campaign:${campaign.id}`,
-        attempts: 3,
-        backoff:  { type: 'exponential', delay: 5_000 },
+        jobId:            `campaign:${campaignId}`,
+        attempts:         3,
+        backoff:          { type: 'exponential', delay: 5_000 },
+        removeOnComplete: { count: 50 },
+        removeOnFail:     { count: 100 },
       },
     );
+
+    this.logger.log({ campaignId, recipientCount: recipients.length }, 'campaign dispatched');
+  }
+
+  // ── Recipients CRUD ────────────────────────────────────────────────────────
+
+  async addRecipients(
+    campaignId:    string,
+    organizationId: string,
+    recipients: Array<{ contactId: string; email?: string }>,
+  ) {
+    await this.findOne(campaignId, organizationId);
+    // createMany ignora duplicados via skipDuplicates
+    const result = await this.prisma.campaignRecipient.createMany({
+      data: recipients.map(r => ({
+        campaignId,
+        contactId: r.contactId,
+        email:     r.email,
+      })),
+      skipDuplicates: true,
+    });
+    // Actualizar contador
+    const total = await this.prisma.campaignRecipient.count({ where: { campaignId } });
+    await this.prisma.campaign.update({
+      where: { id: campaignId },
+      data:  { totalRecipients: total },
+    });
+    return result;
+  }
+
+  async getStats(id: string, organizationId: string) {
+    await this.findOne(id, organizationId);
+    return this.prisma.campaignRecipient.groupBy({
+      by:    ['status'],
+      where: { campaignId: id },
+      _count: { status: true },
+    });
   }
 }
