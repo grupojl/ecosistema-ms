@@ -1,38 +1,51 @@
-# Contratos gRPC
+# Contrato: gRPC inter-servicio
 
-## Protos disponibles
-Todos en `packages/proto/proto/`:
+## Servicios y sus contratos
 
-| Archivo | Servicio gRPC | Métodos principales |
-|---------|--------------|---------------------|
-| `chatia.proto` | `ChatiaService` | `GetConversation`, `ListConversations`, `SendMessage` |
-| `pagos.proto` | `PagosService` | `CreatePayment`, `GetPayment`, `GetTenantConfig` |
-| `notificaciones.proto` | `NotificacionesService` | `SendNotification`, `GetPreferences` |
-| `analytics.proto` | `AnalyticsService` | `PersistEvent`, `GetOverview`, `GetAgentMetrics` |
-| `workers.proto` | `WorkersService` | `EnqueueJob`, `GetJobStatus`, `GetQueueStats` |
+| .proto | Servicio que lo implementa | Puerto gRPC |
+|--------|---------------------------|-------------|
+| `chatia.proto` | `chatia-backend` | 5001 |
+| `pagos.proto` | `pasarelapagos-backend` | 5002 |
+| `notificaciones.proto` | `notificaciones-backend` | 5003 |
+| `analytics.proto` | `analytics-backend` | 5004 |
+| `workers.proto` | `workers-backend` | 5005 |
 
-## Proceso para cambiar un proto
+## Cómo agregar un nuevo RPC
 
-1. **Nunca breaking change** sin deprecation period de 1 sprint
-2. Agregar campos nuevos con números de campo nuevos (protobuf es aditivo)
-3. Si hay breaking change → nuevo método con sufijo `V2` + ADR
-4. Actualizar `packages/grpc-client` con el nuevo módulo cliente
-5. Deploy en orden: primero el servidor, luego los clientes
+1. Editar `packages/proto/proto/<servicio>.proto` — agregar el `rpc` y los `message`
+2. Implementar el método en el `*-grpc.controller.ts` del servicio
+3. Actualizar `packages/grpc-client/src/<servicio>/<servicio>-grpc.module.ts`
+4. El servicio consumidor importa el módulo cliente y lo inyecta en su módulo
 
-## Resolución de paths en Railway
+## Cómo consume un servicio a otro
 
-El `Dockerfile` de cada microservicio copia los protos:
-```dockerfile
-COPY packages/proto/proto ./proto
+```ts
+// En el módulo del servicio consumidor:
+import { ChatIAGrpcModule } from '@ecosistema-ms/grpc-client';
+
+@Module({
+  imports: [ChatIAGrpcModule],
+})
+export class MiModulo {}
+
+// En el servicio:
+@Injectable()
+export class MiService {
+  constructor(
+    @Inject('CHATIA_GRPC_CLIENT') private chatia: ClientGrpc
+  ) {}
+}
 ```
 
-`packages/proto/src/index.ts` detecta automáticamente si está en dev o en Railway runner.
+## Regla de degradación (decidir por servicio)
 
-## Timeouts recomendados
+Cada par consumidor→proveedor debe tener documentado:
+- Timeout configurado (no indefinido)
+- Comportamiento en timeout: rechazar con 503 | reintentar | degradar con cache
+- Estado: ¿documentado? ¿implementado? ¿testeado?
 
-| Tipo de operación | Timeout |
-|-------------------|---------|
-| Consulta simple | 3s |
-| Operación de pago | 10s |
-| Ingestión de documentos | 30s |
-| Export async (solo enqueue) | 5s |
+| Consumidor | Proveedor | Timeout | Fallback | Estado |
+|---|---|---|---|---|
+| `workers-backend` | `chatia-backend` | ⚠️ pendiente | ⚠️ pendiente | pendiente |
+| `notificaciones-backend` | `chatia-backend` | ⚠️ pendiente | ⚠️ pendiente | pendiente |
+| `analytics-backend` | (todos) | ⚠️ pendiente | ⚠️ pendiente | pendiente |

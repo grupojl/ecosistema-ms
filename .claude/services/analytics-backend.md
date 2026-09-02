@@ -1,37 +1,35 @@
-# Servicio: analytics-backend
+# analytics-backend — Servicio de Analíticas
 
 ## Rol
-Ingestion de eventos, proyecciones nocturnas con lock Redis correcto,
-SSE para dashboard en tiempo real, exportacion async.
+Persistencia de eventos de analítica, proyecciones agregadas,
+SSE (Server-Sent Events) para dashboards en tiempo real, exportación.
 
 ## Puertos
-- HTTP: 3003
-- gRPC: 5004
+- HTTP interno/público: 3003
+- gRPC interno: 5004
 
-## Score actual: 7.8/10
+## Clasificación de carpetas
 
-| Area | Estado |
-|------|--------|
-| Ingestion de eventos (gRPC TrackEvent) | OK |
-| Proyecciones rolling con SET NX EX Redis | OK — lock CORRECTO |
-| SSE multi-pod via Redis pub/sub | OK — heartbeat 25s |
-| MAX_SSE_CONNECTIONS configurable | OK |
-| Export async (BullMQ -> workers) | OK |
-| Export con chunking para >100MB | SIN chunking — limite hardcodeado |
-| Tests | 0 tests — DT-001 |
-| Metricas Prometheus reales | MetricsService existe sin exporter |
+### 🔴 BLOQUEANTES
 
-## Nota: este MS tiene el lock distribuido CORRECTO
+| Carpeta | Razón |
+|---------|-------|
+| `src/prisma/` | Infraestructura core |
+| `src/grpc/` | Entry point gRPC |
+| `src/health/` | Railway healthcheck |
+| `src/analytics/sse/` | SSE es la interfaz de tiempo real — no cambiar el endpoint sin coordinar con los consumers |
+| `src/analytics/processors/` | Procesador de eventos — cambiar cómo se procesan afecta toda la analítica |
 
-SET NX EX de Redis en projections.service.ts.
-Copiar este patron a workers-backend (DT-005).
+### 🟢 DINÁMICAS
 
-## Variables de entorno
+| Carpeta | Estado |
+|---------|--------|
+| `src/analytics/` (overview, conversaciones, agentes) | Projections como value objects — Domain/Repository pendiente |
+| `src/analytics/projections/` | Lógica de agregación — candidato a value objects de dominio |
 
-DATABASE_URL=
-REDIS_URL=
-FIREBASE_PROJECT_ID=
-PORT=3003
-GRPC_PORT=5004
-MAX_SSE_CONNECTIONS=100
-FORCE_PROJECTION_RUN=false
+## Nota sobre Domain en analytics
+
+Las "entidades" de analytics son eventos + proyecciones.
+Los eventos son inmutables (no tienen identidad mutable).
+Las proyecciones son value objects derivados.
+El patrón Domain/Repository aplica de forma más ligera que en chatia/pagos.

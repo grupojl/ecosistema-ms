@@ -1,52 +1,37 @@
-# Servicio: notificaciones-backend
+# notificaciones-backend — Servicio de Notificaciones
 
 ## Rol
-Hub de notificaciones multicanal — WhatsApp, Email y Push.
-Deduplicacion con idempotencyKey en DB + Redis, DLQ con monitor automatico.
+Envío de notificaciones multicanal (Email, Push, WhatsApp),
+idempotencia, DLQ (Dead Letter Queue), preferencias de usuario.
 
 ## Puertos
-- HTTP: 3002
-- gRPC: 5003
+- HTTP interno: 3002
+- gRPC interno: 5003
 
-## Score actual: 6.5/10
+## Clasificación de carpetas
 
-| Area | Estado |
-|------|--------|
-| Deduplicacion (idempotencyKey @@unique + Redis) | OK |
-| Opt-out check antes de enviar | OK — ContactPreference |
-| 3 processors (WhatsApp, Email, Push) | OK — BaseNotificationProcessor |
-| DLQ monitor con threshold | OK — alerta a chatia via gRPC si >100 items |
-| Preferencias de canal (gRPC) | OK — UpdateContactPreference |
-| Circuit Breaker en adapters | NINGUNO de los 3 canales — DT-004 |
-| Metricas de tasa de entrega | Sin open rate, sin delivery rate |
-| Tests | 0 tests — DT-001 |
-| @ts-expect-error en dlq-monitor | Tipado gRPC incorrecto — DT-008 |
+### 🔴 BLOQUEANTES
 
-## Flujo de notificacion
+| Carpeta | Razón |
+|---------|-------|
+| `src/prisma/` | Infraestructura core |
+| `src/grpc/` | Entry point gRPC — contrato con el exterior |
+| `src/health/` | Railway healthcheck |
+| `src/metrics/` | Prometheus |
+| `src/notifications/interfaces/notification-channel.interface.ts` | Interface de canales — cambiarla rompe los 3 adapters |
+| `src/notifications/dedup/` | Idempotencia — no modificar sin entender el impacto |
+| `src/notifications/dlq/` | Dead Letter Queue — no simplificar sin ADR |
+| `src/notifications/circuit-breaker.service.ts` | Resiliencia — compartida entre canales |
 
-gRPC SendNotification (o HTTP POST /notifications)
-  -> NotificationsService.enqueue()
-  -> BullMQ queue por canal
-  -> BaseNotificationProcessor.process()
-    -> 1. dedup check (idempotencyKey en Redis)
-    -> 2. opt-out check (ContactPreference)
-    -> 3. upsert PENDING en DB
-    -> 4. resolve recipient
-    -> 5. adapter.send() <- SIN CB HOY
-    -> 6. upsert SENT o FAILED
+### 🟡 DINÁMICA CONTROLADA
 
-## Variables de entorno
+| Carpeta | Regla |
+|---------|-------|
+| `src/notifications/channels/` | Nuevos canales siguen `notification-channel.interface.ts`. No se modifica la interface sin ADR. |
 
-DATABASE_URL=
-REDIS_URL=
-FIREBASE_PROJECT_ID=
-SENDGRID_API_KEY=
-SENDGRID_FROM_EMAIL=
-WHATSAPP_API_URL=
-WHATSAPP_API_TOKEN=
-FCM_PROJECT_ID=
-DLQ_WARN_THRESHOLD=50
-DLQ_ALERT_THRESHOLD=100
-PORT=3002
-GRPC_PORT=5003
-CHATIA_GRPC_URL=chatia-backend.railway.internal:5001
+### 🟢 DINÁMICAS
+
+| Carpeta | Estado |
+|---------|--------|
+| `src/notifications/` (lógica principal) | Domain/Repository pendiente |
+| `src/preferences/` | CRUD de preferencias — Domain/Repository pendiente |

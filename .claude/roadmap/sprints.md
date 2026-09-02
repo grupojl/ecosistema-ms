@@ -1,63 +1,43 @@
-# Sprints — ecosistema-ms (post cierre ADR-003/005/006/007)
+# Sprints — ecosistema-ms
 
-## Estado actual del repo
+## Orden de prioridad (derivado del roadmap de brechas)
 
-5 microservicios con codigo de produccion funcional.
-ADR-003, ADR-005, ADR-006 cerrados en codigo — 4 pasos manuales pendientes.
-ADR-007 parcialmente conectado — tipos creados, services sin conectar.
-0 tests en todo el repo.
+### FASE 0 — Estructura base .claude/ ✅ COMPLETADO
+Ejecutar `x.sh` — crea toda la estructura.
 
-## Sprint actual — S1: Completar pasos manuales de los ADRs cerrados
+### FASE 1 — Clasificar carpetas bloqueantes/dinámicas ✅ COMPLETADO
+Incluido en los archivos `services/<servicio>.md` generados por `x.sh`.
 
-Estas 6 tareas son de bajo riesgo y alto impacto — desbloquean lo que ya esta codificado:
+### FASE 2 — ADR-001: DTOs → Zod (BLOQUEANTE)
+**Estado:** Pendiente — es el primer sprint de código
+**Qué hacer:**
+1. Crear `ZodValidationPipe` + `ZodExceptionFilter` en cada servicio
+2. Migrar todos los DTOs de chatia-backend (~20 DTOs)
+3. Migrar DTOs de pasarelapagos-backend (2 DTOs)
+4. Migrar DTOs de workers-backend (3 DTOs)
+5. Eliminar `class-validator` y `class-transformer`
 
-- [ ] `pnpm add opossum --filter chatia-backend --filter notificaciones-backend` (DT-004a)
-- [ ] `cd workers-backend && pnpm prisma migrate dev --name add_campaign_recipient` (DT-003)
-- [ ] Conectar `DlqModule` en `chatia-backend/src/queue/queue.module.ts` (DT-015)
-- [ ] Registrar `CircuitBreakerService` en `NotificationsModule` (DT-004b)
-- [ ] `AssistantChatService` captura `CircuitOpenError` → fallback (DT-004c)
-- [ ] `dlq-monitor.service.ts` reemplaza `@ts-expect-error` por `firstValueFrom` (DT-008)
+### FASE 3 — Contratos gRPC documentados
+**Estado:** Pendiente
+**Qué hacer:**
+1. Completar `contracts/grpc-contracts.md` con los RPCs de cada .proto
+2. Documentar timeouts y fallbacks por par consumidor→proveedor
+3. Auditar controllers gRPC — extraer lógica de negocio al Service
 
-Adicionalmente en S1:
-- [ ] Fix `start:migrate` en chatia: `prisma migrate deploy && node dist/main.js` (DT-013)
-- [ ] Eliminar `AnalyticsModule` deprecated de chatia (DT-011)
-- [ ] Audit TenantGuard: `grep -rL "TenantGuard" */src/**/*.controller.ts` (DT-006)
+### FASE 4 — Domain/Repository: MOLDE VIVO
+**Estado:** Pendiente (después de Fase 2)
+**Qué hacer:**
+1. Migrar `chatia-backend/conversations/` → Domain + Repository (MOLDE VIVO)
+2. Migrar `pasarelapagos-backend/payments/` → Domain + Repository (CRÍTICO)
+3. Migrar módulos restantes en orden de complejidad
 
-## S2: Conectar toOutput() + Testing Fase 1
+### FASE 5 — Multi-tenant: auditoría de queries
+**Estado:** Pendiente
+**Qué hacer:**
+1. Auditar todos los queries Prisma sin `ecosystemId`
+2. Agregar `ecosystemId` donde falte
+3. Tests de cross-tenant
 
-### toOutput() en services (ADR-007 cierre final)
-- [ ] `conversations.service.ts` — `toConversationOutput()` + importar `ConversationOutput`
-- [ ] `contacts.service.ts` — `toContactOutput()` + eliminar clases inline
-- [ ] `payments.service.ts` — tipar `serialize()` con `PaymentOutput`
-- [ ] Audit final: `grep -rn "export class.*Dto" */src/**/*.service.ts`
-- [ ] Marcar JSONB con `// @ecosistema-ms/jsonb-cast`
-
-### Testing Fase 1 — de 3.0 a 6.0 (ver checklist completo)
-Prioridad por impacto economico:
-1. `routing.service.spec.ts` + `circuit-breaker.service.spec.ts` (pagos)
-2. `notification.processor.spec.ts` + `idempotency.helper.spec.ts`
-3. `assistant-chat.service.spec.ts` + `assignment.service.spec.ts`
-4. `projections.service.spec.ts` + `campaigns.service.spec.ts`
-
-## S3: CB completo + Observabilidad basica
-
-- [ ] CB en `OutgoingMessageProcessor` de chatia por channelType
-- [ ] `nestjs-pino` en chatia, analytics, notificaciones, workers
-- [ ] `correlationId` cross-service en `@ecosistema-ms/auth-server`
-- [ ] Metricas Prometheus reales en todos los MS
-- [ ] `accessToken` de ChannelAccount cifrado at-rest (DT-007)
-- [ ] Integration tests Supertest para contratos HTTP criticos
-
-## S4: Testing 85% + Observabilidad completa
-
-- [ ] `coverageThreshold: { lines: 85 }` en jest config de todos los MS
-- [ ] GitHub Actions: bloquear PR si cobertura baja del 85%
-- [ ] OpenTelemetry tracing distribuido
-- [ ] Dashboard Grafana con metricas unificadas
-- [ ] Alertas: DLQ, CB state, error rate, latencia LLM
-
-## S5: Hardening
-
-- [ ] mTLS entre microservicios en Railway
-- [ ] Versioning semantico de protos
-- [ ] Load testing de payments con k6
+### FASE 6 — Tests 85% + Enforcement CI
+**Estado:** Pendiente
+**Dependencia:** Fases 2-5 completadas

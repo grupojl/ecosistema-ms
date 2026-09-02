@@ -1,57 +1,28 @@
 # Packages compartidos — @ecosistema-ms/*
 
-## @ecosistema-ms/proto
-**Carpeta**: `packages/proto/`
+## Estado: TODOS BLOQUEANTES
 
-Fuente de verdad de los contratos gRPC.
+Los tres packages son invariantes de arquitectura.
+No se modifican sin ADR previo.
 
-```
-packages/proto/
-  proto/
-    chatia.proto
-    pagos.proto
-    notificaciones.proto
-    analytics.proto
-    workers.proto
-  src/
-    index.ts    # Resuelve path a los .proto en dev y en Railway runner
-```
+| Package | Nombre pkg | Rol | Clasificación |
+|---------|-----------|-----|---------------|
+| `packages/proto` | `@ecosistema-ms/proto` | Contratos gRPC (.proto + PROTO_PATHS) | 🔴 BLOQUEANTE |
+| `packages/auth-server` | `@ecosistema-ms/auth-server` | Guards, decorators, TenantContext | 🔴 BLOQUEANTE |
+| `packages/grpc-client` | `@ecosistema-ms/grpc-client` | Módulos cliente gRPC | 🔴 BLOQUEANTE (estructura) · 🟢 DINÁMICA (agregar módulos) |
 
-**Regla crítica**: los `.proto` se copian a `{WORKDIR}/proto/` en el Dockerfile.
-`src/index.ts` usa `process.cwd()` para resolver el path en ambos entornos.
+## Reglas por package
 
----
+### packages/proto
+- Agregar un nuevo `.proto` requiere: actualizar `packages/grpc-client` + el controller del servicio
+- Modificar un `.proto` existente (cambiar campos) rompe compilación — es intencional
+- `src/index.ts` — lógica de PROTO_PATHS no se toca sin ADR
 
-## @ecosistema-ms/auth-server
-**Carpeta**: `packages/auth-server/`
+### packages/auth-server
+- La interface de `TenantContext` es 🔴 BLOQUEANTE — cambiarla afecta todos los servicios
+- Los decorators (`@Public()`, `@Tenant()`) son 🔴 BLOQUEANTE
+- Agregar un nuevo decorator es 🟢 DINÁMICA si no modifica los existentes
 
-Guards, decorators y TenantContext para NestJS.
-
-- `TenantGuard` — verifica Firebase token + extrae `ecosystemId` y `organizationId`
-- `@Public()` — decorator para rutas sin auth (health, webhooks con firma propia)
-- `@Tenant()` — decorator para inyectar `TenantContext` en controller params
-
----
-
-## @ecosistema-ms/grpc-client
-**Carpeta**: `packages/grpc-client/`
-
-Módulos NestJS listos para inyectar en cualquier microservicio como cliente gRPC.
-
-```
-src/
-  chatia/chatia-grpc.module.ts
-  pagos/pagos-grpc.module.ts
-  notificaciones/notificaciones-grpc.module.ts
-  analytics/analytics-grpc.module.ts
-  workers/workers-grpc.module.ts
-  index.ts
-```
-
-Uso en un microservicio:
-```typescript
-import { ChatiaGrpcModule } from '@ecosistema-ms/grpc-client';
-
-@Module({ imports: [ChatiaGrpcModule] })
-export class MiModulo {}
-```
+### packages/grpc-client
+- La estructura de cada módulo cliente es 🔴 BLOQUEANTE (cómo se instancia el cliente)
+- Agregar un módulo para un nuevo servicio es 🟢 DINÁMICA (sigue el mismo patrón)

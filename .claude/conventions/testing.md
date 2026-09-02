@@ -1,65 +1,30 @@
-# Convenciones de Testing
+# Testing
 
 ## Stack
-- **Unit**: Jest + `@nestjs/testing`
-- **Integration**: Supertest (HTTP) + gRPC client de test
-- **E2E**: pendiente (S4)
 
-## Cobertura mínima
-- 85% en paths críticos (pagos, auth, procesamiento de mensajes)
-- 70% general en el resto
+- Backend: Jest + Supertest
+- Cobertura mínima: 85% en paths críticos (pendiente — no hay tests actualmente)
 
-## Estructura de tests por microservicio
+## Reglas duras
 
-```
-{servicio}/src/
-  {dominio}/
-    {dominio}.service.spec.ts      # unit — lógica de dominio
-    {dominio}.controller.spec.ts   # unit — surface HTTP
-  test/
-    {dominio}.e2e-spec.ts          # integration — contrato HTTP completo
-```
+- Un test de domain (cuando exista la capa domain) nunca importa `@nestjs/*`
+  ni `@prisma/client` — se testea sin mockear nada.
+- Cada módulo nuevo incluye: unit tests de la lógica de dominio + integration
+  test del contrato HTTP REST + integration test del contrato gRPC.
 
-## Patrón de test unitario (service)
+## Estado actual
 
-```typescript
-describe('PaymentsService', () => {
-  let service: PaymentsService;
-  let prisma:  DeepMockProxy<PrismaService>;
+No hay evidencia de tests en el packing. Prioridad baja hasta que:
+1. La Capa 2 (DTOs → Zod) esté migrada
+2. La Capa 4+5 (Domain/Repository) esté iniciada con el MOLDE VIVO
 
-  beforeEach(async () => {
-    const module = await Test.createTestingModule({
-      providers: [
-        PaymentsService,
-        { provide: PrismaService, useValue: mockDeep<PrismaService>() },
-      ],
-    }).compile();
+Testear services acoplados a Prisma es costoso y frágil.
+Testear domain puro y repositories con mock es barato y robusto.
 
-    service = module.get(PaymentsService);
-    prisma  = module.get(PrismaService);
-  });
+## Orden de implementación
 
-  it('should throw NotFoundException when payment not found', async () => {
-    prisma.payment.findUnique.mockResolvedValue(null);
-    await expect(service.findOne('id-inexistente', ctx)).rejects.toThrow(NotFoundException);
-  });
-});
-```
-
-## Tenant context en tests
-
-```typescript
-const mockCtx: TenantContext = {
-  ecosystemId:    'test-ecosystem',
-  organizationId: 'test-org',
-  userId:         'user-123',
-  role:           'ADMIN',
-};
-```
-
-## Jobs BullMQ en tests
-
-```typescript
-// Mockear el queue — no correr Redis en tests unitarios
-{ provide: getQueueToken(QUEUE_NAME), useValue: { add: jest.fn() } }
-```
+1. Crear domain de `conversations/` (chatia-backend) y `payments/` (pagos-backend)
+2. Tests de domain primero (sin NestJS, sin Prisma)
+3. Tests de repository (mock Prisma con `@prisma/client/testing`)
+4. Integration tests de controllers REST (Supertest)
+5. Integration tests de controllers gRPC

@@ -477,362 +477,6 @@ tsconfig.base.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path="chatia-backend/src/agents/dto/register-agent.dto.ts">
-// chatia-backend/src/agents/dto/register-agent.dto.ts
-// Extraido de agents.controller.ts donde estaba definido inline
-import { IsString, IsOptional, IsEmail, IsBoolean, MaxLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-⋮----
-export class RegisterAgentDto
-⋮----
-export class UpdateAgentDto
-</file>
-
-<file path="chatia-backend/src/common/services/circuit-breaker.service.ts">
-// chatia-backend/src/common/services/circuit-breaker.service.ts
-// Mismo patron que pasarelapagos y notificaciones-backend. ADR-005.
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import CircuitBreaker from 'opossum';
-⋮----
-export interface CircuitBreakerOptions {
-  timeout?:         number;
-  errorThreshold?:  number;
-  resetTimeout?:    number;
-  volumeThreshold?: number;
-}
-⋮----
-export class CircuitOpenError extends Error
-⋮----
-constructor(key: string)
-⋮----
-export class CircuitBreakerService implements OnModuleDestroy
-⋮----
-/**
-   * Parametros recomendados por integración:
-   *   groq-llm:        timeout:15000, errorThreshold:30, resetTimeout:120000
-   *   whatsapp-send:   timeout:10000, errorThreshold:40, resetTimeout:60000
-   *   instagram-send:  timeout:10000, errorThreshold:40, resetTimeout:60000
-   */
-async execute<T>(
-    key: string,
-    fn: () => Promise<T>,
-    options: CircuitBreakerOptions = {},
-): Promise<T>
-⋮----
-healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown'
-⋮----
-onModuleDestroy()
-⋮----
-private getOrCreate<T>(
-    key: string,
-    fn: () => Promise<T>,
-    opts: CircuitBreakerOptions,
-): CircuitBreaker<unknown[], T>
-</file>
-
-<file path="chatia-backend/src/contacts/dto/list-contacts.dto.ts">
-// chatia-backend/src/contacts/dto/list-contacts.dto.ts
-import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { ContactStatus } from '@prisma/client';
-⋮----
-export class ListContactsDto
-</file>
-
-<file path="chatia-backend/src/contacts/types/contact.types.ts">
-// chatia-backend/src/contacts/types/contact.types.ts
-// Tipos de salida del ContactsService. — ADR-007
-import type { ContactStatus, ChannelType } from '@prisma/client';
-⋮----
-export interface ContactOutput {
-  id:             string;
-  organizationId: string;
-  channelType:    ChannelType;
-  externalId:     string;
-  name:           string | null;
-  email:          string | null;
-  phone:          string | null;
-  avatarUrl:      string | null;
-  username:       string | null;
-  status:         ContactStatus;
-  optedOut:       boolean;
-  tags:           string[];
-  firstSeenAt:    Date;
-  lastSeenAt:     Date;
-  createdAt:      Date;
-}
-⋮----
-export interface ContactStatsOutput {
-  total:    number;
-  active:   number;
-  blocked:  number;
-  optedOut: number;
-}
-</file>
-
-<file path="chatia-backend/src/conversations/types/conversation.types.ts">
-// chatia-backend/src/conversations/types/conversation.types.ts
-// Tipos de salida del ConversationsService hacia controllers y gRPC.
-// Nunca exponer tipos Prisma crudos fuera del service. — ADR-007
-import type {
-  ConversationStatus,
-  ConversationStage,
-  ChannelType,
-} from '@prisma/client';
-⋮----
-export interface ConversationOutput {
-  id:               string;
-  status:           ConversationStatus;
-  stage:            ConversationStage;
-  isAiActive:       boolean;
-  assignedAgentId:  string | null;
-  lastMessageAt:    Date | null;
-  resolvedAt:       Date | null;
-  createdAt:        Date;
-  updatedAt:        Date;
-  // relaciones opcionales — solo cuando se piden con include
-  contact?: {
-    id:          string;
-    externalId:  string;
-    name:        string | null;
-    channelType: ChannelType;
-  };
-  lastMessage?: {
-    id:        string;
-    content:   string;
-    direction: 'INBOUND' | 'OUTBOUND';
-    createdAt: Date;
-  } | null;
-}
-⋮----
-// relaciones opcionales — solo cuando se piden con include
-⋮----
-export interface ConversationListOutput {
-  items: ConversationOutput[];
-  total: number;
-  page:  number;
-  limit: number;
-}
-</file>
-
-<file path="chatia-backend/src/groq/groq-cb.service.ts">
-// chatia-backend/src/groq/groq-cb.service.ts
-// Wrapper de GroqService con CircuitBreaker. ADR-005.
-// Si Groq cae: CircuitOpenError → fallback a AssistantConfig.fallbackMessage.
-// El AssistantChatService debe capturar CircuitOpenError y devolver el fallback.
-import { Injectable, Logger }         from '@nestjs/common';
-import { GroqService, GroqMessage }   from './groq.service.js';
-import { CircuitBreakerService, CircuitOpenError } from '../common/services/circuit-breaker.service.js';
-⋮----
-// LLM es el componente mas fragil — timeout alto, threshold bajo, recuperacion lenta
-⋮----
-export class GroqCbService
-⋮----
-constructor(
-⋮----
-/**
-   * Llama a Groq protegido por CB.
-   * Lanza CircuitOpenError si el breaker esta abierto.
-   * El caller (AssistantChatService) captura el error y devuelve fallbackMessage.
-   */
-async chat(messages: GroqMessage[], model?: string, temperature?: number): Promise<string>
-⋮----
-healthOf(): 'closed' | 'open' | 'halfOpen' | 'unknown'
-</file>
-
-<file path="chatia-backend/src/queue/dlq/dlq.controller.ts">
-// chatia-backend/src/queue/dlq/dlq.controller.ts
-import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation }    from '@nestjs/swagger';
-import { DlqService }                              from './dlq.service.js';
-import { TenantGuard }                             from '../../common/guards/tenant.guard.js';
-import { RolesGuard }                              from '../../common/guards/roles.guard.js';
-import { Roles }                                   from '../../common/decorators/roles.decorator.js';
-⋮----
-export class DlqController
-⋮----
-constructor(private readonly dlq: DlqService)
-⋮----
-getStats()
-⋮----
-retryJob(
-    @Param('queue') queue: 'incoming' | 'outgoing',
-    @Param('jobId') jobId: string,
-)
-⋮----
-retryAll(@Param('queue') queue: 'incoming' | 'outgoing')
-</file>
-
-<file path="chatia-backend/src/queue/dlq/dlq.module.ts">
-// chatia-backend/src/queue/dlq/dlq.module.ts
-import { Module }      from '@nestjs/common';
-import { BullModule }  from '@nestjs/bullmq';
-import { DlqService }  from './dlq.service.js';
-import { DlqController } from './dlq.controller.js';
-import { QUEUES }      from '../queue.constants.js';
-⋮----
-export class DlqModule
-</file>
-
-<file path="chatia-backend/src/queue/dlq/dlq.service.ts">
-// chatia-backend/src/queue/dlq/dlq.service.ts
-// Monitor y replay de la DLQ de mensajes de chatia.
-// ADR-003: jobs criticos (mensajes entrantes/salientes) necesitan DLQ propia.
-import { Injectable, Logger }    from '@nestjs/common';
-import { InjectQueue }           from '@nestjs/bullmq';
-import { Queue }                 from 'bullmq';
-import { QUEUES }                from '../queue.constants.js';
-⋮----
-export class DlqService
-⋮----
-constructor(
-⋮----
-async getStats()
-⋮----
-async retryJob(queue: 'incoming' | 'outgoing', jobId: string)
-⋮----
-async retryAll(queue: 'incoming' | 'outgoing')
-⋮----
-async clearDlq(queue: 'incoming' | 'outgoing')
-</file>
-
-<file path="notificaciones-backend/src/notifications/dlq/chatia-internal.interface.ts">
-// notificaciones-backend/src/notifications/dlq/chatia-internal.interface.ts
-// Tipado correcto del cliente gRPC de chatia para el DlqMonitorService.
-// Reemplaza el @ts-expect-error — rxjs interop de dlq-monitor.service.ts
-// ADR-007: sin @ts-expect-error en produccion.
-import type { Observable } from 'rxjs';
-⋮----
-export interface ChatiaNotifyRequest {
-  organizationId: string;
-  ecosystemId:    string;
-  type:           string;
-  title:          string;
-  body:           string;
-}
-⋮----
-export interface ChatiaNotifyResponse {
-  success: boolean;
-}
-⋮----
-/**
- * Interface tipada del cliente gRPC de chatia.
- * Los metodos gRPC retornan Observable<T> — usar firstValueFrom() para await.
- *
- * Uso correcto:
- *   const result = await firstValueFrom(this.chatiaClient.notifySystem(req));
- *
- * Incorrecto (deprecated rxjs, causa el @ts-expect-error):
- *   await this.chatiaClient.notifySystem(req).toPromise();
- */
-export interface ChatiaInternalGrpcClient {
-  notifySystem(req: ChatiaNotifyRequest): Observable<ChatiaNotifyResponse>;
-}
-⋮----
-notifySystem(req: ChatiaNotifyRequest): Observable<ChatiaNotifyResponse>;
-</file>
-
-<file path="notificaciones-backend/src/notifications/circuit-breaker.service.ts">
-// notificaciones-backend/src/notifications/circuit-breaker.service.ts
-// Copiado del patron de pasarelapagos-backend — opossum como estandar. ADR-005.
-// El mismo servicio funciona para cualquier llamada a proveedor externo.
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import CircuitBreaker from 'opossum';
-⋮----
-export interface CircuitBreakerOptions {
-  timeout?:        number; // ms antes de considerar fallido (default: 8000)
-  errorThreshold?: number; // % de errores para abrir (default: 40)
-  resetTimeout?:   number; // ms hasta intentar half-open (default: 60000)
-  volumeThreshold?: number; // minimo de requests para evaluar (default: 5)
-}
-⋮----
-timeout?:        number; // ms antes de considerar fallido (default: 8000)
-errorThreshold?: number; // % de errores para abrir (default: 40)
-resetTimeout?:   number; // ms hasta intentar half-open (default: 60000)
-volumeThreshold?: number; // minimo de requests para evaluar (default: 5)
-⋮----
-export class CircuitOpenError extends Error
-⋮----
-constructor(key: string)
-⋮----
-export class CircuitBreakerService implements OnModuleDestroy
-⋮----
-/**
-   * Ejecuta fn protegida por un circuit breaker identificado por key.
-   * Si el breaker esta abierto lanza CircuitOpenError inmediatamente.
-   *
-   * Parametros recomendados por canal:
-   *   sendgrid:          timeout:8000, errorThreshold:40, resetTimeout:60000
-   *   whatsapp-biz-api:  timeout:8000, errorThreshold:40, resetTimeout:60000
-   *   fcm:               timeout:5000, errorThreshold:50, resetTimeout:30000
-   */
-async execute<T>(
-    key: string,
-    fn: () => Promise<T>,
-    options: CircuitBreakerOptions = {},
-): Promise<T>
-⋮----
-healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown'
-⋮----
-statsOf(key: string)
-⋮----
-onModuleDestroy()
-⋮----
-private getOrCreate<T>(
-    key: string,
-    fn: () => Promise<T>,
-    opts: CircuitBreakerOptions,
-): CircuitBreaker<unknown[], T>
-⋮----
-// Actualizar la accion si el fn cambio
-</file>
-
-<file path="pasarelapagos-backend/src/modules/payments/types/payment.types.ts">
-// pasarelapagos-backend/src/modules/payments/types/payment.types.ts
-// PaymentOutput — tipo de salida del PaymentsService. — ADR-007
-// El service ya tenia private serialize() haciendo este trabajo.
-// Este archivo formaliza el tipo para que el controller lo use con inference.
-import type { PaymentStatus, PaymentMethodKind } from '@prisma/client';
-⋮----
-export interface PaymentOutput {
-  id:              string;
-  organizationId:  string;
-  status:          PaymentStatus;
-  amountMinor:     string;   // BigInt serializado como string — contrato del ecosistema
-  currency:        string;
-  country:         string;
-  method:          PaymentMethodKind;
-  providerId:      string;
-  externalId:      string | null;
-  description:     string | null;
-  failureCode:     string | null;
-  failureMessage:  string | null;
-  idempotencyKey:  string;
-  customerId:      string | null;
-  createdAt:       Date;
-  updatedAt:       Date;
-}
-⋮----
-amountMinor:     string;   // BigInt serializado como string — contrato del ecosistema
-⋮----
-export interface PaymentListOutput {
-  items:  PaymentOutput[];
-  total:  number;
-  page:   number;
-  limit:  number;
-}
-⋮----
-export interface RefundOutput {
-  id:               string;
-  paymentId:        string;
-  amountMinor:      string;
-  status:           string;
-  externalRefundId: string | null;
-  createdAt:        Date;
-}
-</file>
-
 <file path="analytics-backend/src/analytics/processors/analytics-event.processor.ts">
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
@@ -841,7 +485,7 @@ import { AnalyticsService } from "../analytics.service.js";
 import { ANALYTICS_EVENTS_QUEUE } from "../analytics.constants.js";
 export interface AnalyticsEventJobData { ecosystemId: string; organizationId: string; eventType: string; payload: Record<string, unknown>; occurredAt: string; }
 ⋮----
-export class AnalyticsEventProcessor extends WorkerHost {
+export class AnalyticsEventProcessor extends WorkerHost
 ⋮----
 constructor(private readonly svc: AnalyticsService)
 async process(job: Job<AnalyticsEventJobData>)
@@ -868,7 +512,7 @@ import { Redis }                            from 'ioredis';
 const LOCK_TTL_S  = 3_600; // 1 hora — duración máxima del cron
 const ROLLING_DAYS = 2;    // recalcular los últimos 2 días
 ⋮----
-export class ProjectionsService implements OnModuleInit {
+export class ProjectionsService implements OnModuleInit
 ⋮----
 constructor(
     private readonly prisma:  PrismaService,
@@ -916,7 +560,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response }               from 'express';
 import { SseService }                           from './sse.service.js';
 ⋮----
-export class SseController implements OnModuleDestroy {
+export class SseController implements OnModuleDestroy
 ⋮----
 constructor(private readonly sse: SseService)
 ⋮----
@@ -941,7 +585,7 @@ sseStats()
 import { Module }     from '@nestjs/common';
 import { SseService } from './sse.service.js';
 ⋮----
-export class SseModule {}
+export class SseModule
 </file>
 
 <file path="analytics-backend/src/analytics/sse/sse.service.ts">
@@ -975,7 +619,7 @@ interface SseClient {
   heartbeat:      NodeJS.Timeout;
 }
 ⋮----
-export class SseService implements OnModuleDestroy {
+export class SseService implements OnModuleDestroy
 ⋮----
 private readonly clients = new Map<string, SseClient>(); // clientId → client
 ⋮----
@@ -1048,9 +692,9 @@ import { IsEnum, IsString, IsDateString } from 'class-validator';
 import { AnalyticsService } from './analytics.service.js';
 import { ExportService }    from './export.service.js';
 ⋮----
-class ExportDto {
+class ExportDto
 ⋮----
-export class AnalyticsController {
+export class AnalyticsController
 ⋮----
 constructor(
 ⋮----
@@ -1096,7 +740,7 @@ import { ExportService }           from './export.service.js';
 import { AnalyticsEventProcessor } from './processors/analytics-event.processor.js';
 import { ProjectionsService }      from './projections/projections.service.js';
 ⋮----
-export class AnalyticsModule {}
+export class AnalyticsModule
 </file>
 
 <file path="analytics-backend/src/analytics/export.service.ts">
@@ -1119,7 +763,7 @@ export interface ExportJobData {
   reportType:     string;
 }
 ⋮----
-export class ExportService {
+export class ExportService
 ⋮----
 constructor(
 ⋮----
@@ -1133,14 +777,14 @@ import { Module } from "@nestjs/common";
 import { AnalyticsModule } from "../analytics/analytics.module.js";
 import { AnalyticsGrpcController } from "./analytics-grpc.controller.js";
 ⋮----
-export class GrpcModule {}
+export class GrpcModule
 </file>
 
 <file path="analytics-backend/src/prisma/prisma.module.ts">
 import { Global, Module } from "@nestjs/common";
 import { PrismaService } from "./prisma.service.js";
 ⋮----
-export class PrismaModule {}
+export class PrismaModule
 </file>
 
 <file path="analytics-backend/src/prisma/prisma.service.ts">
@@ -1149,7 +793,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
 ⋮----
 constructor()
 ⋮----
@@ -1171,7 +815,7 @@ import { HealthModule }    from './health/health.module.js';
 import { AnalyticsModule } from './analytics/analytics.module.js';
 import { GrpcModule }      from './grpc/grpc.module.js';
 ⋮----
-export class AppModule {}
+export class AppModule
 </file>
 
 <file path="analytics-backend/package.json">
@@ -1263,6 +907,17 @@ export class AppModule {}
 }
 </file>
 
+<file path="chatia-backend/src/agents/dto/register-agent.dto.ts">
+// chatia-backend/src/agents/dto/register-agent.dto.ts
+// Extraido de agents.controller.ts donde estaba definido inline
+import { IsString, IsOptional, IsEmail, IsBoolean, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+⋮----
+export class RegisterAgentDto {
+⋮----
+export class UpdateAgentDto {
+</file>
+
 <file path="chatia-backend/src/agents/agents.module.ts">
 // src/agents/agents.module.ts
 import { Module } from '@nestjs/common';
@@ -1329,7 +984,7 @@ import { Controller, Get, Query, HttpStatus, Res } from '@nestjs/common';
 import { ApiTags }                                  from '@nestjs/swagger';
 import type { Response }                            from 'express';
 ⋮----
-export class AnalyticsController {
+export class AnalyticsController
 ⋮----
 gone(@Res() res: Response, @Query() q: Record<string, string>): void
 ⋮----
@@ -1345,7 +1000,7 @@ import { Module }             from '@nestjs/common';
 import { AnalyticsController } from './analytics.controller.js';
 import { AnalyticsService }    from './analytics.service.js';
 ⋮----
-export class AnalyticsModule {}
+export class AnalyticsModule
 </file>
 
 <file path="chatia-backend/src/analytics/analytics.service.ts">
@@ -1366,7 +1021,7 @@ export class AnalyticsModule {}
 ⋮----
 import { Injectable, Logger } from '@nestjs/common';
 ⋮----
-export class AnalyticsService {
+export class AnalyticsService
 ⋮----
 constructor()
 </file>
@@ -1377,7 +1032,7 @@ import { Module }       from '@nestjs/common';
 import { BullModule }   from '@nestjs/bullmq';
 import { ANALYTICS_QUEUE, AnalyticsEventsService } from './analytics-events.service.js';
 ⋮----
-export class AnalyticsEventsModule {}
+export class AnalyticsEventsModule
 </file>
 
 <file path="chatia-backend/src/analytics-events/analytics-events.service.ts">
@@ -1409,7 +1064,7 @@ export interface AnalyticsEventJob {
   occurredAtUnix: number;
 }
 ⋮----
-export class AnalyticsEventsService {
+export class AnalyticsEventsService
 ⋮----
 constructor(
 ⋮----
@@ -1858,6 +1513,48 @@ async del(pattern: string): Promise<void>
 buildFaqKey(kbId: string, question: string): string
 </file>
 
+<file path="chatia-backend/src/common/services/circuit-breaker.service.ts">
+// chatia-backend/src/common/services/circuit-breaker.service.ts
+// Mismo patron que pasarelapagos y notificaciones-backend. ADR-005.
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import CircuitBreaker from 'opossum';
+⋮----
+export interface CircuitBreakerOptions {
+  timeout?:         number;
+  errorThreshold?:  number;
+  resetTimeout?:    number;
+  volumeThreshold?: number;
+}
+⋮----
+export class CircuitOpenError extends Error {
+⋮----
+constructor(key: string)
+⋮----
+export class CircuitBreakerService implements OnModuleDestroy {
+⋮----
+/**
+   * Parametros recomendados por integración:
+   *   groq-llm:        timeout:15000, errorThreshold:30, resetTimeout:120000
+   *   whatsapp-send:   timeout:10000, errorThreshold:40, resetTimeout:60000
+   *   instagram-send:  timeout:10000, errorThreshold:40, resetTimeout:60000
+   */
+async execute<T>(
+    key: string,
+    fn: () => Promise<T>,
+    options: CircuitBreakerOptions = {},
+): Promise<T>
+⋮----
+healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown'
+⋮----
+onModuleDestroy()
+⋮----
+private getOrCreate<T>(
+    key: string,
+    fn: () => Promise<T>,
+    opts: CircuitBreakerOptions,
+): CircuitBreaker<unknown[], T>
+</file>
+
 <file path="chatia-backend/src/common/services/embedding.service.ts">
 // src/common/services/embedding.service.ts
 import { Injectable, Logger } from '@nestjs/common';
@@ -1897,15 +1594,45 @@ export class CommonModule {}
 export class CreateContactDto {}
 </file>
 
-<file path="chatia-backend/src/contacts/dto/update-contact.dto.ts">
-// chatia-backend/src/contacts/dto/update-contact.dto.ts
-import {
-  IsString, IsOptional, IsEmail, IsEnum, IsArray, IsBoolean,
-} from 'class-validator';
+<file path="chatia-backend/src/contacts/dto/list-contacts.dto.ts">
+// chatia-backend/src/contacts/dto/list-contacts.dto.ts
+import { IsString, IsOptional, IsEnum, IsInt, Min, Max } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { ContactStatus } from '@prisma/client';
 ⋮----
-export class UpdateContactDto
+export class ListContactsDto {
+</file>
+
+<file path="chatia-backend/src/contacts/types/contact.types.ts">
+// chatia-backend/src/contacts/types/contact.types.ts
+// Tipos de salida del ContactsService. — ADR-007
+import type { ContactStatus, ChannelType } from '@prisma/client';
+⋮----
+export interface ContactOutput {
+  id:             string;
+  organizationId: string;
+  channelType:    ChannelType;
+  externalId:     string;
+  name:           string | null;
+  email:          string | null;
+  phone:          string | null;
+  avatarUrl:      string | null;
+  username:       string | null;
+  status:         ContactStatus;
+  optedOut:       boolean;
+  tags:           string[];
+  firstSeenAt:    Date;
+  lastSeenAt:     Date;
+  createdAt:      Date;
+}
+⋮----
+export interface ContactStatsOutput {
+  total:    number;
+  active:   number;
+  blocked:  number;
+  optedOut: number;
+}
 </file>
 
 <file path="chatia-backend/src/contacts/contacts.controller.ts">
@@ -1970,6 +1697,51 @@ async update(contactId: string, organizationId: string, dto: UpdateContactDto)
 async getStats(organizationId: string)
 </file>
 
+<file path="chatia-backend/src/conversations/types/conversation.types.ts">
+// chatia-backend/src/conversations/types/conversation.types.ts
+// Tipos de salida del ConversationsService hacia controllers y gRPC.
+// Nunca exponer tipos Prisma crudos fuera del service. — ADR-007
+import type {
+  ConversationStatus,
+  ConversationStage,
+  ChannelType,
+} from '@prisma/client';
+⋮----
+export interface ConversationOutput {
+  id:               string;
+  status:           ConversationStatus;
+  stage:            ConversationStage;
+  isAiActive:       boolean;
+  assignedAgentId:  string | null;
+  lastMessageAt:    Date | null;
+  resolvedAt:       Date | null;
+  createdAt:        Date;
+  updatedAt:        Date;
+  // relaciones opcionales — solo cuando se piden con include
+  contact?: {
+    id:          string;
+    externalId:  string;
+    name:        string | null;
+    channelType: ChannelType;
+  };
+  lastMessage?: {
+    id:        string;
+    content:   string;
+    direction: 'INBOUND' | 'OUTBOUND';
+    createdAt: Date;
+  } | null;
+}
+⋮----
+// relaciones opcionales — solo cuando se piden con include
+⋮----
+export interface ConversationListOutput {
+  items: ConversationOutput[];
+  total: number;
+  page:  number;
+  limit: number;
+}
+</file>
+
 <file path="chatia-backend/src/conversations/conversations.module.ts">
 // chatia-backend/src/conversations/conversations.module.ts
 import { Module }              from '@nestjs/common';
@@ -1987,7 +1759,7 @@ import { QUEUES }                  from '../queue/queue.constants';
 ⋮----
 AnalyticsEventsModule,   // ADR-003 A-1.4
 ⋮----
-export class ConversationsModule {}
+export class ConversationsModule
 </file>
 
 <file path="chatia-backend/src/core/strategies/project-context.interface.ts">
@@ -2280,7 +2052,7 @@ private async enqueueIngest(documentId: string, organizationId: string): Promise
 ⋮----
 import { Injectable, Logger } from '@nestjs/common';
 ⋮----
-export class FaqIngestionProcessor {
+export class FaqIngestionProcessor
 ⋮----
 constructor()
 </file>
@@ -2409,7 +2181,7 @@ import { QUEUES }                from '../queue/queue.constants.js';
 ⋮----
 FaqIngestionProcessor, // deprecated — eliminar semana 7
 ⋮----
-export class FaqModule {}
+export class FaqModule
 </file>
 
 <file path="chatia-backend/src/firebase/firebase.module.ts">
@@ -2433,6 +2205,31 @@ onModuleInit()
 async verifyIdToken(token: string): Promise<admin.auth.DecodedIdToken>
 ⋮----
 get isInitialized(): boolean
+</file>
+
+<file path="chatia-backend/src/groq/groq-cb.service.ts">
+// chatia-backend/src/groq/groq-cb.service.ts
+// Wrapper de GroqService con CircuitBreaker. ADR-005.
+// Si Groq cae: CircuitOpenError → fallback a AssistantConfig.fallbackMessage.
+// El AssistantChatService debe capturar CircuitOpenError y devolver el fallback.
+import { Injectable, Logger }         from '@nestjs/common';
+import { GroqService, GroqMessage }   from './groq.service.js';
+import { CircuitBreakerService, CircuitOpenError } from '../common/services/circuit-breaker.service.js';
+⋮----
+// LLM es el componente mas fragil — timeout alto, threshold bajo, recuperacion lenta
+⋮----
+export class GroqCbService {
+⋮----
+constructor(
+⋮----
+/**
+   * Llama a Groq protegido por CB.
+   * Lanza CircuitOpenError si el breaker esta abierto.
+   * El caller (AssistantChatService) captura el error y devuelve fallbackMessage.
+   */
+async chat(messages: GroqMessage[], model?: string, temperature?: number): Promise<string>
+⋮----
+healthOf(): 'closed' | 'open' | 'halfOpen' | 'unknown'
 </file>
 
 <file path="chatia-backend/src/groq/groq.module.ts">
@@ -3080,6 +2877,62 @@ async update(slug: string, organizationId: string, dto: UpdateProjectDto)
 async remove(slug: string, organizationId: string)
 </file>
 
+<file path="chatia-backend/src/queue/dlq/dlq.controller.ts">
+// chatia-backend/src/queue/dlq/dlq.controller.ts
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation }    from '@nestjs/swagger';
+import { DlqService }                              from './dlq.service.js';
+import { TenantGuard }                             from '../../common/guards/tenant.guard.js';
+import { RolesGuard }                              from '../../common/guards/roles.guard.js';
+import { Roles }                                   from '../../common/decorators/roles.decorator.js';
+⋮----
+export class DlqController {
+⋮----
+constructor(private readonly dlq: DlqService)
+⋮----
+getStats()
+⋮----
+retryJob(
+    @Param('queue') queue: 'incoming' | 'outgoing',
+    @Param('jobId') jobId: string,
+)
+⋮----
+retryAll(@Param('queue') queue: 'incoming' | 'outgoing')
+</file>
+
+<file path="chatia-backend/src/queue/dlq/dlq.module.ts">
+// chatia-backend/src/queue/dlq/dlq.module.ts
+import { Module }      from '@nestjs/common';
+import { BullModule }  from '@nestjs/bullmq';
+import { DlqService }  from './dlq.service.js';
+import { DlqController } from './dlq.controller.js';
+import { QUEUES }      from '../queue.constants.js';
+⋮----
+export class DlqModule {}
+</file>
+
+<file path="chatia-backend/src/queue/dlq/dlq.service.ts">
+// chatia-backend/src/queue/dlq/dlq.service.ts
+// Monitor y replay de la DLQ de mensajes de chatia.
+// ADR-003: jobs criticos (mensajes entrantes/salientes) necesitan DLQ propia.
+import { Injectable, Logger }    from '@nestjs/common';
+import { InjectQueue }           from '@nestjs/bullmq';
+import { Queue }                 from 'bullmq';
+import { QUEUES }                from '../queue.constants.js';
+⋮----
+export class DlqService {
+⋮----
+constructor(
+⋮----
+async getStats()
+⋮----
+async retryJob(queue: 'incoming' | 'outgoing', jobId: string)
+⋮----
+async retryAll(queue: 'incoming' | 'outgoing')
+⋮----
+async clearDlq(queue: 'incoming' | 'outgoing')
+</file>
+
 <file path="chatia-backend/src/queue/processors/incoming-message.processor.ts">
 // src/queue/processors/incoming-message.processor.ts
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
@@ -3296,7 +3149,7 @@ import { NotificationsModule } from "../notifications/notifications.module.js";
 import { PreferencesModule } from "../preferences/preferences.module.js";
 import { NotificacionesGrpcController } from "./notificaciones-grpc.controller.js";
 ⋮----
-export class GrpcModule {}
+export class GrpcModule
 </file>
 
 <file path="notificaciones-backend/src/metrics/metrics.module.ts">
@@ -3304,7 +3157,7 @@ export class GrpcModule {}
 import { Global, Module } from '@nestjs/common';
 import { MetricsService }  from './metrics.service.js';
 ⋮----
-export class MetricsModule {}
+export class MetricsModule
 </file>
 
 <file path="notificaciones-backend/src/metrics/metrics.service.ts">
@@ -3319,7 +3172,7 @@ import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { metrics }     from '@opentelemetry/api';
 import type { Counter, Histogram, UpDownCounter } from '@opentelemetry/api';
 ⋮----
-export class MetricsService implements OnModuleInit {
+export class MetricsService implements OnModuleInit
 ⋮----
 onModuleInit(): void
 ⋮----
@@ -3336,7 +3189,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
 ⋮----
-export class EmailAdapter implements INotificationChannel, OnModuleInit {
+export class EmailAdapter implements INotificationChannel, OnModuleInit
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -3368,7 +3221,7 @@ import type { INotificationChannel, SendPayload } from '../../interfaces/notific
 ⋮----
 const FCM_BATCH_SIZE = 500; // límite de la API de FCM
 ⋮----
-export class PushAdapter implements INotificationChannel, OnModuleInit {
+export class PushAdapter implements INotificationChannel, OnModuleInit
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -3414,7 +3267,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
 ⋮----
-export class WhatsappAdapter implements INotificationChannel, OnModuleInit {
+export class WhatsappAdapter implements INotificationChannel, OnModuleInit
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -3435,6 +3288,42 @@ import { createHash } from 'node:crypto';
 export function buildIdempotencyKey(params: {
   eventType: string; contactId: string; organizationId: string; windowMinutes?: number;
 }): string
+</file>
+
+<file path="notificaciones-backend/src/notifications/dlq/chatia-internal.interface.ts">
+// notificaciones-backend/src/notifications/dlq/chatia-internal.interface.ts
+// Tipado correcto del cliente gRPC de chatia para el DlqMonitorService.
+// Reemplaza el @ts-expect-error — rxjs interop de dlq-monitor.service.ts
+// ADR-007: sin @ts-expect-error en produccion.
+import type { Observable } from 'rxjs';
+⋮----
+export interface ChatiaNotifyRequest {
+  organizationId: string;
+  ecosystemId:    string;
+  type:           string;
+  title:          string;
+  body:           string;
+}
+⋮----
+export interface ChatiaNotifyResponse {
+  success: boolean;
+}
+⋮----
+/**
+ * Interface tipada del cliente gRPC de chatia.
+ * Los metodos gRPC retornan Observable<T> — usar firstValueFrom() para await.
+ *
+ * Uso correcto:
+ *   const result = await firstValueFrom(this.chatiaClient.notifySystem(req));
+ *
+ * Incorrecto (deprecated rxjs, causa el @ts-expect-error):
+ *   await this.chatiaClient.notifySystem(req).toPromise();
+ */
+export interface ChatiaInternalGrpcClient {
+  notifySystem(req: ChatiaNotifyRequest): Observable<ChatiaNotifyResponse>;
+}
+⋮----
+notifySystem(req: ChatiaNotifyRequest): Observable<ChatiaNotifyResponse>;
 </file>
 
 <file path="notificaciones-backend/src/notifications/interfaces/notification-channel.interface.ts">
@@ -3469,6 +3358,61 @@ isConfigured():   boolean;
 send(payload: SendPayload): Promise<void>;
 </file>
 
+<file path="notificaciones-backend/src/notifications/circuit-breaker.service.ts">
+// notificaciones-backend/src/notifications/circuit-breaker.service.ts
+// Copiado del patron de pasarelapagos-backend — opossum como estandar. ADR-005.
+// El mismo servicio funciona para cualquier llamada a proveedor externo.
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import CircuitBreaker from 'opossum';
+⋮----
+export interface CircuitBreakerOptions {
+  timeout?:        number; // ms antes de considerar fallido (default: 8000)
+  errorThreshold?: number; // % de errores para abrir (default: 40)
+  resetTimeout?:   number; // ms hasta intentar half-open (default: 60000)
+  volumeThreshold?: number; // minimo de requests para evaluar (default: 5)
+}
+⋮----
+timeout?:        number; // ms antes de considerar fallido (default: 8000)
+errorThreshold?: number; // % de errores para abrir (default: 40)
+resetTimeout?:   number; // ms hasta intentar half-open (default: 60000)
+volumeThreshold?: number; // minimo de requests para evaluar (default: 5)
+⋮----
+export class CircuitOpenError extends Error {
+⋮----
+constructor(key: string)
+⋮----
+export class CircuitBreakerService implements OnModuleDestroy {
+⋮----
+/**
+   * Ejecuta fn protegida por un circuit breaker identificado por key.
+   * Si el breaker esta abierto lanza CircuitOpenError inmediatamente.
+   *
+   * Parametros recomendados por canal:
+   *   sendgrid:          timeout:8000, errorThreshold:40, resetTimeout:60000
+   *   whatsapp-biz-api:  timeout:8000, errorThreshold:40, resetTimeout:60000
+   *   fcm:               timeout:5000, errorThreshold:50, resetTimeout:30000
+   */
+async execute<T>(
+    key: string,
+    fn: () => Promise<T>,
+    options: CircuitBreakerOptions = {},
+): Promise<T>
+⋮----
+healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown'
+⋮----
+statsOf(key: string)
+⋮----
+onModuleDestroy()
+⋮----
+private getOrCreate<T>(
+    key: string,
+    fn: () => Promise<T>,
+    opts: CircuitBreakerOptions,
+): CircuitBreaker<unknown[], T>
+⋮----
+// Actualizar la accion si el fn cambio
+</file>
+
 <file path="notificaciones-backend/src/notifications/notifications.constants.ts">
 // notificaciones-backend/src/notifications/notifications.constants.ts
 ⋮----
@@ -3497,9 +3441,9 @@ import { IsEnum, IsString, IsOptional, IsObject } from 'class-validator';
 import { NotificationsService }    from './notifications.service.js';
 import type { EnqueueNotificationDto } from './notifications.service.js';
 ⋮----
-class EnqueueDto implements EnqueueNotificationDto {
+class EnqueueDto implements EnqueueNotificationDto
 ⋮----
-export class NotificationsController {
+export class NotificationsController
 ⋮----
 constructor(private readonly svc: NotificationsService)
 ⋮----
@@ -3539,7 +3483,7 @@ import { DlqModule }                 from './dlq/dlq.module.js';
 ⋮----
 // Processors BullMQ
 ⋮----
-export class NotificationsModule {}
+export class NotificationsModule
 </file>
 
 <file path="notificaciones-backend/src/notifications/notifications.service.ts">
@@ -3569,7 +3513,7 @@ export interface StatsQuery {
   channel?:       'WHATSAPP' | 'EMAIL' | 'PUSH';
 }
 ⋮----
-export class NotificationsService {
+export class NotificationsService
 ⋮----
 constructor(
 ⋮----
@@ -3605,7 +3549,7 @@ import { Controller, Get, Put, Param, Body } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 import { PreferencesService } from "./preferences.service.js";
 ⋮----
-export class PreferencesController {
+export class PreferencesController
 ⋮----
 constructor(private readonly svc: PreferencesService)
 ⋮----
@@ -3620,14 +3564,14 @@ import { Module } from "@nestjs/common";
 import { PreferencesController } from "./preferences.controller.js";
 import { PreferencesService } from "./preferences.service.js";
 ⋮----
-export class PreferencesModule {}
+export class PreferencesModule
 </file>
 
 <file path="notificaciones-backend/src/preferences/preferences.service.ts">
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 ⋮----
-export class PreferencesService {
+export class PreferencesService
 ⋮----
 constructor(private readonly prisma: PrismaService)
 getPreferences(organizationId: string, contactId: string)
@@ -3638,7 +3582,7 @@ upsertPreference(ecosystemId: string, organizationId: string, contactId: string,
 import { Global, Module } from "@nestjs/common";
 import { PrismaService } from "./prisma.service.js";
 ⋮----
-export class PrismaModule {}
+export class PrismaModule
 </file>
 
 <file path="notificaciones-backend/src/prisma/prisma.service.ts">
@@ -3647,7 +3591,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
 ⋮----
 constructor()
 ⋮----
@@ -3669,7 +3613,7 @@ import { PreferencesModule }    from './preferences/preferences.module.js';
 import { GrpcModule }           from './grpc/grpc.module.js';
 import { MetricsModule }        from './metrics/metrics.module.js';
 ⋮----
-export class AppModule {}
+export class AppModule
 </file>
 
 <file path="notificaciones-backend/package.json">
@@ -3816,7 +3760,7 @@ import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from "@ecosistema-ms/proto";
  * URL interna Railway: CHATIA_GRPC_URL (ej: chatia-backend.railway.internal:5001)
  */
 ⋮----
-export class ChatiaGrpcModule {}
+export class ChatiaGrpcModule
 </file>
 
 <file path="packages/grpc-client/src/notificaciones/notificaciones-grpc.module.ts">
@@ -3824,7 +3768,7 @@ import { Module } from "@nestjs/common";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { NOTIF_PROTO_PATH, NOTIF_PACKAGE } from "@ecosistema-ms/proto";
 ⋮----
-export class NotificacionesGrpcModule {}
+export class NotificacionesGrpcModule
 </file>
 
 <file path="packages/grpc-client/src/pagos/pagos-grpc.module.ts">
@@ -3839,7 +3783,7 @@ import { PAGOS_PROTO_PATH, PAGOS_PACKAGE } from "@ecosistema-ms/proto";
  * URL interna Railway: PAGOS_GRPC_URL (ej: pasarelapagos-backend.railway.internal:5002)
  */
 ⋮----
-export class PagosGrpcModule {}
+export class PagosGrpcModule
 </file>
 
 <file path="packages/grpc-client/src/workers/workers-grpc.module.ts">
@@ -3847,7 +3791,7 @@ import { Module } from "@nestjs/common";
 import { ClientsModule, Transport } from "@nestjs/microservices";
 import { WORKERS_PROTO_PATH, WORKERS_PACKAGE } from "@ecosistema-ms/proto";
 ⋮----
-export class WorkersGrpcModule {}
+export class WorkersGrpcModule
 </file>
 
 <file path="packages/grpc-client/src/index.ts">
@@ -4399,7 +4343,7 @@ export class SharedGuardsModule {}
 import { Controller, Get } from "@nestjs/common";
 import { ApiTags }          from "@nestjs/swagger";
 ⋮----
-export class HealthController {
+export class HealthController
 ⋮----
 check()
 </file>
@@ -4408,7 +4352,7 @@ check()
 import { Module }           from "@nestjs/common";
 import { HealthController }  from "./health.controller";
 ⋮----
-export class HealthModule {}
+export class HealthModule
 </file>
 
 <file path="pasarelapagos-backend/src/modules/audit/audit.module.ts">
@@ -4694,6 +4638,51 @@ import { PaymentStatus } from '@prisma/client';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
 export class ListPaymentsDto {
+</file>
+
+<file path="pasarelapagos-backend/src/modules/payments/types/payment.types.ts">
+// pasarelapagos-backend/src/modules/payments/types/payment.types.ts
+// PaymentOutput — tipo de salida del PaymentsService. — ADR-007
+// El service ya tenia private serialize() haciendo este trabajo.
+// Este archivo formaliza el tipo para que el controller lo use con inference.
+import type { PaymentStatus, PaymentMethodKind } from '@prisma/client';
+⋮----
+export interface PaymentOutput {
+  id:              string;
+  organizationId:  string;
+  status:          PaymentStatus;
+  amountMinor:     string;   // BigInt serializado como string — contrato del ecosistema
+  currency:        string;
+  country:         string;
+  method:          PaymentMethodKind;
+  providerId:      string;
+  externalId:      string | null;
+  description:     string | null;
+  failureCode:     string | null;
+  failureMessage:  string | null;
+  idempotencyKey:  string;
+  customerId:      string | null;
+  createdAt:       Date;
+  updatedAt:       Date;
+}
+⋮----
+amountMinor:     string;   // BigInt serializado como string — contrato del ecosistema
+⋮----
+export interface PaymentListOutput {
+  items:  PaymentOutput[];
+  total:  number;
+  page:   number;
+  limit:  number;
+}
+⋮----
+export interface RefundOutput {
+  id:               string;
+  paymentId:        string;
+  amountMinor:      string;
+  status:           string;
+  externalRefundId: string | null;
+  createdAt:        Date;
+}
 </file>
 
 <file path="pasarelapagos-backend/src/modules/payments/payments.controller.ts">
@@ -5474,7 +5463,7 @@ import { Controller, Get, Post, Body, Param } from "@nestjs/common";
 import { ApiTags, ApiOperation }              from "@nestjs/swagger";
 import { PagosService }                       from "./pagos.service";
 ⋮----
-export class PagosController {
+export class PagosController
 ⋮----
 constructor(private readonly svc: PagosService)
 ⋮----
@@ -5489,14 +5478,14 @@ import { PagosService }    from "./pagos.service";
 import { PagosController } from "./pagos.controller";
 import { PagosGrpcController } from "./pagos.grpc.controller";
 ⋮----
-export class PagosModule {}
+export class PagosModule
 </file>
 
 <file path="pasarelapagos-backend/src/pagos/pagos.service.ts">
 import { Injectable, Logger } from "@nestjs/common";
 import { PrismaService }      from "../prisma/prisma.service";
 ⋮----
-export class PagosService {
+export class PagosService
 ⋮----
 constructor(private readonly prisma: PrismaService)
 ⋮----
@@ -5518,14 +5507,14 @@ async getPaymentStatus(paymentId: string, organizationId: string)
 import { Global, Module } from "@nestjs/common";
 import { PrismaService }  from "./prisma.service";
 ⋮----
-export class PrismaModule {}
+export class PrismaModule
 </file>
 
 <file path="pasarelapagos-backend/src/prisma/prisma.service.ts">
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
 import { PrismaClient } from "@prisma/client";
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
 ⋮----
 async onModuleInit()
 ⋮----
@@ -5603,7 +5592,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger'
 import { CampaignsService }    from './campaigns.service.js';
 import { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
 ⋮----
-export class CampaignsController {
+export class CampaignsController
 ⋮----
 constructor(private readonly svc: CampaignsService)
 ⋮----
@@ -5642,7 +5631,7 @@ import { WORKER_QUEUES } from '../jobs/jobs.constants.js';
 import { CampaignsController } from './campaigns.controller.js';
 import { CampaignsService }    from './campaigns.service.js';
 ⋮----
-export class CampaignsModule {}
+export class CampaignsModule
 </file>
 
 <file path="workers-backend/src/dlq/dlq.controller.ts">
@@ -5653,7 +5642,7 @@ import {
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { DlqService } from './dlq.service.js';
 ⋮----
-export class DlqController {
+export class DlqController
 ⋮----
 constructor(private readonly svc: DlqService)
 ⋮----
@@ -5670,7 +5659,7 @@ discard(@Param('queue') queue: string, @Param('jobId') jobId: string)
 import { Module } from "@nestjs/common";
 import { JobsModule } from "../jobs/jobs.module.js";
 import { WorkersGrpcController } from "./workers-grpc.controller.js";
-@Module({ imports: [JobsModule], controllers: [WorkersGrpcController] }) export class GrpcModule {}
+@Module(
 </file>
 
 <file path="workers-backend/src/grpc/workers-grpc.controller.ts">
@@ -5678,7 +5667,7 @@ import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
 import { JobsService } from "../jobs/jobs.service.js";
 ⋮----
-export class WorkersGrpcController {
+export class WorkersGrpcController
 ⋮----
 constructor(private readonly jobs: JobsService)
 ⋮----
@@ -5751,7 +5740,7 @@ export interface FaqIngestJobData {
   chunkSize: number; chunkOverlap: number; embeddingModel: string;
 }
 ⋮----
-export class FaqIngestProcessor extends WorkerHost {
+export class FaqIngestProcessor extends WorkerHost
 ⋮----
 constructor(private readonly jobs: JobsService)
 async process(job: Job<FaqIngestJobData>): Promise<void>
@@ -5789,7 +5778,7 @@ interface BreakerConfig {
 ⋮----
 successThreshold: number; // éxitos en HALF_OPEN para cerrar
 ⋮----
-export class CircuitBreakerService {
+export class CircuitBreakerService
 ⋮----
 constructor(private readonly config: ConfigService)
 ⋮----
@@ -5832,7 +5821,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import { CircuitBreakerService }            from './circuit-breaker.service.js';
 ⋮----
-export class EmbeddingService implements OnModuleInit {
+export class EmbeddingService implements OnModuleInit
 ⋮----
 constructor(
 ⋮----
@@ -5868,7 +5857,7 @@ import { Controller, Get, Param } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { JobsService } from "./jobs.service.js";
 ⋮----
-export class JobsController {
+export class JobsController
 ⋮----
 constructor(private readonly svc: JobsService)
 @Get(":jobId/status") status(@Param("jobId") jobId: string)
@@ -5878,7 +5867,7 @@ constructor(private readonly svc: JobsService)
 import { Injectable, NotFoundException, Logger } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 ⋮----
-export class JobsService {
+export class JobsService
 ⋮----
 constructor(private readonly prisma: PrismaService)
 async getJobStatus(jobId: string)
@@ -5892,7 +5881,7 @@ import { Global, Module } from '@nestjs/common';
 import { WorkersMetricsService } from './metrics.service.js';
 import { CircuitBreakerService } from '../jobs/services/circuit-breaker.service.js';
 ⋮----
-export class MetricsModule {}
+export class MetricsModule
 </file>
 
 <file path="workers-backend/src/metrics/metrics.service.ts">
@@ -5909,7 +5898,7 @@ import { metrics }     from '@opentelemetry/api';
 import type { Counter, Histogram, UpDownCounter, ObservableGauge } from '@opentelemetry/api';
 import { CircuitBreakerService }            from '../jobs/services/circuit-breaker.service.js';
 ⋮----
-export class WorkersMetricsService implements OnModuleInit {
+export class WorkersMetricsService implements OnModuleInit
 ⋮----
 constructor(private readonly breaker: CircuitBreakerService)
 ⋮----
@@ -5927,7 +5916,7 @@ recordDlqChange(queue: string, delta: number): void
 <file path="workers-backend/src/prisma/prisma.module.ts">
 import { Global, Module } from "@nestjs/common";
 import { PrismaService } from "./prisma.service.js";
-@Global() @Module({ providers: [PrismaService], exports: [PrismaService] }) export class PrismaModule {}
+@Global() @Module(
 </file>
 
 <file path="workers-backend/src/prisma/prisma.service.ts">
@@ -5936,7 +5925,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 ⋮----
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy
 ⋮----
 constructor()
 ⋮----
@@ -6111,7 +6100,7 @@ import { TerminusModule }   from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 import { PrismaModule }     from '../prisma/prisma.module.js';
 ⋮----
-export class HealthModule {}
+export class HealthModule
 </file>
 
 <file path="analytics-backend/src/main.ts">
@@ -6665,11 +6654,11 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
 ⋮----
-class RegisterAgentDto {
+class RegisterAgentDto
 ⋮----
-class UpdateAgentDto {
+class UpdateAgentDto
 ⋮----
-export class AgentsController {
+export class AgentsController
 ⋮----
 constructor(private readonly prisma: PrismaService)
 ⋮----
@@ -6716,9 +6705,9 @@ import type { TenantContext } from '../common/types/tenant-context';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
 ⋮----
-class ToggleAiDto {
+class ToggleAiDto
 ⋮----
-export class AiConfigController {
+export class AiConfigController
 ⋮----
 constructor(private readonly aiConfigService: AiConfigService)
 ⋮----
@@ -6744,7 +6733,7 @@ import {
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class ChatDto {
+export class ChatDto
 </file>
 
 <file path="chatia-backend/src/assistant/assistant.controller.ts">
@@ -6765,9 +6754,9 @@ import { AssistantSessionService } from './session/assistant-session.service';
 import { ChatDto } from './dto/chat.dto';
 import { UpdateAssistantConfigDto } from './config/dto/assistant-config.dto';
 ⋮----
-class ToggleDto {
+class ToggleDto
 ⋮----
-export class AssistantController {
+export class AssistantController
 ⋮----
 constructor(
 ⋮----
@@ -6812,11 +6801,11 @@ import { ChannelType, Prisma } from '@prisma/client';
 import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { randomUUID } from 'crypto';
 ⋮----
-export class CreateChannelAccountDto {
+export class CreateChannelAccountDto
 ⋮----
-export class UpdateChannelAccountDto {
+export class UpdateChannelAccountDto
 ⋮----
-export class ChannelAccountsService {
+export class ChannelAccountsService
 ⋮----
 constructor(private readonly prisma: PrismaService)
 ⋮----
@@ -6831,6 +6820,17 @@ async update(id: string, organizationId: string, dto: UpdateChannelAccountDto)
 async rotateToken(id: string, organizationId: string)
 </file>
 
+<file path="chatia-backend/src/contacts/dto/update-contact.dto.ts">
+// chatia-backend/src/contacts/dto/update-contact.dto.ts
+import {
+  IsString, IsOptional, IsEmail, IsEnum, IsArray, IsBoolean,
+} from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ContactStatus } from '@prisma/client';
+⋮----
+export class UpdateContactDto {
+</file>
+
 <file path="chatia-backend/src/conversations/conversations.controller.ts">
 // src/conversations/conversations.controller.ts
 import {
@@ -6843,9 +6843,9 @@ import { TenantGuard } from '../common/guards/tenant.guard';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
 ⋮----
-class TagDto {
+class TagDto
 ⋮----
-export class ConversationsController {
+export class ConversationsController
 ⋮----
 constructor(private readonly svc: ConversationsService)
 ⋮----
@@ -6899,7 +6899,7 @@ removeTag(
 import { IsString, IsNotEmpty, IsOptional, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class RegisterEcosystemDto {
+export class RegisterEcosystemDto
 </file>
 
 <file path="chatia-backend/src/faq/document/dto/kb-document.dto.ts">
@@ -6917,7 +6917,7 @@ export enum KbSourceTypeDto {
   JSON     = 'JSON',
 }
 ⋮----
-export class CreateKbDocumentDto {
+export class CreateKbDocumentDto
 </file>
 
 <file path="chatia-backend/src/faq/ingestion/faq-ingestion.service.ts">
@@ -6949,7 +6949,7 @@ export interface EnqueueFaqIngestInput {
   embeddingModel?: string;
 }
 ⋮----
-export class FaqIngestionService {
+export class FaqIngestionService
 ⋮----
 constructor(
 ⋮----
@@ -7001,9 +7001,9 @@ async upsertChunks(params: {
 import { IsString, IsOptional, IsBoolean, MinLength, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class CreateKnowledgeBaseDto {
+export class CreateKnowledgeBaseDto
 ⋮----
-export class UpdateKnowledgeBaseDto {
+export class UpdateKnowledgeBaseDto
 </file>
 
 <file path="chatia-backend/src/faq/query/dto/faq-query.dto.ts">
@@ -7011,7 +7011,7 @@ export class UpdateKnowledgeBaseDto {
 import { IsString, IsOptional, IsInt, IsBoolean, Min, Max, MinLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class FaqQueryDto {
+export class FaqQueryDto
 </file>
 
 <file path="chatia-backend/src/faq/faq.controller.ts">
@@ -7037,7 +7037,7 @@ import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from './knowledge-base
 import { CreateKbDocumentDto } from './document/dto/kb-document.dto';
 import { FaqQueryDto } from './query/dto/faq-query.dto';
 ⋮----
-export class FaqController {
+export class FaqController
 ⋮----
 constructor(
 ⋮----
@@ -7091,9 +7091,9 @@ private async resolveProject(slug: string, organizationId: string)
 import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class InternalChatDto {
+export class InternalChatDto
 ⋮----
-export class InternalProjectDto {
+export class InternalProjectDto
 </file>
 
 <file path="chatia-backend/src/projects/dto/create-project.dto.ts">
@@ -7104,7 +7104,7 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 ⋮----
-export class CreateProjectDto {
+export class CreateProjectDto
 </file>
 
 <file path="chatia-backend/src/widget/widget.controller.ts">
@@ -7120,9 +7120,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
 import { AssistantSessionService } from '../assistant/session/assistant-session.service';
 ⋮----
-class WidgetChatDto {
+class WidgetChatDto
 ⋮----
-export class WidgetController {
+export class WidgetController
 ⋮----
 constructor(
 ⋮----
@@ -7215,7 +7215,7 @@ AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
 ⋮----
 // Negocio
 ⋮----
-export class AppModule {}
+export class AppModule
 </file>
 
 <file path="chatia-backend/package.json">
@@ -7405,7 +7405,7 @@ interface UpdatePreferenceRequest {
   optedOut:       boolean;
 }
 ⋮----
-export class NotificacionesGrpcController {
+export class NotificacionesGrpcController
 ⋮----
 constructor(
 ⋮----
@@ -7424,7 +7424,7 @@ import { TerminusModule }   from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 import { PrismaModule }     from '../prisma/prisma.module.js';
 ⋮----
-export class HealthModule {}
+export class HealthModule
 </file>
 
 <file path="notificaciones-backend/src/notifications/dlq/dlq-monitor.service.ts">
@@ -7461,7 +7461,7 @@ interface ChatiaInternalClient {
 ⋮----
 notifySystem(req: ChatiaNotifyRequest):
 ⋮----
-export class DlqMonitorService implements OnModuleInit {
+export class DlqMonitorService implements OnModuleInit
 ⋮----
 constructor(
 ⋮----
@@ -7512,7 +7512,7 @@ export interface NotificationJobData {
 }
 ⋮----
 // Tres processors registrados — uno por queue — comparten la lógica de BaseProcessor
-abstract class BaseNotificationProcessor extends WorkerHost {
+abstract class BaseNotificationProcessor extends WorkerHost
 ⋮----
 async process(job: Job<NotificationJobData>): Promise<void>
 ⋮----
@@ -7539,13 +7539,13 @@ private async upsert(
     status:         'PENDING' | 'SENT' | 'FAILED' | 'SKIPPED',
 )
 ⋮----
-export class WhatsappProcessor extends BaseNotificationProcessor {
+export class WhatsappProcessor extends BaseNotificationProcessor
 ⋮----
 constructor(
 ⋮----
-export class EmailProcessor extends BaseNotificationProcessor {
+export class EmailProcessor extends BaseNotificationProcessor
 ⋮----
-export class PushProcessor extends BaseNotificationProcessor {
+export class PushProcessor extends BaseNotificationProcessor
 </file>
 
 <file path="notificaciones-backend/src/main.ts">
@@ -7570,7 +7570,7 @@ import { Module }              from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 ⋮----
-export class AnalyticsGrpcModule
+export class AnalyticsGrpcModule {}
 </file>
 
 <file path="pasarelapagos-backend/src/pagos/pagos.grpc.controller.ts">
@@ -7580,7 +7580,7 @@ import { PagosService } from "./pagos.service";
 ⋮----
 // Implementa el contrato definido en packages/proto/proto/pagos.proto
 ⋮----
-export class PagosGrpcController {
+export class PagosGrpcController
 ⋮----
 constructor(private readonly svc: PagosService)
 ⋮----
@@ -7709,6 +7709,396 @@ ping(data:
 }
 </file>
 
+<file path="workers-backend/src/campaigns/dto/campaign.dto.ts">
+import { CampaignStatus } from '@prisma/client';
+// workers-backend/src/campaigns/dto/campaign.dto.ts
+⋮----
+import {
+  IsString, IsEnum, IsOptional,
+  IsDateString, IsArray, IsObject,
+} from 'class-validator';
+⋮----
+export class CreateCampaignDto
+⋮----
+export class PatchCampaignDto
+</file>
+
+<file path="workers-backend/src/dlq/dlq.module.ts">
+// workers-backend/src/dlq/dlq.module.ts
+import { Module }          from '@nestjs/common';
+import { BullModule }      from '@nestjs/bullmq';
+import { WORKER_QUEUES }   from '../jobs/jobs.constants.js';
+import { DlqController }   from './dlq.controller.js';
+import { DlqService }      from './dlq.service.js';
+⋮----
+export class DlqModule
+</file>
+
+<file path="workers-backend/src/health/health.module.ts">
+import { Module }           from '@nestjs/common';
+import { TerminusModule }   from '@nestjs/terminus';
+import { HealthController } from './health.controller.js';
+import { PrismaModule }     from '../prisma/prisma.module.js';
+⋮----
+export class HealthModule
+</file>
+
+<file path="workers-backend/src/jobs/processors/analytics-export.processor.ts">
+// workers-backend/src/jobs/processors/analytics-export.processor.ts
+//
+// A-3.2: Genera exportaciones de analytics en background.
+// Recibe job de analytics-backend → consulta via gRPC → genera CSV/JSON → sube a Railway Volume.
+// Límite: exportaciones > 100MB rechazadas con error descriptivo.
+//
+// Resultado en JobLog.result: { url, format, sizeBytes, rowCount }
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger, Inject }        from '@nestjs/common';
+import type { ClientGrpc } from '@nestjs/microservices';
+import type { Job }              from 'bullmq';
+import { firstValueFrom }        from 'rxjs';
+import { writeFile, mkdir }      from 'node:fs/promises';
+import { join }                  from 'node:path';
+⋮----
+import { JobsService } from '../jobs.service.js';
+⋮----
+const MAX_SIZE_BYTES = 100 * 1_024 * 1_024; // 100MB
+⋮----
+export interface ExportJobData {
+  ecosystemId:    string;
+  organizationId: string;
+  from:           string; // ISO date string
+  to:             string;
+  format:         'csv' | 'json';
+  reportType:     'overview' | 'conversations' | 'agents';
+}
+⋮----
+from:           string; // ISO date string
+⋮----
+interface AnalyticsGrpcClient {
+  getOverview(req: object):            { toPromise: () => Promise<Record<string, unknown>> };
+  getConversationsByDay(req: object):  { toPromise: () => Promise<{ days: unknown[] }> };
+  getAgentMetrics(req: object):        { toPromise: () => Promise<{ agents: unknown[]; total: number }> };
+}
+⋮----
+getOverview(req: object):
+getConversationsByDay(req: object):
+getAgentMetrics(req: object):
+⋮----
+export class AnalyticsExportProcessor extends WorkerHost
+⋮----
+constructor(
+    private readonly jobs: JobsService,
+    @Inject('ANALYTICS_GRPC_CLIENT') private readonly grpc: ClientGrpc,
+)
+⋮----
+onModuleInit(): void
+⋮----
+async process(job: Job<ExportJobData>): Promise<void>
+⋮----
+// 1. Consultar datos via gRPC a analytics-backend
+⋮----
+// 2. Serializar
+⋮----
+// 3. Persistir en Railway Volume (o /tmp en local)
+⋮----
+// 4. URL accesible — en Railway: montar volumen y exponer via HTTP estático
+// En local: path absoluto
+⋮----
+// ── Fetch data via gRPC ───────────────────────────────────────────────────
+⋮----
+private async fetchData(
+    reportType: string,
+    params: { ecosystemId: string; organizationId: string; fromUnix: number; toUnix: number },
+): Promise<unknown[] | Record<string, unknown>>
+⋮----
+// @ts-expect-error rxjs interop
+⋮----
+return [result]; // overview es un objeto — lo envolvemos en array para CSV
+⋮----
+// @ts-expect-error rxjs interop
+⋮----
+// Paginar hasta traer todos los agentes
+⋮----
+// @ts-expect-error rxjs interop
+⋮----
+// ── CSV serializer mínimo ─────────────────────────────────────────────────
+⋮----
+private toCsv(data: unknown[] | Record<string, unknown>): string
+⋮----
+// Escapar comas y comillas
+</file>
+
+<file path="workers-backend/src/jobs/processors/campaign-email.processor.ts">
+// workers-backend/src/jobs/processors/campaign-email.processor.ts
+//
+// W-2.2: Procesa campañas masivas de email.
+// Rate limiting: 100 emails/seg via token bucket en Redis.
+// Cursor persistido en JobLog: si el job falla en batch 50/100, retry desde 50.
+// Despacha en batches de 50 → encola a notify.email (notificaciones-backend).
+//
+// FLUJO:
+//   1. Leer cursor del JobLog (si es retry)
+//   2. Para cada recipientId: verificar opt-out via notificaciones-backend gRPC
+//   3. Encolar en notify.email con idempotencyKey por (campaignId + contactId)
+//   4. Actualizar cursor en JobLog cada 50 enviados
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger, Inject }        from '@nestjs/common';
+import type { ClientGrpc } from '@nestjs/microservices';
+import { InjectQueue }           from '@nestjs/bullmq';
+import { Queue }                 from 'bullmq';
+import type { Job }              from 'bullmq';
+import { firstValueFrom }        from 'rxjs';
+import { createHash }            from 'node:crypto';
+⋮----
+import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
+import { JobsService }                 from '../jobs.service.js';
+import type {
+  CampaignEmailJobData,
+  CampaignEmailJobResult,
+}                                      from '../dto/campaign-email-job.dto.js';
+⋮----
+interface NotifGrpcClient {
+  getPreferences(req: { organizationId: string; contactId: string }): {
+    toPromise: () => Promise<{ optedOut: boolean }>;
+  };
+}
+⋮----
+getPreferences(req:
+⋮----
+export class CampaignEmailProcessor extends WorkerHost
+⋮----
+constructor(
+    private readonly jobs: JobsService,
+    @Inject('NOTIF_GRPC_CLIENT')    private readonly notifGrpc: ClientGrpc,
+    @InjectQueue(NOTIFY_QUEUE) private readonly emailQueue: Queue,
+)
+⋮----
+onModuleInit(): void
+⋮----
+async process(job: Job<CampaignEmailJobData>): Promise<CampaignEmailJobResult>
+⋮----
+// Leer cursor desde JobLog (si es retry de un intento anterior)
+⋮----
+// Verificar opt-out
+⋮----
+// @ts-expect-error — rxjs interop
+⋮----
+// Si gRPC falla, continuar (best-effort para opt-out check)
+⋮----
+// Encolar en notify.email con idempotencyKey determinístico
+⋮----
+to:        contactId, // el caller debe mapear contactId → email
+⋮----
+jobId:    idempotencyKey, // BullMQ deduplicará
+⋮----
+// Actualizar cursor en JobLog después de cada batch
+⋮----
+// Guardar cursor para que el retry retome desde donde quedó
+</file>
+
+<file path="workers-backend/src/jobs/processors/vector-index.processor.ts">
+// workers-backend/src/jobs/processors/vector-index.processor.ts
+//
+// W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
+// Recibe chunks ya extraídos → genera embeddings → persiste en chatia via gRPC.
+//
+// SLA: 1000 chunks indexados en < 30s.
+// NOTA: Si se adopta Qdrant (ADR-006), solo cambiar el adapter gRPC destino.
+⋮----
+import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Logger, Inject }        from '@nestjs/common';
+import type { ClientGrpc } from '@nestjs/microservices';
+import type { Job }              from 'bullmq';
+import { firstValueFrom }        from 'rxjs';
+⋮----
+import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
+import { JobsService }                 from '../jobs.service.js';
+import { EmbeddingService }            from '../services/embedding.service.js';
+import type {
+  VectorIndexJobData,
+  VectorIndexJobResult,
+}                                      from '../dto/vector-index-job.dto.js';
+⋮----
+const EMBED_CONCURRENCY = 5; // paralelo para generación de embeddings
+⋮----
+interface ChatiaGrpcClient {
+  upsertChunks(req: object): { toPromise: () => Promise<{ success: boolean; chunksStored: number }> };
+}
+⋮----
+upsertChunks(req: object):
+⋮----
+export class VectorIndexProcessor extends WorkerHost
+⋮----
+constructor(
+    private readonly jobs:      JobsService,
+    private readonly embedding: EmbeddingService,
+    @Inject('CHATIA_GRPC_CLIENT') private readonly grpc: ClientGrpc,
+)
+⋮----
+onModuleInit(): void
+⋮----
+async process(job: Job<VectorIndexJobData>): Promise<VectorIndexJobResult>
+⋮----
+// Generar embeddings en batches paralelos (límite EMBED_CONCURRENCY)
+⋮----
+// Persistir en chatia via gRPC
+⋮----
+// @ts-expect-error — rxjs interop
+⋮----
+// SLA check — warning si supera 30s
+⋮----
+// ── Embeddings con concurrencia controlada ────────────────────────────────
+⋮----
+private async generateEmbeddingsParallel(texts: string[]): Promise<number[][]>
+</file>
+
+<file path="workers-backend/src/jobs/services/chunking.service.ts">
+// workers-backend/src/jobs/services/chunking.service.ts
+import { Injectable, Logger } from '@nestjs/common';
+⋮----
+// Definido localmente — evita dep circular con faq-ingest-job.dto
+export type FaqDocumentSource = 'URL' | 'BASE64' | 'TEXT';
+⋮----
+export interface TextChunk {
+  content:    string;
+  chunkIndex: number;
+  tokenCount: number;
+}
+⋮----
+export class ChunkingService
+⋮----
+async extractAndChunk(
+    content:   string,
+    source:    FaqDocumentSource,
+    fileName?: string,
+): Promise<TextChunk[]>
+⋮----
+private async extractText(
+    content:   string,
+    source:    FaqDocumentSource,
+    fileName?: string,
+): Promise<string>
+⋮----
+private async extractFromBuffer(
+    buffer:    Buffer,
+    mimeType:  string,
+    fileName?: string,
+): Promise<string>
+⋮----
+// @ts-expect-error — pdf-parse puede no tener tipos en todos los entornos
+⋮----
+// @ts-expect-error — mammoth puede no tener tipos en todos los entornos
+⋮----
+private chunkText(text: string): TextChunk[]
+</file>
+
+<file path="workers-backend/src/jobs/jobs.module.ts">
+// workers-backend/src/jobs/jobs.module.ts
+import { join }          from 'path';
+import { Module }        from '@nestjs/common';
+import { BullModule }    from '@nestjs/bullmq';
+import { ConfigModule, ConfigService }   from '@nestjs/config';
+import { ClientsModule, Transport }      from '@nestjs/microservices';
+⋮----
+import { WORKER_QUEUES, QUEUE_CONFIG }       from './jobs.constants.js';
+import { JobsService }                       from './jobs.service.js';
+import { JobsController }                    from './jobs.controller.js';
+import { EmbeddingService }                  from './services/embedding.service.js';
+import { ChunkingService }                   from './services/chunking.service.js';
+import { CircuitBreakerService }             from './services/circuit-breaker.service.js';
+import { FaqIngestProcessor }                from './processors/faq-ingest.processor.js';
+import { VectorIndexProcessor }              from './processors/vector-index.processor.js';
+import { CampaignEmailProcessor }            from './processors/campaign-email.processor.js';
+import { AnalyticsExportProcessor }          from './processors/analytics-export.processor.js';
+⋮----
+// gRPC clients registrados aquí para que los processors los puedan inyectar
+⋮----
+export class JobsModule
+</file>
+
+<file path="tsconfig.base.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="analytics-backend/src/grpc/analytics-grpc.controller.ts">
+// analytics-backend/src/grpc/analytics-grpc.controller.ts
+import { Controller, Logger } from '@nestjs/common';
+import { GrpcMethod }         from '@nestjs/microservices';
+import { AnalyticsService }   from '../analytics/analytics.service.js';
+⋮----
+interface TrackEventRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  event_type:      string;
+  occurred_at:     number;
+  payload_json:    Buffer | string;
+}
+⋮----
+interface OverviewRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  from_unix:       number;
+  to_unix:         number;
+}
+⋮----
+interface AgentMetricsRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  from_unix:       number;
+  to_unix:         number;
+  page?:           number;
+  page_size?:      number;
+}
+⋮----
+interface ConvByDayRequest {
+  ecosystem_id:    string;
+  organization_id: string;
+  from_unix:       number;
+  to_unix:         number;
+}
+⋮----
+export class AnalyticsGrpcController
+⋮----
+constructor(private readonly svc: AnalyticsService)
+⋮----
+async trackEvent(data: TrackEventRequest)
+⋮----
+async getOverview(data: OverviewRequest)
+⋮----
+async getConversationsByDay(data: ConvByDayRequest)
+⋮----
+async getAgentMetrics(data: AgentMetricsRequest)
+⋮----
+ping(data:
+</file>
+
 <file path="workers-backend/prisma/schema.prisma">
 // schema.prisma — workers-backend
 // Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
@@ -7814,20 +8204,6 @@ model CampaignRecipient {
 }
 </file>
 
-<file path="workers-backend/src/campaigns/dto/campaign.dto.ts">
-import { CampaignStatus } from '@prisma/client';
-// workers-backend/src/campaigns/dto/campaign.dto.ts
-⋮----
-import {
-  IsString, IsEnum, IsOptional,
-  IsDateString, IsArray, IsObject,
-} from 'class-validator';
-⋮----
-export class CreateCampaignDto {
-⋮----
-export class PatchCampaignDto {
-</file>
-
 <file path="workers-backend/src/campaigns/campaigns.service.ts">
 // workers-backend/src/campaigns/campaigns.service.ts
 //
@@ -7848,7 +8224,7 @@ import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js'
 ⋮----
 const SCHEDULER_LOCK_TTL = 55; // segundos — menos que el intervalo del cron (60s)
 ⋮----
-export class CampaignsService
+export class CampaignsService {
 ⋮----
 constructor(
 ⋮----
@@ -7905,382 +8281,6 @@ async addRecipients(
 async getStats(id: string, organizationId: string)
 </file>
 
-<file path="workers-backend/src/dlq/dlq.module.ts">
-// workers-backend/src/dlq/dlq.module.ts
-import { Module }          from '@nestjs/common';
-import { BullModule }      from '@nestjs/bullmq';
-import { WORKER_QUEUES }   from '../jobs/jobs.constants.js';
-import { DlqController }   from './dlq.controller.js';
-import { DlqService }      from './dlq.service.js';
-⋮----
-export class DlqModule {}
-</file>
-
-<file path="workers-backend/src/health/health.module.ts">
-import { Module }           from '@nestjs/common';
-import { TerminusModule }   from '@nestjs/terminus';
-import { HealthController } from './health.controller.js';
-import { PrismaModule }     from '../prisma/prisma.module.js';
-⋮----
-export class HealthModule {}
-</file>
-
-<file path="workers-backend/src/jobs/processors/analytics-export.processor.ts">
-// workers-backend/src/jobs/processors/analytics-export.processor.ts
-//
-// A-3.2: Genera exportaciones de analytics en background.
-// Recibe job de analytics-backend → consulta via gRPC → genera CSV/JSON → sube a Railway Volume.
-// Límite: exportaciones > 100MB rechazadas con error descriptivo.
-//
-// Resultado en JobLog.result: { url, format, sizeBytes, rowCount }
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject }        from '@nestjs/common';
-import type { ClientGrpc } from '@nestjs/microservices';
-import type { Job }              from 'bullmq';
-import { firstValueFrom }        from 'rxjs';
-import { writeFile, mkdir }      from 'node:fs/promises';
-import { join }                  from 'node:path';
-⋮----
-import { JobsService } from '../jobs.service.js';
-⋮----
-const MAX_SIZE_BYTES = 100 * 1_024 * 1_024; // 100MB
-⋮----
-export interface ExportJobData {
-  ecosystemId:    string;
-  organizationId: string;
-  from:           string; // ISO date string
-  to:             string;
-  format:         'csv' | 'json';
-  reportType:     'overview' | 'conversations' | 'agents';
-}
-⋮----
-from:           string; // ISO date string
-⋮----
-interface AnalyticsGrpcClient {
-  getOverview(req: object):            { toPromise: () => Promise<Record<string, unknown>> };
-  getConversationsByDay(req: object):  { toPromise: () => Promise<{ days: unknown[] }> };
-  getAgentMetrics(req: object):        { toPromise: () => Promise<{ agents: unknown[]; total: number }> };
-}
-⋮----
-getOverview(req: object):
-getConversationsByDay(req: object):
-getAgentMetrics(req: object):
-⋮----
-export class AnalyticsExportProcessor extends WorkerHost {
-⋮----
-constructor(
-    private readonly jobs: JobsService,
-    @Inject('ANALYTICS_GRPC_CLIENT') private readonly grpc: ClientGrpc,
-)
-⋮----
-onModuleInit(): void
-⋮----
-async process(job: Job<ExportJobData>): Promise<void>
-⋮----
-// 1. Consultar datos via gRPC a analytics-backend
-⋮----
-// 2. Serializar
-⋮----
-// 3. Persistir en Railway Volume (o /tmp en local)
-⋮----
-// 4. URL accesible — en Railway: montar volumen y exponer via HTTP estático
-// En local: path absoluto
-⋮----
-// ── Fetch data via gRPC ───────────────────────────────────────────────────
-⋮----
-private async fetchData(
-    reportType: string,
-    params: { ecosystemId: string; organizationId: string; fromUnix: number; toUnix: number },
-): Promise<unknown[] | Record<string, unknown>>
-⋮----
-// @ts-expect-error rxjs interop
-⋮----
-return [result]; // overview es un objeto — lo envolvemos en array para CSV
-⋮----
-// @ts-expect-error rxjs interop
-⋮----
-// Paginar hasta traer todos los agentes
-⋮----
-// @ts-expect-error rxjs interop
-⋮----
-// ── CSV serializer mínimo ─────────────────────────────────────────────────
-⋮----
-private toCsv(data: unknown[] | Record<string, unknown>): string
-⋮----
-// Escapar comas y comillas
-</file>
-
-<file path="workers-backend/src/jobs/processors/campaign-email.processor.ts">
-// workers-backend/src/jobs/processors/campaign-email.processor.ts
-//
-// W-2.2: Procesa campañas masivas de email.
-// Rate limiting: 100 emails/seg via token bucket en Redis.
-// Cursor persistido en JobLog: si el job falla en batch 50/100, retry desde 50.
-// Despacha en batches de 50 → encola a notify.email (notificaciones-backend).
-//
-// FLUJO:
-//   1. Leer cursor del JobLog (si es retry)
-//   2. Para cada recipientId: verificar opt-out via notificaciones-backend gRPC
-//   3. Encolar en notify.email con idempotencyKey por (campaignId + contactId)
-//   4. Actualizar cursor en JobLog cada 50 enviados
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject }        from '@nestjs/common';
-import type { ClientGrpc } from '@nestjs/microservices';
-import { InjectQueue }           from '@nestjs/bullmq';
-import { Queue }                 from 'bullmq';
-import type { Job }              from 'bullmq';
-import { firstValueFrom }        from 'rxjs';
-import { createHash }            from 'node:crypto';
-⋮----
-import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
-import { JobsService }                 from '../jobs.service.js';
-import type {
-  CampaignEmailJobData,
-  CampaignEmailJobResult,
-}                                      from '../dto/campaign-email-job.dto.js';
-⋮----
-interface NotifGrpcClient {
-  getPreferences(req: { organizationId: string; contactId: string }): {
-    toPromise: () => Promise<{ optedOut: boolean }>;
-  };
-}
-⋮----
-getPreferences(req:
-⋮----
-export class CampaignEmailProcessor extends WorkerHost {
-⋮----
-constructor(
-    private readonly jobs: JobsService,
-    @Inject('NOTIF_GRPC_CLIENT')    private readonly notifGrpc: ClientGrpc,
-    @InjectQueue(NOTIFY_QUEUE) private readonly emailQueue: Queue,
-)
-⋮----
-onModuleInit(): void
-⋮----
-async process(job: Job<CampaignEmailJobData>): Promise<CampaignEmailJobResult>
-⋮----
-// Leer cursor desde JobLog (si es retry de un intento anterior)
-⋮----
-// Verificar opt-out
-⋮----
-// @ts-expect-error — rxjs interop
-⋮----
-// Si gRPC falla, continuar (best-effort para opt-out check)
-⋮----
-// Encolar en notify.email con idempotencyKey determinístico
-⋮----
-to:        contactId, // el caller debe mapear contactId → email
-⋮----
-jobId:    idempotencyKey, // BullMQ deduplicará
-⋮----
-// Actualizar cursor en JobLog después de cada batch
-⋮----
-// Guardar cursor para que el retry retome desde donde quedó
-</file>
-
-<file path="workers-backend/src/jobs/processors/vector-index.processor.ts">
-// workers-backend/src/jobs/processors/vector-index.processor.ts
-//
-// W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
-// Recibe chunks ya extraídos → genera embeddings → persiste en chatia via gRPC.
-//
-// SLA: 1000 chunks indexados en < 30s.
-// NOTA: Si se adopta Qdrant (ADR-006), solo cambiar el adapter gRPC destino.
-⋮----
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Logger, Inject }        from '@nestjs/common';
-import type { ClientGrpc } from '@nestjs/microservices';
-import type { Job }              from 'bullmq';
-import { firstValueFrom }        from 'rxjs';
-⋮----
-import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
-import { JobsService }                 from '../jobs.service.js';
-import { EmbeddingService }            from '../services/embedding.service.js';
-import type {
-  VectorIndexJobData,
-  VectorIndexJobResult,
-}                                      from '../dto/vector-index-job.dto.js';
-⋮----
-const EMBED_CONCURRENCY = 5; // paralelo para generación de embeddings
-⋮----
-interface ChatiaGrpcClient {
-  upsertChunks(req: object): { toPromise: () => Promise<{ success: boolean; chunksStored: number }> };
-}
-⋮----
-upsertChunks(req: object):
-⋮----
-export class VectorIndexProcessor extends WorkerHost {
-⋮----
-constructor(
-    private readonly jobs:      JobsService,
-    private readonly embedding: EmbeddingService,
-    @Inject('CHATIA_GRPC_CLIENT') private readonly grpc: ClientGrpc,
-)
-⋮----
-onModuleInit(): void
-⋮----
-async process(job: Job<VectorIndexJobData>): Promise<VectorIndexJobResult>
-⋮----
-// Generar embeddings en batches paralelos (límite EMBED_CONCURRENCY)
-⋮----
-// Persistir en chatia via gRPC
-⋮----
-// @ts-expect-error — rxjs interop
-⋮----
-// SLA check — warning si supera 30s
-⋮----
-// ── Embeddings con concurrencia controlada ────────────────────────────────
-⋮----
-private async generateEmbeddingsParallel(texts: string[]): Promise<number[][]>
-</file>
-
-<file path="workers-backend/src/jobs/services/chunking.service.ts">
-// workers-backend/src/jobs/services/chunking.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-⋮----
-// Definido localmente — evita dep circular con faq-ingest-job.dto
-export type FaqDocumentSource = 'URL' | 'BASE64' | 'TEXT';
-⋮----
-export interface TextChunk {
-  content:    string;
-  chunkIndex: number;
-  tokenCount: number;
-}
-⋮----
-export class ChunkingService {
-⋮----
-async extractAndChunk(
-    content:   string,
-    source:    FaqDocumentSource,
-    fileName?: string,
-): Promise<TextChunk[]>
-⋮----
-private async extractText(
-    content:   string,
-    source:    FaqDocumentSource,
-    fileName?: string,
-): Promise<string>
-⋮----
-private async extractFromBuffer(
-    buffer:    Buffer,
-    mimeType:  string,
-    fileName?: string,
-): Promise<string>
-⋮----
-// @ts-expect-error — pdf-parse puede no tener tipos en todos los entornos
-⋮----
-// @ts-expect-error — mammoth puede no tener tipos en todos los entornos
-⋮----
-private chunkText(text: string): TextChunk[]
-</file>
-
-<file path="workers-backend/src/jobs/jobs.module.ts">
-// workers-backend/src/jobs/jobs.module.ts
-import { join }          from 'path';
-import { Module }        from '@nestjs/common';
-import { BullModule }    from '@nestjs/bullmq';
-import { ConfigModule, ConfigService }   from '@nestjs/config';
-import { ClientsModule, Transport }      from '@nestjs/microservices';
-⋮----
-import { WORKER_QUEUES, QUEUE_CONFIG }       from './jobs.constants.js';
-import { JobsService }                       from './jobs.service.js';
-import { JobsController }                    from './jobs.controller.js';
-import { EmbeddingService }                  from './services/embedding.service.js';
-import { ChunkingService }                   from './services/chunking.service.js';
-import { CircuitBreakerService }             from './services/circuit-breaker.service.js';
-import { FaqIngestProcessor }                from './processors/faq-ingest.processor.js';
-import { VectorIndexProcessor }              from './processors/vector-index.processor.js';
-import { CampaignEmailProcessor }            from './processors/campaign-email.processor.js';
-import { AnalyticsExportProcessor }          from './processors/analytics-export.processor.js';
-⋮----
-// gRPC clients registrados aquí para que los processors los puedan inyectar
-⋮----
-export class JobsModule {}
-</file>
-
-<file path="tsconfig.base.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
-<file path="analytics-backend/src/grpc/analytics-grpc.controller.ts">
-// analytics-backend/src/grpc/analytics-grpc.controller.ts
-import { Controller, Logger } from '@nestjs/common';
-import { GrpcMethod }         from '@nestjs/microservices';
-import { AnalyticsService }   from '../analytics/analytics.service.js';
-⋮----
-interface TrackEventRequest {
-  ecosystem_id:    string;
-  organization_id: string;
-  event_type:      string;
-  occurred_at:     number;
-  payload_json:    Buffer | string;
-}
-⋮----
-interface OverviewRequest {
-  ecosystem_id:    string;
-  organization_id: string;
-  from_unix:       number;
-  to_unix:         number;
-}
-⋮----
-interface AgentMetricsRequest {
-  ecosystem_id:    string;
-  organization_id: string;
-  from_unix:       number;
-  to_unix:         number;
-  page?:           number;
-  page_size?:      number;
-}
-⋮----
-interface ConvByDayRequest {
-  ecosystem_id:    string;
-  organization_id: string;
-  from_unix:       number;
-  to_unix:         number;
-}
-⋮----
-export class AnalyticsGrpcController {
-⋮----
-constructor(private readonly svc: AnalyticsService)
-⋮----
-async trackEvent(data: TrackEventRequest)
-⋮----
-async getOverview(data: OverviewRequest)
-⋮----
-async getConversationsByDay(data: ConvByDayRequest)
-⋮----
-async getAgentMetrics(data: AgentMetricsRequest)
-⋮----
-ping(data:
-</file>
-
 <file path="workers-backend/src/dlq/dlq.service.ts">
 // workers-backend/src/dlq/dlq.service.ts
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -8305,7 +8305,7 @@ export interface QueueStats {
   critical: boolean;
 }
 ⋮----
-export class DlqService {
+export class DlqService
 ⋮----
 constructor(
 ⋮----
@@ -8434,7 +8434,7 @@ import { PrismaService }  from '../prisma/prisma.service.js';
 ⋮----
 const Public = ()
 ⋮----
-export class HealthController {
+export class HealthController
 ⋮----
 constructor(
 ⋮----
@@ -8459,7 +8459,7 @@ import type { IncomingMessage }       from '../channels/channel.interface';
 import { QUEUES, JOBS }               from '../queue/queue.constants';
 import { AnalyticsEventsService }     from '../analytics-events/analytics-events.service';
 ⋮----
-export class ConversationsService {
+export class ConversationsService
 ⋮----
 constructor(
 ⋮----
@@ -8524,7 +8524,7 @@ import { PrismaService }  from '../prisma/prisma.service.js';
 ⋮----
 const Public = ()
 ⋮----
-export class HealthController {
+export class HealthController
 ⋮----
 constructor(
 ⋮----
@@ -8539,7 +8539,7 @@ import { PrismaService }  from '../prisma/prisma.service.js';
 ⋮----
 const Public = ()
 ⋮----
-export class HealthController {
+export class HealthController
 ⋮----
 constructor(
 ⋮----
@@ -8553,7 +8553,7 @@ import { CACHE_MANAGER }              from '@nestjs/cache-manager';
 import type { Cache }                 from 'cache-manager';
 import { PrismaService }              from '../prisma/prisma.service.js';
 ⋮----
-export class AnalyticsService {
+export class AnalyticsService
 ⋮----
 constructor(
 ⋮----
@@ -8596,7 +8596,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { QUEUES }           from '../notifications.constants.js';
 import { DlqMonitorService } from './dlq-monitor.service.js';
 ⋮----
-export class DlqModule
+export class DlqModule {}
 </file>
 
 <file path="packages/proto/src/index.ts">
@@ -8627,7 +8627,7 @@ import { DlqModule }       from './dlq/dlq.module.js';
 import { GrpcModule }      from './grpc/grpc.module.js';
 import { CampaignsModule } from './campaigns/campaigns.module.js';
 ⋮----
-export class AppModule
+export class AppModule {}
 </file>
 
 </files>

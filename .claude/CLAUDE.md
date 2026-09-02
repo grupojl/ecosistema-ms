@@ -1,56 +1,50 @@
-# Ecosistema MS — grupojl/ecosistema-ms
+# ecosistema-ms — instrucción raíz para el AI
 
-## Identidad del repositorio
-Monorepo de microservicios que alimentan al ecosistema principal (`grupojl/welver`).
-Cada microservicio corre como servicio independiente en Railway, apuntando al mismo repo.
+## Stack canónico
 
-## Entorno de desarrollo
-- Windows + Git Bash
-- Node 24.14.0 / pnpm 10.30.3
-- Deploy: Railway (Root Dir `/`, Dockerfile Path `{servicio}/Dockerfile`)
-
-## CRÍTICO — pnpm catalog
-`catalog:algo` (named catalogs) **NO funcionan**. Usar siempre `catalog:` (default único).
-Si ves `catalog:backend`, `catalog:grpc`, etc. → es un bug, normalizar a `catalog:`.
+- Backend: NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
+- Comunicación inter-servicio: gRPC (`@nestjs/microservices` + `@grpc/grpc-js`)
+- Contratos: `packages/proto/proto/*.proto` → `@ecosistema-ms/proto`
+- Auth: Firebase Authentication (client) + Firebase Admin (server)
+- Workspace: pnpm 10 workspaces con **catalog único** (ver `conventions/entorno.md`)
+- Deploy: Railway — servicios separados, mismo repo
 
 ## Microservicios
+
 | Carpeta | Puerto HTTP | Puerto gRPC | Rol |
 |---------|-------------|-------------|-----|
 | `chatia-backend` | 3000 | 5001 | Chat IA, Knowledge Base, Canales, Agentes |
-| `pasarelapagos-backend` | 3001 | 5002 | Pagos multi-provider, Transacciones |
+| `pasarelapagos-backend` | 3001 | 5002 | Pagos MercadoPago/Stripe/dLocal/Conekta |
 | `notificaciones-backend` | 3002 | 5003 | Email, Push, WhatsApp, DLQ |
-| `analytics-backend` | 3003 | 5004 | Eventos, Proyecciones, SSE, Export |
-| `workers-backend` | 3004 | 5005 | Jobs BullMQ, Campaigns, Embeddings, DLQ |
+| `analytics-backend` | 3003 | 5004 | Eventos, Proyecciones, SSE |
+| `workers-backend` | 3004 | 5005 | Campañas, Jobs BullMQ, Vector Index |
 
 ## Packages compartidos
-| Carpeta | Nombre | Rol |
-|---------|--------|-----|
-| `packages/proto` | `@ecosistema-ms/proto` | Contratos gRPC (.proto + paths TS) |
-| `packages/auth-server` | `@ecosistema-ms/auth-server` | Guards, decorators, TenantContext |
-| `packages/grpc-client` | `@ecosistema-ms/grpc-client` | Módulos NestJS gRPC inter-servicio |
 
-## Comunicación inter-servicio
-- **gRPC** sobre red privada Railway para llamadas síncronas
-- Local: `localhost:500X` | Railway: `{servicio}.railway.internal:500X`
-- Variables: `CHATIA_GRPC_URL`, `PAGOS_GRPC_URL`, `NOTIF_GRPC_URL`, `ANALYTICS_GRPC_URL`, `WORKERS_GRPC_URL`
-- **BullMQ** sobre Redis compartido para jobs asíncronos
-- **HTTP REST** para consumidores externos (welver, clientes)
+| Carpeta | Nombre pkg | Rol |
+|---------|-----------|-----|
+| `packages/proto` | `@ecosistema-ms/proto` | Contratos gRPC (.proto files + paths TS) |
+| `packages/auth-server` | `@ecosistema-ms/auth-server` | Guards, decorators, TenantContext NestJS |
+| `packages/grpc-client` | `@ecosistema-ms/grpc-client` | Módulos NestJS para llamadas gRPC inter-servicio |
 
-## Multi-tenancy
-Toda query lleva `ecosystemId` + `organizationId` como filtros obligatorios.
-El `TenantGuard` de `@ecosistema-ms/auth-server` los resuelve del token Firebase.
+## Antes de escribir cualquier código
 
-## Stack
-- NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
-- gRPC: `@nestjs/microservices` + `@grpc/grpc-js`
-- Auth: Firebase Authentication + Firebase Admin SDK
+1. Leer `architecture/00-principios.md` — reglas de aislamiento Railway
+2. Leer `architecture/03-reglas-duras.md` — qué bloquea un PR
+3. Leer `services/<servicio>.md` — carpetas BLOQUEANTES vs DINÁMICAS
+4. Leer `modules/<servicio>/<modulo>.md` — contexto del módulo a tocar
 
-## Relación con welver/
-`grupojl/welver` consume estos microservicios via HTTP + gRPC.
-Cada ecosistema cliente tiene su propio `FIREBASE_PROJECT_ID` y `DATABASE_URL`.
+## Reglas CRÍTICAS (resumen ejecutivo)
 
-## Antes de tocar cualquier código
-1. Leer `.claude/architecture/00-principios.md`
-2. Leer `.claude/services/{servicio}.md` del microservicio afectado
-3. Verificar `.claude/contracts/grpc-contracts.md` si hay cambios en protos
-4. Aplicar el checklist de `.claude/checklists/` correspondiente
+- **Catalog único**: `catalog:algo` en package.json → bug, normalizar a `catalog:`
+- **Sin DTOs class-validator**: todo input nuevo = schema Zod inline en el controller
+- **Sin cross-service import**: los microservicios se comunican por gRPC/HTTP, nunca por import directo
+- **Todo query lleva `ecosystemId` + `organizationId`**: sin scope = filtración de datos
+- **Sin `as any` ni `as unknown as`** en repositories: usar `toEntity()` privado
+- **Carpetas BLOQUEANTES** no se modifican sin ADR: ver `services/<servicio>.md`
+
+## Relación con otros ecosistemas
+
+- `grupojl/welver` (ecosistema 1) consume estos microservicios via HTTP + gRPC
+- Aislamiento por `FIREBASE_PROJECT_ID` + `DATABASE_URL` separada por ecosistema cliente
+- El `TenantGuard` resuelve `ecosystemId` del token Firebase en cada request

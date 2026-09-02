@@ -1,38 +1,34 @@
-# Servicio: workers-backend
+# workers-backend — Servicio de Workers
 
 ## Rol
-Motor de jobs BullMQ — embeddings, indices vectoriales, emails de campanas,
-exports de analytics. Scheduler de campanas con cron y JobLog en DB.
+Ejecución de jobs asíncronos BullMQ: campañas de mensajería,
+indexación de vectores para RAG, DLQ monitoring.
 
 ## Puertos
-- HTTP: 3004
-- gRPC: 5005
+- HTTP interno: 3004
+- gRPC interno: 5005
 
-## Score actual: 7.0/10
+## Clasificación de carpetas
 
-| Area | Estado |
-|------|--------|
-| Processors (vector, faq, campaign, export) | OK |
-| JobLog en DB (ecosystemId + organizationId) | OK |
-| CircuitBreakerService en jobs | OK |
-| DLQ controller (replay manual) | OK |
-| Scheduler de campanas con cron | OK |
-| Lock distribuido del scheduler | SIMPLIFICADO — no es Redlock real (DT-005) |
-| CampaignRecipient table | NO EXISTE — recipientIds=[] en produccion (DT-003) |
-| Tests | 0 tests — DT-001 |
+### 🔴 BLOQUEANTES
 
-## DEUDA CRITICA: DT-003
+| Carpeta | Razón |
+|---------|-------|
+| `src/prisma/` | Infraestructura core |
+| `src/grpc/` | Entry point gRPC |
+| `src/health/` | Railway healthcheck |
+| `src/dlq/` | Dead Letter Queue monitoring — no simplificar sin ADR |
+| `src/jobs/processors/` | Procesadores BullMQ — la interfaz de jobs es el contrato con los productores |
 
-Campaign.recipientIds = [] en produccion.
-Las campanas de email masivo no envian a nadie real.
-Crear tabla CampaignRecipient antes del siguiente go-live.
+### 🟡 DINÁMICA CONTROLADA
 
-## Variables de entorno
+| Carpeta | Regla |
+|---------|-------|
+| `src/jobs/processors/` | Nuevos processors siguen el mismo patrón. La interface de job (DTO de payload) debe estar en `jobs/dto/` y ser compatible con el productor. |
 
-REDIS_URL=
-DATABASE_URL=
-FIREBASE_PROJECT_ID=
-ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5004
-CHATIA_GRPC_URL=chatia-backend.railway.internal:5001
-PORT=3004
-GRPC_PORT=5005
+### 🟢 DINÁMICAS
+
+| Carpeta | Estado |
+|---------|--------|
+| `src/campaigns/` | Domain/Repository pendiente |
+| `src/jobs/dto/` | Migrar a Zod (son DTOs de payload de BullMQ, no de controllers REST) |

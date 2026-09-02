@@ -1,36 +1,33 @@
-# Módulo: conversations (chatia-backend)
+# Módulo: conversations (MOLDE VIVO — pendiente de migración)
 
-## Responsabilidad
-Lifecycle completo de conversaciones: apertura, cierre, transferencia entre agentes.
+## ¿Qué hace?
 
-## Estados de conversación
-`OPEN` → `PENDING` → `CLOSED` | `TRANSFERRED`
+Gestiona el ciclo de vida completo de las conversaciones entre clientes
+y los agentes IA de una organización.
 
-## Invariantes de dominio
-- Una conversación pertenece a exactamente una organización y un canal
-- Solo usuarios con rol ADMIN+ pueden transferir conversaciones
-- Al cerrar, se emite evento `conversation.closed` a analytics-backend
+## Invariantes de dominio (a implementar en domain/)
 
-## Endpoints HTTP
-| Método | Path | Descripción |
-|--------|------|-------------|
-| GET | `/conversations` | Listar con paginación |
-| GET | `/conversations/:id` | Detalle |
-| POST | `/conversations/:id/close` | Cerrar conversación |
-| POST | `/conversations/:id/transfer` | Transferir a agente |
+- Una conversación no puede volver a `OPEN` desde `CLOSED`
+- Solo el `assignedAgentId` puede responder en una conversación `ASSIGNED`
+- El `soft-delete` no elimina los mensajes — solo marca la conversación
+- Los tags son un set — no pueden duplicarse en la misma conversación
 
-## Jobs asociados
-- `incoming-message` → puede crear nueva conversación si no existe
-- `outgoing-message` → envía mensaje al canal externo
+## Estado actual
 
-## Queries críticas (N+1 watch)
-```typescript
-// ✅ Siempre include explícito
-prisma.conversation.findMany({
-  where:   { ecosystemId, organizationId },
-  include: { messages: { take: 1, orderBy: { createdAt: 'desc' } }, contact: true },
-  orderBy: { updatedAt: 'desc' },
-  take:    limit,
-  skip:    offset,
-});
-```
+⚠️ `conversations.service.ts` llama `PrismaService` directamente.
+**Pendiente: migrar a Domain + Repository — ver ADR-002.**
+Este módulo será el MOLDE VIVO para todos los demás.
+
+## Funciones principales
+
+- `create` — crear conversación con ecosystemId + organizationId obligatorios
+- `list` — listar con filtros (status, tags, agente asignado)
+- `assign` — asignar agente a conversación
+- `resolve` — cerrar conversación
+- `softDelete` / `restore`
+- `addTag` / `removeTag`
+
+## Dependencias
+
+- `PrismaService` (hoy directo — migrar a `IConversationsRepository`)
+- `AnalyticsEventsService` — emite eventos al analytics-backend

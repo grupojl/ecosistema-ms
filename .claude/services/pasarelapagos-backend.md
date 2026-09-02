@@ -1,45 +1,47 @@
-# Servicio: pasarelapagos-backend
+# pasarelapagos-backend — Servicio de Pagos
 
 ## Rol
-Pasarela de pagos multi-provider — MercadoPago, Stripe, Conekta, dLocal,
-Pagarme y Fake. Routing dinamico con circuit breaker.
+Procesamiento de pagos (MercadoPago, Stripe, dLocal, Conekta, Pagarme, Fake),
+reconciliación, webhooks de proveedores, gestión de tenants/API keys.
 
 ## Puertos
-- HTTP: 3001
-- gRPC: 5002
+- HTTP público: 3001
+- gRPC interno: 5002
 
-## Score actual: 8.0/10 — el MS mas maduro del ecosistema
+## Clasificación de carpetas
 
-| Area | Estado |
-|------|--------|
-| PaymentProvider interface | OK — contrato limpio e inmutable |
-| RoutingService con CB y cache 5min | OK |
-| CircuitBreakerService (opossum) | OK — healthOf(), statsOf() |
-| State machine de pagos | OK — assertValidTransition() |
-| Idempotencia (idempotencyKey) | OK — @@unique([tenantId, idempotencyKey]) |
-| PII cifrado at-rest | OK — pii.service.ts, email en Customer |
-| API Keys (bcrypt + prefix pk_) | OK — rawKey solo se muestra en create |
-| Reconciliacion cron + BullMQ | OK — cada 5min, pagos PENDING > 30min |
-| WebhookInbound idempotente | OK — @@unique([providerId, externalId]) |
-| DLQ processor | OK — TODO en codigo: conectar a Slack/Sentry |
-| OpenTelemetry dep instalada | OK — unico MS con la dep |
-| Tests | 0 tests — DT-001 |
-| PCI DSS formal | Sin certificacion |
+### 🔴 BLOQUEANTES — no modificar sin ADR
 
-## Providers
+| Carpeta | Razón |
+|---------|-------|
+| `src/prisma/` | Infraestructura core |
+| `src/common/` | PII service, shared guards — seguridad y privacidad de datos |
+| `src/modules/firebase/` | Firebase Auth — no reimplementar |
+| `src/modules/audit/` | Auditoría de pagos — obligatoria por compliance, no se omite |
+| `src/modules/metrics/` | Prometheus — observabilidad |
+| `src/modules/redis/` | Cache de infraestructura |
+| `src/modules/queue/` | BullMQ — jobs de reconciliación y webhooks |
+| `src/modules/providers/provider.interface.ts` | Interface de providers — cambiarla rompe todos los adapters |
+| `src/modules/providers/routing.service.ts` | Lógica de routing entre providers — cambiar la estrategia requiere ADR |
+| `src/modules/providers/circuit-breaker.service.ts` | Resiliencia de providers — no duplicar por provider |
+| `src/pagos/` | Entry point gRPC — contrato con el exterior |
+| `src/app.module.ts` | Raíz — no agregar lógica aquí |
 
-stripe, mercadopago, conekta, dlocal, pagarme, fake (testing)
+### 🟡 DINÁMICA CONTROLADA — crecer siguiendo el molde
 
-## Variables de entorno
+| Carpeta | Regla |
+|---------|-------|
+| `src/modules/providers/adapters/` | Nuevos providers siguen `provider.interface.ts`. No se modifica la interface sin ADR. Cada adapter vive en su propia carpeta. |
 
-DATABASE_URL=
-REDIS_URL=
-REDIS_ENABLED=true
-FIREBASE_PROJECT_ID=
-STRIPE_SECRET_KEY=
-MERCADOPAGO_ACCESS_TOKEN=
-CONEKTA_PRIVATE_KEY=
-ENCRYPTION_KEY=
-PORT=3001
-GRPC_PORT=5002
-RECONCILE_CRON=   # opcional
+### 🟢 DINÁMICAS — crecen libremente siguiendo Domain/Repository
+
+| Carpeta | Estado actual | Molde a seguir |
+|---------|---------------|----------------|
+| `src/modules/payments/` | Service → Prisma directo | **MOLDE VIVO** de pagos — migrar primero |
+| `src/modules/webhooks/` | Service → Prisma directo | payments/ (post-migración) |
+| `src/modules/tenants/` | Service → Prisma directo | payments/ (post-migración) |
+
+## Molde vivo de referencia
+
+`src/modules/payments/` — será el molde una vez migrado a Domain + Repository.
+Los estados de pago y sus transiciones son las invariantes de dominio clave.

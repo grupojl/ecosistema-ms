@@ -1,22 +1,38 @@
-# ADR-XXX — Título
+# ADR-XXX: Título descriptivo de la decisión
 
-**Estado**: Propuesto | Aceptado | Deprecado | Supersedido por ADR-YYY
-**Fecha**: YYYY-MM-DD
-**Autores**: @usuario
+**Fecha:** YYYY-MM-DD
+**Estado:** Propuesto | Aceptado | Reemplazado por ADR-YYY | Rechazado
 
 ## Contexto
-Qué problema o decisión se está tomando y por qué es relevante ahora.
+
+¿Qué problema o situación motivó esta decisión?
+¿Qué restricciones existen? ¿Qué pasa si no se decide nada?
 
 ## Decisión
-Qué se decidió hacer.
 
-## Alternativas consideradas
-| Opción | Por qué se descartó |
-|--------|---------------------|
-| Opción A | ... |
-| Opción B | ... |
+¿Qué se decidió hacer exactamente?
+Ser específico — el "qué", no el "cómo".
+
+## Alternativas descartadas
+
+| Alternativa | Por qué se descartó |
+|---|---|
+| Alternativa A | Razón concreta |
+| Alternativa B | Razón concreta |
 
 ## Consecuencias
-- ✅ Beneficios
-- ⚠️ Trade-offs aceptados
-- 🔴 Riesgos a monitorear
+
+**Ganancia:**
+- Qué mejora, qué se simplifica, qué riesgo se elimina
+
+**Costo / deuda técnica consciente:**
+- Qué trabajo extra genera, qué limitación introduce
+
+**Regla permanente que queda:**
+- La regla de código review que deriva de esta decisión
+
+## Referencias
+
+- Archivos clave afectados
+- Otros ADRs relacionados
+- Checklists actualizados por este ADR
