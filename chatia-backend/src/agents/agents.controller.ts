@@ -1,145 +1,77 @@
+// chatia-backend/src/agents/agents.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
 import { randomUUID } from 'crypto';
-// src/agents/agents.controller.ts
 import {
   Controller, Post, Get, Patch, Body, Param,
   UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import {
-  ApiTags, ApiOperation, ApiBearerAuth,
-} from '@nestjs/swagger';
-import {
-  IsString, IsOptional, IsEmail, IsBoolean, MaxLength,
-} from 'class-validator';
-import { PrismaService } from '../prisma/prisma.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { RolesGuard } from '../common/guards/roles.guard';
-import { Roles } from '../common/decorators/roles.decorator';
-import { Tenant } from '../common/decorators/tenant.decorator';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { PrismaService }    from '../prisma/prisma.service';
+import { TenantGuard }      from '../common/guards/tenant.guard';
+import { RolesGuard }       from '../common/guards/roles.guard';
+import { Roles }            from '../common/decorators/roles.decorator';
+import { Tenant }           from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { RegisterAgentSchema, UpdateAgentSchema } from './schemas';
+import type { RegisterAgentInput, UpdateAgentInput } from './schemas';
 
-class RegisterAgentDto {
-  @IsString()
-  firebaseUid!: string;
-
-  @IsString() @MaxLength(100)
-  name!: string;
-
-  @IsEmail()
-  email!: string;
-
-  @IsString() @IsOptional()
-  organizationId?: string;
-
-  @IsString() @IsOptional()
-  avatarUrl?: string;
-}
-
-class UpdateAgentDto {
-  @IsString() @IsOptional() @MaxLength(100)
-  name?: string;
-
-  @IsString() @IsOptional()
-  avatarUrl?: string;
-
-  @IsBoolean() @IsOptional()
-  isActive?: boolean;
-}
-
-@ApiTags('Agents')
-@Controller('agents')
+@ApiTags('agents')
+@Controller('api/v1/agents')
 export class AgentsController {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Registro de un nuevo agente. Puede ser llamado por el propio agente
-   * en su primer login (sin TenantGuard) o por un admin.
-   * Si no se provee organizationId, se crea una Organization nueva.
-   */
   @Post('register')
-  @ApiOperation({ summary: 'Registrar agente (primer login o admin)' })
-  async register(@Body() dto: RegisterAgentDto) {
-    const existing = await this.prisma.agent.findUnique({
-      where: { firebaseUid: dto.firebaseUid },
-    });
-    if (existing) return { success: true, data: existing, isNew: false };
-
-    let organizationId = dto.organizationId;
-
-    if (!organizationId) {
-      const org = await this.prisma.organization.create({
-        data: { id: randomUUID(), ecosystemId: 'dev', name: `Org de ${dto.name}`, slug: `org-${Date.now()}`, isActive: true },
-      });
-      organizationId = org.id;
-    }
-
-    const agent = await this.prisma.agent.create({
-      data: {
-        firebaseUid: dto.firebaseUid,
-        name: dto.name,
-        email: dto.email,
-        organizationId,
-        avatarUrl: dto.avatarUrl,
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Registro de agente (primer login o por admin)' })
+  async register(
+    @Body(new ZodValidationPipe(RegisterAgentSchema)) dto: RegisterAgentInput,
+  ) {
+    return this.prisma.agent.upsert({
+      where:  { firebaseUid: dto.firebaseUid },
+      update: { name: dto.name, email: dto.email, avatarUrl: dto.avatarUrl },
+      create: {
+        id:             randomUUID(),
+        firebaseUid:    dto.firebaseUid,
+        name:           dto.name,
+        email:          dto.email,
+        avatarUrl:      dto.avatarUrl,
+        organizationId: dto.organizationId ?? '',
       },
     });
-
-    return { success: true, data: agent, isNew: true };
   }
 
-  /**
-   * Perfil del agente autenticado.
-   */
   @Get('me')
-  @ApiBearerAuth()
   @UseGuards(TenantGuard)
-  @ApiOperation({ summary: 'Perfil del agente autenticado' })
+  @ApiBearerAuth()
   async me(@Tenant() tenant: TenantContext) {
-    const agent = await this.prisma.agent.findFirst({
-      where: { id: tenant.agentId, organizationId: tenant.organizationId },
-      include: { organization: { select: { id: true, name: true } } },
+    return this.prisma.agent.findFirst({
+      where: { firebaseUid: tenant.userId, organizationId: tenant.organizationId },
     });
-    return { success: true, data: agent };
   }
 
-  /**
-   * Listar agentes de la organización (solo admin).
-   */
   @Get()
-  @ApiBearerAuth()
   @UseGuards(TenantGuard, RolesGuard)
-  @Roles('admin')
-  @ApiOperation({ summary: 'Listar agentes (admin)' })
+  @Roles('OWNER', 'ADMIN')
+  @ApiBearerAuth()
   async list(@Tenant() tenant: TenantContext) {
-    const agents = await this.prisma.agent.findMany({
-      where: { organizationId: tenant.organizationId },
-      orderBy: { createdAt: 'desc' },
+    return this.prisma.agent.findMany({
+      where: { organizationId: tenant.organizationId, isActive: true },
+      orderBy: { name: 'asc' },
     });
-    return { success: true, data: agents };
   }
 
-  /**
-   * Actualizar agente (admin puede actualizar cualquiera, agente solo a sí mismo).
-   */
   @Patch(':id')
-  @ApiBearerAuth()
   @UseGuards(TenantGuard)
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Actualizar agente' })
+  @ApiBearerAuth()
   async update(
     @Param('id') id: string,
     @Tenant() tenant: TenantContext,
-    @Body() dto: UpdateAgentDto,
+    @Body(new ZodValidationPipe(UpdateAgentSchema)) dto: UpdateAgentInput,
   ) {
-    const isAdmin = tenant.role === 'OWNER' || tenant.role === 'ADMIN';
-    const isSelf  = tenant.agentId === id;
-
-    if (!isAdmin && !isSelf) {
-      return { success: false, message: 'Solo podés editar tu propio perfil' };
-    }
-
-    const agent = await this.prisma.agent.update({
+    return this.prisma.agent.update({
       where: { id, organizationId: tenant.organizationId },
-      data: dto,
+      data:  dto,
     });
-    return { success: true, data: agent };
   }
 }

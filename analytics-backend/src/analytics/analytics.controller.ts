@@ -6,27 +6,18 @@
 // GET  /analytics/agents
 // POST /analytics/export          → async, retorna jobId para workers-backend
 // GET  /analytics/export/:jobId/status
-
 import {
   Controller, Get, Post, Param,
   Query, Body, HttpCode, HttpStatus,
 } from '@nestjs/common';
+import { ExportSchema, type ExportInput } from './schemas.js';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
 import {
   ApiTags, ApiBearerAuth, ApiOperation,
   ApiResponse, ApiQuery, ApiBody,
 } from '@nestjs/swagger';
-import { IsEnum, IsString, IsDateString } from 'class-validator';
 import { AnalyticsService } from './analytics.service.js';
 import { ExportService }    from './export.service.js';
-
-class ExportDto {
-  @IsString()  organizationId!: string;
-  @IsString()  ecosystemId!:    string;
-  @IsDateString() from!:        string;
-  @IsDateString() to!:          string;
-  @IsEnum(['csv', 'json']) format!: 'csv' | 'json';
-  @IsEnum(['overview', 'conversations', 'agents']) reportType!: string;
-}
 
 @ApiTags('analytics')
 @ApiBearerAuth()
@@ -57,12 +48,22 @@ export class AnalyticsController {
 
   @Get('conversations/by-day')
   @ApiOperation({ summary: 'Conversaciones agrupadas por día' })
+  @ApiQuery({ name: 'ecosystemId',    required: true })
+  @ApiQuery({ name: 'organizationId', required: true })
+  @ApiQuery({ name: 'from',           required: true, description: 'ISO date' })
+  @ApiQuery({ name: 'to',             required: true, description: 'ISO date' })
   byDay(
+    @Query('ecosystemId')    ecosystemId:    string,
     @Query('organizationId') organizationId: string,
     @Query('from')           from:           string,
     @Query('to')             to:             string,
   ) {
-    return this.svc.getConversationsByDay(organizationId, new Date(from), new Date(to));
+    return this.svc.getConversationsByDay(
+      organizationId,
+      ecosystemId,
+      new Date(from),
+      new Date(to),
+    );
   }
 
   @Get('agents')
@@ -86,13 +87,11 @@ export class AnalyticsController {
   }
 
   // ── Export async ──────────────────────────────────────────────────────────
-
   @Post('export')
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({ summary: 'Iniciar exportación async — retorna jobId' })
-  @ApiBody({ type: ExportDto })
   @ApiResponse({ status: 202, description: 'Exportación encolada' })
-  startExport(@Body() dto: ExportDto) {
+  startExport(@Body(new ZodValidationPipe(ExportSchema)) dto: ExportInput) {
     return this.export_.enqueue({
       ecosystemId:    dto.ecosystemId,
       organizationId: dto.organizationId,

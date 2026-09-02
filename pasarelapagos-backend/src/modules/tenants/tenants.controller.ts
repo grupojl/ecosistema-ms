@@ -1,3 +1,4 @@
+// pasarelapagos-backend/src/modules/tenants/tenants.controller.ts
 import {
   Body,
   Controller,
@@ -8,22 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiSecurity } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
+import { CreateApiKeySchema, type CreateApiKeyInput } from './schemas';
+import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import { Tenant } from '../../common/decorators/tenant.decorator';
 import type { TenantContext } from '../../common/decorators/tenant.decorator';
 import { ApiKeyGuard } from '../../common/guards/api-key.guard';
 import { ApiKeyService } from './api-key.service';
-
-class CreateApiKeyDto {
-  @IsString()
-  label!: string;
-
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(365)
-  expiresInDays?: number;
-}
 
 @ApiTags('tenants')
 @ApiSecurity('x-api-key')
@@ -33,8 +24,11 @@ export class TenantsController {
   constructor(private readonly apiKeys: ApiKeyService) {}
 
   @Post()
-  create(@Tenant() t: TenantContext, @Body() dto: CreateApiKeyDto) {
-    return this.apiKeys.create(t.id, dto.label, dto.expiresInDays);
+  create(
+    @Tenant() t: TenantContext,
+    @Body(new ZodValidationPipe(CreateApiKeySchema)) dto: CreateApiKeyInput,
+  ) {
+    return this.apiKeys.create(t.id, dto.name, dto.expiresIn);
   }
 
   @Get()

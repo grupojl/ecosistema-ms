@@ -1,8 +1,9 @@
-import { Module }         from "@nestjs/common";
-import { ClientsModule, Transport } from "@nestjs/microservices";
-import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from "@ecosistema-ms/proto";
+// packages/grpc-client/src/chatia/chatia-grpc.module.ts
+import { Module }                    from '@nestjs/common';
+import { ClientsModule, Transport }  from '@nestjs/microservices';
+import { CHATIA_PROTO_PATH, CHATIA_PACKAGE } from '@ecosistema-ms/proto';
 
-export const CHATIA_GRPC_CLIENT = "CHATIA_GRPC_CLIENT";
+export const CHATIA_GRPC_CLIENT = 'CHATIA_GRPC_CLIENT';
 
 /**
  * ChatiaGrpcModule — importar en cualquier microservicio que necesite
@@ -18,9 +19,16 @@ export const CHATIA_GRPC_CLIENT = "CHATIA_GRPC_CLIENT";
         useFactory: () => ({
           transport: Transport.GRPC,
           options: {
-            url:       process.env["CHATIA_GRPC_URL"] ?? "localhost:5001",
+            url:       process.env['CHATIA_GRPC_URL'] ?? 'localhost:5001',
             package:   CHATIA_PACKAGE,
             protoPath: CHATIA_PROTO_PATH,
+            channelOptions: {
+              'grpc.keepalive_time_ms':              30_000,
+              'grpc.keepalive_timeout_ms':            5_000,
+              'grpc.keepalive_permit_without_calls':      1,
+              'grpc.http2.max_pings_without_data':        0,
+              'grpc.max_receive_message_length':  4 * 1024 * 1024,
+            },
           },
         }),
       },

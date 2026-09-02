@@ -1,93 +1,99 @@
-// src/conversations/conversations.controller.ts
+// chatia-backend/src/conversations/conversations.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
 import {
-  Controller, Get, Post, Patch, Delete,
-  Param, Body, Query, UseGuards,
+  Controller, Get, Post, Patch, Delete, Body,
+  Param, Query, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { IsString, MinLength, MaxLength } from 'class-validator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { ConversationsService } from './conversations.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
+import { TenantGuard }          from '../common/guards/tenant.guard';
+import { Tenant }               from '../common/decorators/tenant.decorator';
+import type { TenantContext }   from '../common/types/tenant-context';
+import { ZodValidationPipe }    from '../common/pipes/zod-validation.pipe';
+import {
+  ListConversationsSchema, SendMessageSchema,
+  TakeoverSchema, AddTagSchema,
+} from './schemas';
+import type {
+  ListConversationsInput, SendMessageInput,
+  TakeoverInput, AddTagInput,
+} from './schemas';
 
-class TagDto {
-  @IsString()
-  @MinLength(1)
-  @MaxLength(50)
-  tag!: string;
-}
-
-@Controller('conversations')
+@ApiTags('conversations')
+@ApiBearerAuth()
 @UseGuards(TenantGuard)
+@Controller('api/v1/conversations')
 export class ConversationsController {
   constructor(private readonly svc: ConversationsService) {}
 
   @Get()
-  list(@Tenant() t: TenantContext, @Query() q: any) {
-    return this.svc.list(t.organizationId, q);
+  list(
+    @Tenant() tenant: TenantContext,
+    @Query(new ZodValidationPipe(ListConversationsSchema)) query: ListConversationsInput,
+  ) {
+    return this.svc.list(tenant.organizationId, query);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @Tenant() t: TenantContext) {
-    return this.svc.findOne(id, t.organizationId);
+  findOne(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.findOne(id, tenant.organizationId);
   }
 
   @Post(':id/messages')
+  @HttpCode(HttpStatus.CREATED)
   sendMessage(
     @Param('id') id: string,
-    @Tenant() t: TenantContext,
-    @Body('text') text: string,
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(SendMessageSchema)) dto: SendMessageInput,
   ) {
-    return this.svc.sendManualMessage(id, t.organizationId, text);
+    return this.svc.sendManualMessage(id, tenant.organizationId, dto.text);
   }
 
   @Patch(':id/takeover')
   takeover(
     @Param('id') id: string,
-    @Tenant() t: TenantContext,
-    @Body('agentId') agentId: string,
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(TakeoverSchema)) dto: TakeoverInput,
   ) {
-    return this.svc.takeover(id, t.organizationId, agentId);
+    return this.svc.takeover(id, tenant.organizationId, dto.agentId);
   }
 
   @Patch(':id/release')
-  release(@Param('id') id: string, @Tenant() t: TenantContext) {
-    return this.svc.release(id, t.organizationId);
+  release(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.release(id, tenant.organizationId);
   }
 
   @Patch(':id/resolve')
-  resolve(@Param('id') id: string, @Tenant() t: TenantContext) {
-    return this.svc.resolve(id, t.organizationId);
+  resolve(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.resolve(id, tenant.organizationId);
   }
 
-  /** DELETE /conversations/:id — soft delete (archiva) */
   @Delete(':id')
-  softDelete(@Param('id') id: string, @Tenant() t: TenantContext) {
-    return this.svc.softDelete(id, t.organizationId);
+  softDelete(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.softDelete(id, tenant.organizationId);
   }
 
-  /** PATCH /conversations/:id/restore — restaurar conversación archivada */
   @Patch(':id/restore')
-  restore(@Param('id') id: string, @Tenant() t: TenantContext) {
-    return this.svc.restore(id, t.organizationId);
+  restore(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.restore(id, tenant.organizationId);
   }
 
-  /** POST /conversations/:id/tags   body: { tag: "urgente" } */
   @Post(':id/tags')
+  @HttpCode(HttpStatus.OK)
   addTag(
     @Param('id') id: string,
-    @Tenant() t: TenantContext,
-    @Body() dto: TagDto,
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(AddTagSchema)) dto: AddTagInput,
   ) {
-    return this.svc.addTag(id, t.organizationId, dto.tag);
+    return this.svc.addTag(id, tenant.organizationId, dto.tag);
   }
 
-  /** DELETE /conversations/:id/tags/:tag */
   @Delete(':id/tags/:tag')
   removeTag(
     @Param('id') id: string,
     @Param('tag') tag: string,
-    @Tenant() t: TenantContext,
+    @Tenant() tenant: TenantContext,
   ) {
-    return this.svc.removeTag(id, t.organizationId, tag);
+    return this.svc.removeTag(id, tenant.organizationId, tag);
   }
 }

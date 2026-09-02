@@ -18,25 +18,26 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
     "@nestjs/bullmq": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/config": "catalog:",
     "@nestjs/core": "catalog:",
     "@nestjs/event-emitter": "catalog:",
+    "@nestjs/mapped-types": "catalog:",
     "@nestjs/microservices": "catalog:",
     "@nestjs/platform-express": "catalog:",
     "@nestjs/swagger": "catalog:",
-    "@nestjs/throttler": "catalog:",
     "@nestjs/terminus": "catalog:",
-    "@nestjs/mapped-types": "catalog:",
+    "@nestjs/throttler": "catalog:",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
     "bcryptjs": "catalog:",
     "bullmq": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
     "dotenv": "catalog:",
     "firebase-admin": "catalog:",
     "helmet": "catalog:",
@@ -47,10 +48,7 @@
     "socket.io": "^4.8.1",
     "swagger-ui-express": "catalog:",
     "uuid": "catalog:",
-    "zod": "catalog:",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@eslint/eslintrc": "catalog:",
@@ -61,8 +59,8 @@
     "@types/bcryptjs": "catalog:",
     "@types/express": "catalog:",
     "@types/jest": "catalog:",
-    "@types/node": "catalog:",
     "@types/multer": "^1.4.12",
+    "@types/node": "catalog:",
     "@types/supertest": "catalog:",
     "@types/uuid": "catalog:",
     "eslint": "catalog:",
@@ -82,11 +80,19 @@
     "typescript-eslint": "catalog:"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
-    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }

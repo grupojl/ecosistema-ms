@@ -1,12 +1,21 @@
 // workers-backend/src/campaigns/campaigns.controller.ts
-
+// Migrado de class-validator → Zod inline (ADR-001)
 import {
   Controller, Get, Post, Patch,
   Param, Body, Query, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { CampaignsService }    from './campaigns.service.js';
-import { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
+import { CampaignsService }  from './campaigns.service.js';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { CreateCampaignSchema } from './schemas.js';
+import type { CreateCampaignInput } from './schemas.js';
+import { z } from 'zod';
+
+const PatchCampaignSchema = z.object({
+  status: z.enum(['PAUSED', 'CANCELLED']).optional(),
+  scheduledAt: z.coerce.date().optional(),
+});
+type PatchCampaignInput = z.infer<typeof PatchCampaignSchema>;
 
 @ApiTags('campaigns')
 @ApiBearerAuth()
@@ -16,49 +25,45 @@ export class CampaignsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Crear campaña (DRAFT o SCHEDULED)' })
-  create(@Body() dto: CreateCampaignDto) {
+  @ApiOperation({ summary: 'Crear campaña' })
+  create(@Body(new ZodValidationPipe(CreateCampaignSchema)) dto: CreateCampaignInput) {
     return this.svc.create(dto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Listar campañas de una organización' })
   @ApiQuery({ name: 'organizationId', required: true })
-  @ApiQuery({ name: 'status',         required: false })
+  @ApiQuery({ name: 'status', required: false })
   findAll(
     @Query('organizationId') organizationId: string,
-    @Query('status')         status?:        string,
+    @Query('status') status?: string,
   ) {
     return this.svc.findAll(organizationId, status);
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Detalle de una campaña' })
   findOne(
-    @Param('id')             id: string,
+    @Param('id') id: string,
     @Query('organizationId') organizationId: string,
   ) {
     return this.svc.findOne(id, organizationId);
   }
 
   @Patch(':id')
-  @ApiOperation({ summary: 'Pausar, reprogramar o cancelar campaña' })
   patch(
-    @Param('id')             id:             string,
+    @Param('id') id: string,
     @Query('organizationId') organizationId: string,
-    @Body()                  dto:            PatchCampaignDto,
+    @Body(new ZodValidationPipe(PatchCampaignSchema)) dto: PatchCampaignInput,
   ) {
     return this.svc.patch(id, organizationId, dto);
   }
 
   @Post(':id/dispatch')
   @HttpCode(HttpStatus.ACCEPTED)
-  @ApiOperation({ summary: 'Despachar campaña manualmente (sin esperar scheduledAt)' })
   dispatch(
-    @Param('id')             id:             string,
+    @Param('id') id: string,
     @Query('organizationId') organizationId: string,
   ) {
-    void this.svc.findOne(id, organizationId); // validar ownership
-    return this.svc.dispatchCampaign(id).then(() => ({ dispatched: true }));
+    void this.svc.findOne(id, organizationId);
+    return this.svc.dispatch(id, organizationId);
   }
 }

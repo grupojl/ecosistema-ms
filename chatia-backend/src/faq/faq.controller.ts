@@ -1,157 +1,96 @@
-import type { Multer } from "multer";
-// src/faq/faq.controller.ts
+// chatia-backend/src/faq/faq.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
 import {
-  Controller, Get, Post, Put, Delete, Param, Body,
-  Query, UseGuards, HttpCode, HttpStatus,
-  UseInterceptors, UploadedFile, NotFoundException,
+  Controller, Get, Post, Patch, Delete, Body,
+  Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { PrismaService } from '../prisma/prisma.service';
-import { KnowledgeBaseService } from './knowledge-base/knowledge-base.service';
-import { KbDocumentService } from './document/kb-document.service';
-import { FaqQueryService } from './query/faq-query.service';
-import { RagService } from './rag/rag.service';
-import { CacheService } from '../common/services/cache.service';
-import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from './knowledge-base/dto/knowledge-base.dto';
-import { CreateKbDocumentDto } from './document/dto/kb-document.dto';
-import { FaqQueryDto } from './query/dto/faq-query.dto';
+import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
+import { KnowledgeBaseService }  from './knowledge-base/knowledge-base.service';
+import { KbDocumentService }     from './document/kb-document.service';
+import { FaqQueryService }       from './query/faq-query.service';
+import { TenantGuard }           from '../common/guards/tenant.guard';
+import { Tenant }                from '../common/decorators/tenant.decorator';
+import type { TenantContext }    from '../common/types/tenant-context';
+import { ZodValidationPipe }     from '../common/pipes/zod-validation.pipe';
+import {
+  CreateKnowledgeBaseSchema, CreateKbDocumentSchema, FaqQuerySchema,
+} from './schemas';
+import type {
+  CreateKnowledgeBaseInput, CreateKbDocumentInput, FaqQueryInput,
+} from './schemas';
 
-@ApiTags('FAQ')
+@ApiTags('faq')
 @ApiBearerAuth()
-@Controller('projects/:slug/faq')
 @UseGuards(TenantGuard)
+@Controller('api/v1/faq')
 export class FaqController {
   constructor(
-    private readonly prisma: PrismaService,
-    private readonly kbService: KnowledgeBaseService,
-    private readonly docService: KbDocumentService,
-    private readonly queryService: FaqQueryService,
-    private readonly ragService: RagService,
-    private readonly cache: CacheService,
+    private readonly kb:    KnowledgeBaseService,
+    private readonly doc:   KbDocumentService,
+    private readonly query: FaqQueryService,
   ) {}
 
-  // ── Knowledge Bases ───────────────────────────────────────────────────────
+  // ── Knowledge Bases ────────────────────────────────────────────────────────
 
   @Post('knowledge-bases')
-  @ApiOperation({ summary: 'Crear knowledge base' })
-  async createKb(@Param('slug') slug: string, @Tenant() t: TenantContext, @Body() dto: CreateKnowledgeBaseDto) {
-    const project = await this.resolveProject(slug, t.organizationId);
-    return this.kbService.create(project.id, t.organizationId, dto);
+  @HttpCode(HttpStatus.CREATED)
+  createKb(
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(CreateKnowledgeBaseSchema)) dto: CreateKnowledgeBaseInput,
+  ) {
+    return this.kb.create(dto.projectId, tenant.organizationId, dto as never);
   }
 
   @Get('knowledge-bases')
-  @ApiOperation({ summary: 'Listar knowledge bases' })
-  async findAllKbs(@Param('slug') slug: string, @Tenant() t: TenantContext) {
-    const project = await this.resolveProject(slug, t.organizationId);
-    return this.kbService.findAll(project.id, t.organizationId);
+  listKbs(@Tenant() tenant: TenantContext, @Param('projectId') projectId: string) {
+    return this.kb.findAll(projectId, tenant.organizationId);
   }
 
   @Get('knowledge-bases/:kbId')
-  @ApiOperation({ summary: 'Detalle de knowledge base' })
-  findOneKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext) {
-    return this.kbService.findOne(kbId, t.organizationId);
-  }
-
-  @Put('knowledge-bases/:kbId')
-  @ApiOperation({ summary: 'Actualizar knowledge base' })
-  updateKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Body() dto: UpdateKnowledgeBaseDto) {
-    return this.kbService.update(kbId, t.organizationId, dto);
+  getKb(@Param('kbId') kbId: string, @Tenant() tenant: TenantContext) {
+    return this.kb.findOne(kbId, tenant.organizationId);
   }
 
   @Delete('knowledge-bases/:kbId')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Eliminar knowledge base' })
-  removeKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext) {
-    return this.kbService.remove(kbId, t.organizationId);
+  removeKb(@Param('kbId') kbId: string, @Tenant() tenant: TenantContext) {
+    return this.kb.remove(kbId, tenant.organizationId);
   }
 
-  @Get('knowledge-bases/:kbId/stats')
-  @ApiOperation({ summary: 'Stats de indexación' })
-  statsKb(@Param('kbId') kbId: string, @Tenant() t: TenantContext) {
-    return this.kbService.getStats(kbId, t.organizationId);
-  }
-
-  // ── Documentos ────────────────────────────────────────────────────────────
+  // ── Documents ─────────────────────────────────────────────────────────────
 
   @Post('knowledge-bases/:kbId/documents')
-  @ApiOperation({ summary: 'Crear documento' })
-  createDoc(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Body() dto: CreateKbDocumentDto) {
-    return this.docService.create(kbId, t.organizationId, dto);
-  }
-
-  @Post('knowledge-bases/:kbId/documents/upload')
-  @ApiOperation({ summary: 'Upload PDF' })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(FileInterceptor('file'))
-  uploadPdf(
+  @HttpCode(HttpStatus.CREATED)
+  createDoc(
     @Param('kbId') kbId: string,
-    @Tenant() t: TenantContext,
-    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number },
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(CreateKbDocumentSchema)) dto: CreateKbDocumentInput,
   ) {
-    const base64 = file.buffer.toString('base64');
-    return this.docService.create(kbId, t.organizationId, {
-      title: file.originalname,
-      sourceType: 'PDF' as any,
-      rawContent: base64,
-    });
+    return this.doc.create(kbId, tenant.organizationId, dto as never);
   }
 
   @Get('knowledge-bases/:kbId/documents')
-  @ApiOperation({ summary: 'Listar documentos' })
-  findAllDocs(@Param('kbId') kbId: string, @Tenant() t: TenantContext, @Query('status') status?: string) {
-    return this.docService.findAll(kbId, t.organizationId, status);
+  listDocs(@Param('kbId') kbId: string, @Tenant() tenant: TenantContext) {
+    return this.doc.findAll(kbId, tenant.organizationId);
   }
 
-  @Post('knowledge-bases/:kbId/documents/:docId/reindex')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Re-indexar documento' })
-  async reindexDoc(@Param('kbId') kbId: string, @Param('docId') docId: string, @Tenant() t: TenantContext) {
-    // Invalidar cache del KB al re-indexar
-    await this.cache.del(`faq:${kbId}:*`);
-    return this.docService.reindex(docId, t.organizationId);
+  @Delete('documents/:docId')
+  removeDoc(@Param('docId') docId: string, @Tenant() tenant: TenantContext) {
+    return this.doc.remove(docId, tenant.organizationId);
   }
 
-  @Delete('knowledge-bases/:kbId/documents/:docId')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Eliminar documento' })
-  async removeDoc(@Param('kbId') kbId: string, @Param('docId') docId: string, @Tenant() t: TenantContext) {
-    await this.cache.del(`faq:${kbId}:*`);
-    return this.docService.remove(docId, t.organizationId);
+  @Patch('documents/:docId/reindex')
+  reindex(@Param('docId') docId: string, @Tenant() tenant: TenantContext) {
+    return this.doc.reindex(docId, tenant.organizationId);
   }
 
-  // ── Query / RAG ───────────────────────────────────────────────────────────
+  // ── Query ─────────────────────────────────────────────────────────────────
 
   @Post('query')
-  @ApiOperation({ summary: 'Búsqueda semántica — con includeAnswer=true genera respuesta RAG' })
-  async query(@Tenant() t: TenantContext, @Body() dto: FaqQueryDto) {
-    const topK = dto.topK ?? 5;
-
-    if (dto.includeAnswer) {
-      // Con cache Redis (TTL 1 hora)
-      const cacheKey = this.cache.buildFaqKey(dto.kbId, dto.question);
-      const cached = await this.cache.get<object>(cacheKey);
-      if (cached) return cached;
-
-      const result = await this.ragService.answer(dto.kbId, dto.question);
-      await this.cache.set(cacheKey, result, 3600);
-      return result;
-    }
-
-    // Solo chunks sin generar respuesta
-    return this.queryService.search(dto.kbId, dto.question, topK);
-  }
-
-  // ── Helper ────────────────────────────────────────────────────────────────
-
-  private async resolveProject(slug: string, organizationId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { organizationId_slug: { organizationId, slug } },
-    });
-    if (!project) throw new NotFoundException(`Proyecto "${slug}" no encontrado`);
-    return project;
+  @HttpCode(HttpStatus.OK)
+  queryFaq(
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(FaqQuerySchema)) dto: FaqQueryInput,
+  ) {
+    return this.query.answer(dto.kbId, dto.question, { topK: dto.topK });
   }
 }

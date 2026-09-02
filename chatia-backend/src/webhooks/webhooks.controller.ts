@@ -1,42 +1,55 @@
-// src/webhooks/webhooks.controller.ts
-import { Controller, Get, Post, Param, Query, Body, Req, Res, HttpCode } from '@nestjs/common';
-import type { Request, Response } from 'express';
-import { WebhooksService } from './webhooks.service';
-import { ChannelType } from '@prisma/client';
+// chatia-backend/src/webhooks/webhooks.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
+import {
+  Controller, Get, Post, Patch, Delete, Body,
+  Param, HttpCode, HttpStatus, UseGuards,
+} from '@nestjs/common';
+import { ApiTags, ApiBearerAuth }    from '@nestjs/swagger';
+import { WebhooksService }   from './webhooks.service';
+import { TenantGuard }       from '../common/guards/tenant.guard';
+import { Tenant }            from '../common/decorators/tenant.decorator';
+import type { TenantContext } from '../common/types/tenant-context';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { CreateWebhookSchema, UpdateWebhookSchema } from './schemas';
+import type { CreateWebhookInput, UpdateWebhookInput } from './schemas';
 
-@Controller('webhooks')
+@ApiTags('webhooks')
+@ApiBearerAuth()
+@UseGuards(TenantGuard)
+@Controller('api/v1/webhooks')
 export class WebhooksController {
   constructor(private readonly svc: WebhooksService) {}
 
-  @Get(':channelType/:externalId')
-  async verify(
-    @Param('channelType') ct: string,
-    @Param('externalId') externalId: string,
-    @Query() query: Record<string, string>,
-    @Res() res: Response,
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
+  create(
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(CreateWebhookSchema)) dto: CreateWebhookInput,
   ) {
-    const challenge = await this.svc.verify(ct.toUpperCase() as ChannelType, externalId, query);
-    res.send(challenge);
+    return this.svc.create(tenant.organizationId, dto);
   }
 
-  @Post(':channelType/:externalId')
-  @HttpCode(200)
-  async handleEvent(
-    @Param('channelType') ct: string,
-    @Param('externalId') externalId: string,
-    @Body() payload: unknown,
-    @Req() req: Request & { rawBody?: Buffer },
-  ) {
-    const sig = req.headers['x-hub-signature-256'] as string
-      ?? req.headers['x-tiktok-signature'] as string;
+  @Get()
+  findAll(@Tenant() tenant: TenantContext) {
+    return this.svc.findAll(tenant.organizationId);
+  }
 
-    await this.svc.handleEvent(
-      ct.toUpperCase() as ChannelType,
-      externalId,
-      payload,
-      req.rawBody ?? Buffer.from(''),
-      sig,
-    );
-    return { status: 'ok' };
+  @Get(':id')
+  findOne(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.findOne(id, tenant.organizationId);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Tenant() tenant: TenantContext,
+    @Body(new ZodValidationPipe(UpdateWebhookSchema)) dto: UpdateWebhookInput,
+  ) {
+    return this.svc.update(id, tenant.organizationId, dto);
+  }
+
+  @Delete(':id')
+  remove(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    return this.svc.remove(id, tenant.organizationId);
   }
 }

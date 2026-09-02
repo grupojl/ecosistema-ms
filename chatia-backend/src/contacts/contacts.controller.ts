@@ -1,19 +1,32 @@
-// src/contacts/contacts.controller.ts
+// chatia-backend/src/contacts/contacts.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
 import {
-  Controller, Get, Patch, Body, Param, Query, HttpCode, HttpStatus, UseGuards,
+  Controller, Get, Patch, Post, Body, Param, Query,
+  HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { ContactsService, UpdateContactDto, ListContactsDto } from './contacts.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ContactsService }    from './contacts.service';
+import { TenantGuard }        from '../common/guards/tenant.guard';
+import { Tenant }             from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
+import { ZodValidationPipe }  from '../common/pipes/zod-validation.pipe';
+import {
+  UpdateContactSchema, ListContactsSchema,
+} from './schemas';
+import type { UpdateContactInput, ListContactsInput } from './schemas';
 
-@Controller('contacts')
+@ApiTags('contacts')
+@ApiBearerAuth()
 @UseGuards(TenantGuard)
+@Controller('api/v1/contacts')
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
-  list(@Tenant() tenant: TenantContext, @Query() query: ListContactsDto) {
+  list(
+    @Tenant() tenant: TenantContext,
+    @Query(new ZodValidationPipe(ListContactsSchema)) query: ListContactsInput,
+  ) {
     return this.contactsService.list(tenant.organizationId, query);
   }
 
@@ -28,11 +41,10 @@ export class ContactsController {
   }
 
   @Patch(':id')
-  @HttpCode(HttpStatus.OK)
   update(
     @Param('id') id: string,
     @Tenant() tenant: TenantContext,
-    @Body() dto: UpdateContactDto,
+    @Body(new ZodValidationPipe(UpdateContactSchema)) dto: UpdateContactInput,
   ) {
     return this.contactsService.update(id, tenant.organizationId, dto);
   }

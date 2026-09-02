@@ -1,28 +1,42 @@
-# Checklists 10/10 por capa
+# Checklists 10/10 por capa — Estado actual
 
-Cada archivo es la guía para llevar esa capa al máximo nivel en ecosistema-ms.
+## Backend (5 microservicios)
 
-## Backend (aplica a los 5 microservicios)
+| Capa | Archivo | Score | Tendencia | Bloqueante |
+|---|---|---|---|---|
+| 1 — Auth/Tenant | `backend-capa-1-auth.md` | 6/10 | → | No |
+| 2 — Validación REST (Zod) | `backend-capa-2-rest-controllers.md` | **8/10** | ↑↑ | 3 tareas pendientes |
+| 3 — Controllers gRPC | `backend-capa-3-grpc-controllers.md` | 6/10 | → | No |
+| 4+5 — Domain/Repository | `backend-capas-4-5-domain-repo.md` | **4/10** | ↑ | Constructor pendiente |
+| 6 — Multi-tenant | `backend-capa-6-multitenant.md` | 5/10 | → | Auditoría pendiente |
 
-| Capa | Archivo | Score actual | Nivel |
-|---|---|---|---|
-| 1 — Auth/Tenant | `backend-capa-1-auth.md` | 6/10 | Startup |
-| 2 — Validación REST (Zod) | `backend-capa-2-rest-controllers.md` | 2/10 | ❌ BLOQUEANTE |
-| 3 — Controllers gRPC | `backend-capa-3-grpc-controllers.md` | 6/10 | Funcional |
-| 4+5 — Domain/Repository | `backend-capas-4-5-domain-repo.md` | 1/10 | No iniciado |
-| 6 — Multi-tenant | `backend-capa-6-multitenant.md` | 5/10 | Parcial |
+## Progreso de hoy (resumen de sesión)
 
-## Cómo usar estos archivos
+| Qué | Estado |
+|-----|--------|
+| ZodValidationPipe + filters en 3 servicios | ✅ |
+| schemas.ts Zod en ~15 módulos de chatia | ✅ |
+| 11 controllers chatia migrados a Zod | ✅ |
+| 1 controller workers migrado a Zod | ✅ |
+| class-validator eliminado de 3 package.json | ✅ |
+| conversations.module.ts con Repository binding | ✅ |
+| payments.module.ts con Repository binding | ✅ |
+| domain/ + repository/ para conversations y payments | ✅ |
+| grpc-contracts.md documentado | ✅ |
+| auditoria-multitenant.md generada | ✅ |
 
-1. Al iniciar una sesión de trabajo, leer el checklist de la capa que se va a trabajar
-2. Los ítems `- [ ]` son tareas concretas para llegar a 10/10
-3. Los ítems `- [x]` están completos — no retroceder
-4. Los marcados como `BLOQUEANTE` deben resolverse antes que cualquier otra tarea
+## Para mañana — en orden de prioridad
 
-## Progreso hacia 10/10 — orden de impacto
+1. **Eliminar carpetas dto/ huérfanas** (Capa 2: 8→9)
+   → Ver lista completa en `backend-capa-2-rest-controllers.md`
 
-1. **Eliminar DTOs class-validator** (Capa 2: 2→8) — BLOQUEANTE activo
-2. **Domain/Repository en conversations + payments** (Capa 4+5: 1→5)
-3. **Scope ecosystemId+organizationId consistente** (Capa 6: 5→9)
-4. **Tests 85% cobertura** (todas las capas: +0.5 cada una)
-5. **Enforcement CI (dependency-cruiser + ESLint)** (todas: +0.5 cada una)
+2. **Migrar 8 archivos restantes con class-validator inline** (Capa 2: 9→10)
+   → analytics.controller, channel-accounts.service, contacts.service,
+     notifications.controller (chatia), widget.controller,
+     notificaciones notifications.controller, tenants.controller
+
+3. **Conectar constructores** (Capa 4+5: 4→6)
+   → ConversationsService → IConversationsRepository
+   → PaymentsService → IPaymentsRepository
+
+4. **Registrar AllExceptionsFilter en main.ts** de chatia y workers

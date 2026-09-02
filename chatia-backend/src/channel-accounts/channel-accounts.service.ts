@@ -1,11 +1,11 @@
 // src/channel-accounts/channel-accounts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { CreateChannelAccountInput, UpdateChannelAccountInput } from './schemas';
 import { PrismaService } from '../prisma/prisma.service';
 import { ChannelType, Prisma } from '@prisma/client';
-import { IsString, IsEnum, IsOptional } from 'class-validator';
 import { randomUUID } from 'crypto';
 
-export class CreateChannelAccountDto {
+export class CreateChannelAccountInput {
   @IsEnum(ChannelType)
   channelType!: ChannelType;
 
@@ -22,7 +22,7 @@ export class CreateChannelAccountDto {
   extraConfig?: Record<string, unknown>;
 }
 
-export class UpdateChannelAccountDto {
+export class UpdateChannelAccountInput {
   @IsString() @IsOptional()
   name?: string;
 
@@ -37,7 +37,7 @@ export class UpdateChannelAccountDto {
 export class ChannelAccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: CreateChannelAccountDto) {
+  async create(organizationId: string, dto: CreateChannelAccountInput) {
     const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
 
     const account = await this.prisma.channelAccount.create({
@@ -84,7 +84,7 @@ export class ChannelAccountsService {
     return { success: true, data: account };
   }
 
-  async update(id: string, organizationId: string, dto: UpdateChannelAccountDto) {
+  async update(id: string, organizationId: string, dto: UpdateChannelAccountInput) {
     const account = await this.prisma.channelAccount.findFirst({
       where: { id, organizationId },
     });

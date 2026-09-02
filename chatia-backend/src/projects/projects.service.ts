@@ -1,10 +1,9 @@
-// src/projects/projects.service.ts
+// chatia-backend/src/projects/projects.service.ts
 import {
   Injectable, NotFoundException, ConflictException, Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateProjectDto } from './dto/create-project.dto';
-import { UpdateProjectDto } from './dto/update-project.dto';
+import type { CreateProjectInput, UpdateProjectInput } from './schemas';
 
 @Injectable()
 export class ProjectsService {
@@ -12,29 +11,26 @@ export class ProjectsService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(organizationId: string, dto: CreateProjectDto) {
+  async create(organizationId: string, dto: CreateProjectInput) {
     // Generar slug desde name si no viene en el DTO
-    if (!dto.slug) {
-      dto.slug = dto.name
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 60);
-    }
+    const slug = dto.slug ?? dto.name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .substring(0, 60);
 
     const existing = await this.prisma.project.findUnique({
-      where: { organizationId_slug: { organizationId, slug: dto.slug } },
+      where: { organizationId_slug: { organizationId, slug } },
     });
     if (existing) {
-      throw new ConflictException(`Ya existe un proyecto con el slug "${dto.slug}"`);
+      throw new ConflictException(`Ya existe un proyecto con el slug "${slug}"`);
     }
 
     const project = await this.prisma.project.create({
-      data: { ...dto, slug: dto.slug!, organizationId },
+      data: { ...dto, slug, organizationId },
     });
-
     this.logger.log(`Proyecto creado: ${project.id} (${project.slug})`);
     return { success: true, data: project };
   }
@@ -75,13 +71,15 @@ export class ProjectsService {
     return project;
   }
 
-  async update(slug: string, organizationId: string, dto: UpdateProjectDto) {
+  async update(slug: string, organizationId: string, dto: UpdateProjectInput) {
     await this.findOne(slug, organizationId);
     if (dto.slug && dto.slug !== slug) {
       const conflict = await this.prisma.project.findUnique({
         where: { organizationId_slug: { organizationId, slug: dto.slug } },
       });
-      if (conflict) throw new ConflictException(`Ya existe un proyecto con el slug "${dto.slug}"`);
+      if (conflict) {
+        throw new ConflictException(`Ya existe un proyecto con el slug "${dto.slug}"`);
+      }
     }
     const updated = await this.prisma.project.update({
       where: { organizationId_slug: { organizationId, slug } },

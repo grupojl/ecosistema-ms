@@ -33,8 +33,6 @@
     "@prisma/client": "catalog:",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
     "dotenv": "catalog:",
     "firebase-admin": "catalog:",
     "helmet": "catalog:",

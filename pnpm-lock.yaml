@@ -417,12 +417,6 @@ importers:
       bullmq:
         specifier: 'catalog:'
         version: 5.81.3(redis@5.12.1(@opentelemetry/api@1.9.1))
-      class-transformer:
-        specifier: 'catalog:'
-        version: 0.5.1
-      class-validator:
-        specifier: 'catalog:'
-        version: 0.15.1
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2
@@ -827,12 +821,6 @@ importers:
       cache-manager:
         specifier: 'catalog:'
         version: 6.4.3
-      class-transformer:
-        specifier: 'catalog:'
-        version: 0.5.1
-      class-validator:
-        specifier: 'catalog:'
-        version: 0.15.1
       compression:
         specifier: ^1.7.5
         version: 1.8.1
@@ -1029,12 +1017,6 @@ importers:
       cache-manager:
         specifier: 'catalog:'
         version: 6.4.3
-      class-transformer:
-        specifier: 'catalog:'
-        version: 0.5.1
-      class-validator:
-        specifier: 'catalog:'
-        version: 0.15.1
       dotenv:
         specifier: 'catalog:'
         version: 17.4.2

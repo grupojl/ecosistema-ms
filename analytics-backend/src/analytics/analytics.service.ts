@@ -44,7 +44,7 @@ export class AnalyticsService {
     return result;
   }
 
-  async getConversationsByDay(organizationId: string, from: Date, to: Date) {
+  async getConversationsByDay(organizationId: string, ecosystemId: string, from: Date, to: Date) {
     const cacheKey = `analytics:byDay:${organizationId}:${from.toISOString()}:${to.toISOString()}`;
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;

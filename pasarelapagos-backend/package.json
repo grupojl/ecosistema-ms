@@ -18,6 +18,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
     "@nestjs/bullmq": "catalog:",
     "@nestjs/cache-manager": "catalog:",
     "@nestjs/common": "catalog:",
@@ -28,26 +33,29 @@
     "@nestjs/platform-express": "catalog:",
     "@nestjs/schedule": "catalog:",
     "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
     "@nestjs/throttler": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/auto-instrumentations-node": "catalog:",
     "@opentelemetry/exporter-prometheus": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@types/compression": "^1.7.5",
+    "@types/cookie-parser": "^1.4.8",
     "axios": "catalog:",
     "bcryptjs": "catalog:",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
+    "compression": "^1.7.5",
+    "cookie-parser": "^1.4.7",
     "dotenv": "catalog:",
     "firebase-admin": "catalog:",
     "helmet": "catalog:",
     "ioredis": "catalog:",
     "mercadopago": "catalog:",
+    "nanoid": "^5.1.5",
     "nestjs-pino": "catalog:",
+    "opossum": "^8.1.4",
     "pg": "catalog:",
     "pino": "catalog:",
     "pino-http": "catalog:",
@@ -56,17 +64,7 @@
     "stripe": "catalog:",
     "swagger-ui-express": "catalog:",
     "uuid": "catalog:",
-    "zod": "catalog:",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@types/cookie-parser": "^1.4.8",
-    "@types/compression": "^1.7.5",
-    "nanoid": "^5.1.5",
-    "opossum": "^8.1.4",
-    "cookie-parser": "^1.4.7",
-    "compression": "^1.7.5",
-    "@nestjs/terminus": "catalog:",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@eslint/eslintrc": "catalog:",
@@ -97,11 +95,19 @@
     "typescript-eslint": "catalog:"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
-    "transform": { "^.+\\.(t|j)s$": "ts-jest" },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }

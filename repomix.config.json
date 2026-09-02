@@ -3,7 +3,7 @@
   "output": {
     "filePath": "ecosistema-ms.xml",
     "style": "xml",
-    "compress": true,
+    "compress": false,
     "showLineNumbers": false,
     "removeComments": false,
     "removeEmptyLines": true,
@@ -14,6 +14,7 @@
     "package.json",
     "pnpm-workspace.yaml",
     "tsconfig.base.json",
+    ".claude/**/*",
 
     "packages/proto/proto/*.proto",
     "packages/proto/src/index.ts",

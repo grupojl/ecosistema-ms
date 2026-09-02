@@ -1,21 +1,22 @@
-// src/ai-config/ai-config.controller.ts
+// chatia-backend/src/ai-config/ai-config.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
 import {
-  Controller, Get, Put, Patch, Body, Param, HttpCode, HttpStatus, UseGuards,
+  Controller, Get, Put, Patch, Body,
+  Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
-import { IsBoolean } from 'class-validator';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { AiConfigService } from './ai-config.service';
+import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
+import { AiConfigService }   from './ai-config.service';
+import { TenantGuard }       from '../common/guards/tenant.guard';
+import { Tenant }            from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import { UpdateAiConfigDto } from './dto/update-ai-config.dto';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { UpdateAiConfigSchema, ToggleAiSchema } from './schemas';
+import type { UpdateAiConfigInput, ToggleAiInput } from './schemas';
 
-class ToggleAiDto {
-  @IsBoolean()
-  enabled!: boolean;
-}
-
-@Controller('channel-accounts/:accountId/ai-config')
+@ApiTags('ai-config')
+@ApiBearerAuth()
 @UseGuards(TenantGuard)
+@Controller('api/v1/channel-accounts/:accountId/ai-config')
 export class AiConfigController {
   constructor(private readonly aiConfigService: AiConfigService) {}
 
@@ -25,13 +26,12 @@ export class AiConfigController {
   }
 
   @Put()
-  @HttpCode(HttpStatus.OK)
   update(
     @Param('accountId') accountId: string,
     @Tenant() tenant: TenantContext,
-    @Body() dto: UpdateAiConfigDto,
+    @Body(new ZodValidationPipe(UpdateAiConfigSchema)) dto: UpdateAiConfigInput,
   ) {
-    return this.aiConfigService.update(accountId, tenant.organizationId, dto);
+    return this.aiConfigService.update(accountId, tenant.organizationId, dto as never);
   }
 
   @Patch('toggle')
@@ -39,7 +39,7 @@ export class AiConfigController {
   toggle(
     @Param('accountId') accountId: string,
     @Tenant() tenant: TenantContext,
-    @Body() dto: ToggleAiDto,
+    @Body(new ZodValidationPipe(ToggleAiSchema)) dto: ToggleAiInput,
   ) {
     return this.aiConfigService.toggleEnabled(accountId, tenant.organizationId, dto.enabled);
   }

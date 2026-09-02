@@ -4,6 +4,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import helmet from 'helmet';
 import * as express from 'express';
@@ -32,6 +33,7 @@ async function bootstrap() {
 
   // Filter + interceptor globales
   app.useGlobalFilters(new HttpExceptionFilter());
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
   app.useGlobalInterceptors(new LoggingInterceptor());
 
   app.setGlobalPrefix('api/v1');

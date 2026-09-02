@@ -1,90 +1,56 @@
-// src/internal/internal.controller.ts
-//
-// Endpoints consumidos por servicios internos del ecosistema.
-// Protegidos por InternalApiKeyGuard — sin Firebase, sin TenantGuard.
-//
-// Consumidores:
-//   realsass-sass-back      → POST /internal/chat, GET /internal/projects
-//   realsass-ecommerce-back → POST /internal/chat (soporte en órdenes)
-//
-// Headers requeridos en cada request:
-//   x-api-key: {CHAT_INTERNAL_API_KEY}
+// chatia-backend/src/internal/internal.controller.ts
+// Migrado de class-validator → Zod inline (ADR-001)
+// Protegido por InternalApiKeyGuard — sin Firebase, sin TenantGuard.
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Param,
-  Post,
-  UseGuards,
+  Body, Controller, Delete, Get,
+  HttpCode, HttpStatus, Param, Post, UseGuards,
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { InternalApiKeyGuard }  from './internal-api-key.guard';
-import { InternalChatDto, InternalProjectDto } from './dto/internal-chat.dto';
 import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
 import { ProjectsService }      from '../projects/projects.service';
+import { ZodValidationPipe }    from '../common/pipes/zod-validation.pipe';
+import { InternalChatSchema, InternalProjectSchema } from './schemas';
+import type { InternalChatInput, InternalProjectInput } from './schemas';
 
-@ApiTags('Internal (API Key)')
-@ApiHeader({ name: 'x-api-key', description: 'Clave interna del ecosistema', required: true })
-@Controller('internal')
+@ApiTags('internal')
+@ApiHeader({ name: 'x-api-key', required: true })
 @UseGuards(InternalApiKeyGuard)
+@Controller('internal')
 export class InternalController {
   constructor(
     private readonly chatService:     AssistantChatService,
     private readonly projectsService: ProjectsService,
   ) {}
 
-  // ── Chat ──────────────────────────────────────────────────────────────────
-
   @Post('chat')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Enviar mensaje al asistente (server-to-server)' })
-  chat(@Body() dto: InternalChatDto) {
-    return this.chatService.chat({
-      projectSlug:    dto.projectSlug,
-      organizationId: dto.organizationId,
-      userId:         dto.userId,
-      message:        dto.message,
-      channel:        (dto.channel as any) ?? 'api',
-    });
+  @ApiOperation({ summary: 'Enviar mensaje al asistente IA (uso interno)' })
+  chat(@Body(new ZodValidationPipe(InternalChatSchema)) dto: InternalChatInput) {
+    return this.chatService.chat(dto);
   }
 
-  // ── Proyectos ─────────────────────────────────────────────────────────────
-
-  @Get('projects/:organizationId')
-  @ApiOperation({ summary: 'Listar proyectos de una organización' })
+  @Get(':organizationId/projects')
   listProjects(@Param('organizationId') organizationId: string) {
     return this.projectsService.findAll(organizationId);
   }
 
   @Post('projects')
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Crear proyecto para una organización' })
-  createProject(@Body() dto: InternalProjectDto) {
-    return this.projectsService.create(dto.organizationId, {
-      slug:        dto.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
-      name:        dto.name,
-      description: dto.description,
-    });
+  createProject(
+    @Body(new ZodValidationPipe(InternalProjectSchema)) dto: InternalProjectInput,
+  ) {
+    return this.projectsService.create(dto.organizationId, dto);
   }
 
-  @Delete('projects/:organizationId/:slug')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Eliminar proyecto' })
+  @Delete(':organizationId/projects/:slug')
   deleteProject(
     @Param('organizationId') organizationId: string,
     @Param('slug') slug: string,
   ) {
-    return this.projectsService.remove(organizationId, slug);
+    return this.projectsService.removeBySlug(slug, organizationId);
   }
-
-  // ── Health interno ────────────────────────────────────────────────────────
 
   @Get('ping')
-  @ApiOperation({ summary: 'Verificar conectividad desde ecosistema' })
-  ping() {
-    return { ok: true, service: 'chat-ia', timestamp: new Date().toISOString() };
-  }
+  ping() { return { status: 'ok', service: 'chatia-backend' }; }
 }

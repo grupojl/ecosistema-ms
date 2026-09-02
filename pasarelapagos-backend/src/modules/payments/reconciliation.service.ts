@@ -1,8 +1,13 @@
-import { InjectQueue } from '@nestjs/bullmq';
+// pasarelapagos-backend/src/modules/payments/reconciliation.service.ts
+//
+// DT-006 fix: tenantId dentro del where de schedulePendingReconciliation()
+// Sin este filtro el cron procesa pagos de TODOS los tenants mezclados.
+import { ConfigService }  from '@nestjs/config';
+import { InjectQueue }    from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
+import { Queue }          from 'bullmq';
+import { PrismaService }  from '../prisma/prisma.service';
 import { ProviderRegistry } from '../providers/provider.registry';
 import { assertValidTransition } from './payment-state.machine';
 import {
@@ -30,14 +35,16 @@ export class ReconciliationService {
   private readonly PENDING_THRESHOLD_MIN = 30;
 
   constructor(
-    private readonly prisma: PrismaService,
+    private readonly prisma:   PrismaService,
     private readonly registry: ProviderRegistry,
+    private readonly config:   ConfigService,
     @InjectQueue(QUEUE_RECONCILE) private readonly queue: Queue<ReconcileJobData>,
   ) {}
 
   /**
    * Cada 5 minutos busca pagos PENDING > 30 min y los encola para reconciliar.
    * Configurable con RECONCILE_CRON env var.
+   * DT-006: filtra por tenantId — sin esto se mezclan datos entre ecosistemas.
    */
   @Cron(process.env.RECONCILE_CRON ?? CronExpression.EVERY_5_MINUTES)
   async schedulePendingReconciliation(): Promise<void> {
@@ -47,12 +54,13 @@ export class ReconciliationService {
 
     const stale = await this.prisma.payment.findMany({
       where: {
-        status: PaymentStatus.PENDING,
+        tenantId:   this.config.getOrThrow<string>('TENANT_ID'),
+        status:     PaymentStatus.PENDING,
         externalId: { not: null },
-        createdAt: { lt: threshold },
+        createdAt:  { lt: threshold },
       },
       select: { id: true },
-      take: 100, // batch seguro
+      take: 100,
     });
 
     if (stale.length === 0) return;
@@ -63,9 +71,9 @@ export class ReconciliationService {
       name: JOB_RECONCILE_PAYMENT,
       data: { paymentId: id },
       opts: {
-        jobId: `reconcile:${id}`,
+        jobId:    `reconcile:${id}`,
         attempts: 3,
-        backoff: { type: 'exponential' as const, delay: 5_000 },
+        backoff:  { type: 'exponential' as const, delay: 5_000 },
       },
     }));
 
@@ -78,13 +86,8 @@ export class ReconciliationService {
    */
   async reconcileOne(paymentId: string): Promise<void> {
     const payment = await this.prisma.payment.findUnique({
-      where: { id: paymentId },
-      select: {
-        id: true,
-        status: true,
-        externalId: true,
-        providerId: true,
-      },
+      where:  { id: paymentId },
+      select: { id: true, status: true, externalId: true, providerId: true },
     });
 
     if (!payment?.externalId) {
@@ -92,8 +95,8 @@ export class ReconciliationService {
       return;
     }
 
-    const provider = this.registry.get(payment.providerId);
-    const result = await provider.retrieve(payment.externalId);
+    const provider  = this.registry.get(payment.providerId);
+    const result    = await provider.retrieve(payment.externalId);
     const newStatus = STATUS_MAP[result.status];
 
     if (!newStatus || payment.status === newStatus) return;
@@ -111,20 +114,17 @@ export class ReconciliationService {
     await this.prisma.$transaction(async (tx) => {
       await tx.payment.update({
         where: { id: paymentId },
-        data: { status: newStatus },
+        data:  { status: newStatus },
       });
-
       await tx.paymentEvent.create({
         data: {
           paymentId,
-          type: 'reconciliation.updated',
+          type:    'reconciliation.updated',
           payload: { from: payment.status, to: newStatus, raw: result.raw as any },
         },
       });
     });
 
-    this.logger.log(
-      `Reconciliado: ${paymentId} ${payment.status} → ${newStatus}`,
-    );
+    this.logger.log(`Reconciliado: ${paymentId} ${payment.status} → ${newStatus}`);
   }
 }

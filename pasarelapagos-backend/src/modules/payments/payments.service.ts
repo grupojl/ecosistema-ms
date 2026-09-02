@@ -1,25 +1,34 @@
-// src/modules/payments/payments.service.ts
+// pasarelapagos-backend/src/modules/payments/payments.service.ts
+//
+// Arquitectura: PrismaService + IPaymentsRepository coexisten.
+// — IPaymentsRepository para lecturas simples (findById, list, idempotencia).
+// — PrismaService directamente para operaciones que requieren $transaction
+//   multi-tabla (create con customer.upsert + paymentEvent, refund con Refund).
+//   Estas operaciones no pueden abstraerse en el repository sin romper atomicidad.
 import {
   BadRequestException,
   Injectable,
+  Inject,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService }    from '../prisma/prisma.service';
+import {
+  PAYMENTS_REPOSITORY,
+  IPaymentsRepository,
+} from './repository/payments.repository.interface';
 import { ProviderRegistry } from '../providers/provider.registry';
-import { AuditService } from '../audit/audit.service';
-import { MetricsService } from '../metrics/metrics.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { assertValidTransition } from './payment-state.machine';
-import type { OrgContext } from '../../common/interfaces/org-context.interface';
-import { PaymentStatus, Prisma } from '@prisma/client';
-// Importamos el enum de Prisma con alias para no colisionar con el tipo del provider
+import { AuditService }     from '../audit/audit.service';
+import { MetricsService }   from '../metrics/metrics.service';
+import type { CreatePaymentInput } from './schemas';
+import { assertValidTransition }   from './payment-state.machine';
+import type { OrgContext }         from '../../common/interfaces/org-context.interface';
+import { PaymentStatus, Prisma }   from '@prisma/client';
 import { PaymentMethodKind as PrismaPaymentMethodKind } from '@prisma/client';
 import type { PaymentMethodKind as ProviderMethodKind } from '../providers/provider.interface';
 
 // ---------------------------------------------------------------------------
 // Mapper: convierte el value lowercase del provider al ENUM de Prisma
-// Ejemplo: 'card' → PaymentMethodKind.CARD
 // ---------------------------------------------------------------------------
 const METHOD_MAP: Record<ProviderMethodKind, PrismaPaymentMethodKind> = {
   card:          PrismaPaymentMethodKind.CARD,
@@ -42,6 +51,8 @@ export class PaymentsService {
 
   constructor(
     private readonly prisma:   PrismaService,
+    @Inject(PAYMENTS_REPOSITORY)
+    private readonly paymentsRepo: IPaymentsRepository,
     private readonly registry: ProviderRegistry,
     private readonly audit:    AuditService,
     private readonly metrics:  MetricsService,
@@ -51,7 +62,7 @@ export class PaymentsService {
   // CREATE
   // ---------------------------------------------------------------------------
   async create(
-    dto: CreatePaymentDto,
+    dto: CreatePaymentInput,
     idempotencyKey: string,
     ctx: OrgContext,
   ) {
@@ -64,13 +75,8 @@ export class PaymentsService {
     const orgId = ctx.organizationId;
     const start = Date.now();
 
-    // 1. Idempotencia nivel DB — filtrado por organizationId
-    const existing = await this.prisma.payment.findFirst({
-      where: {
-        organizationId: orgId,
-        idempotencyKey,
-      } as Prisma.PaymentWhereInput,
-    });
+    // 1. Idempotencia via repository
+    const existing = await this.paymentsRepo.findByIdempotencyKey(idempotencyKey, orgId);
     if (existing) return this.serialize(existing);
 
     // 2. Routing
@@ -85,13 +91,11 @@ export class PaymentsService {
 
     const prismaMethod = toPrismaMethod(dto.method);
 
-    // 3. Crear Payment PENDING en DB
+    // 3. Crear Payment PENDING en DB — necesita $transaction multi-tabla
     const payment = await this.prisma.$transaction(async (tx) => {
       let customerId: string | undefined;
 
       if (dto.customerId) {
-        // Usar UncheckedCreateInput: permite pasar tenantId/organizationId
-        // como scalars sin necesitar el objeto de relación anidado.
         const customer = await tx.customer.upsert({
           where: {
             tenantId_externalId: {
@@ -139,7 +143,7 @@ export class PaymentsService {
       return p;
     });
 
-    // 4. Llamar provider — usa el tipo lowercase del provider interface
+    // 4. Llamar provider
     try {
       const result = await provider.createCharge({
         amountMinor:   BigInt(dto.amountMinor),
@@ -205,67 +209,53 @@ export class PaymentsService {
   }
 
   // ---------------------------------------------------------------------------
-  // LIST — siempre filtrado por organizationId
+  // LIST — via repository
   // ---------------------------------------------------------------------------
   async findAll(
     ctx: OrgContext,
     query: { status?: PaymentStatus; page?: number; limit?: number },
   ) {
-    const page  = query.page  ?? 1;
-    const limit = query.limit ?? 20;
-    const skip  = (page - 1) * limit;
-
-    const where = {
+    const result = await this.paymentsRepo.list({
       organizationId: ctx.organizationId,
-      ...(query.status ? { status: query.status } : {}),
-    } as Prisma.PaymentWhereInput;
-
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.payment.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.payment.count({ where }),
-    ]);
+      tenantId:       ctx.tenantId,
+      status:         query.status,
+      page:           query.page  ?? 1,
+      limit:          query.limit ?? 20,
+    });
 
     return {
-      data: items.map((p) => this.serialize(p)),
-      meta: { total, page, limit, pages: Math.ceil(total / limit) },
+      data: result.data.map((p) => this.serialize(p)),
+      meta: {
+        total: result.total,
+        page:  result.page,
+        limit: query.limit ?? 20,
+        pages: Math.ceil(result.total / (query.limit ?? 20)),
+      },
     };
   }
 
   // ---------------------------------------------------------------------------
-  // FIND ONE — validar que pertenece a la org
+  // FIND ONE — via repository
   // ---------------------------------------------------------------------------
   async findOne(id: string, ctx: OrgContext) {
-    const payment = await this.prisma.payment.findFirst({
-      where:   { id, organizationId: ctx.organizationId } as Prisma.PaymentWhereInput,
-      include: { events: { orderBy: { createdAt: 'asc' } } },
-    });
+    const payment = await this.paymentsRepo.findById(id, ctx.organizationId);
 
     if (!payment) {
       throw new NotFoundException(`Payment ${id} no encontrado`);
     }
 
-    return {
-      ...this.serialize(payment),
-      events: payment.events,
-    };
+    return this.serialize(payment);
   }
 
   // ---------------------------------------------------------------------------
-  // REFUND
+  // REFUND — necesita $transaction multi-tabla
   // ---------------------------------------------------------------------------
   async refund(
     id: string,
     body: { amountMinor?: number; reason?: string },
     ctx: OrgContext,
   ) {
-    const payment = await this.prisma.payment.findFirst({
-      where: { id, organizationId: ctx.organizationId } as Prisma.PaymentWhereInput,
-    });
+    const payment = await this.paymentsRepo.findById(id, ctx.organizationId);
 
     if (!payment) {
       throw new NotFoundException(`Payment ${id} no encontrado`);
@@ -363,8 +353,8 @@ export class PaymentsService {
     amountMinor:     bigint;
     currency:        string;
     country:         string;
-    method:          PrismaPaymentMethodKind;
-    status:          PaymentStatus;
+    method:          PrismaPaymentMethodKind | string;
+    status:          PaymentStatus | string;
     providerId:      string;
     externalId?:     string | null;
     description?:    string | null;
@@ -379,7 +369,6 @@ export class PaymentsService {
   }) {
     return {
       ...payment,
-      // BigInt serializado como string — contrato del ecosistema
       amountMinor: payment.amountMinor.toString(),
     };
   }

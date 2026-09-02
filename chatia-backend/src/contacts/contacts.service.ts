@@ -1,59 +1,29 @@
-// src/contacts/contacts.service.ts
+// chatia-backend/src/contacts/contacts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { UpdateContactInput, ListContactsInput } from './schemas';
 import { ContactStatus } from '@prisma/client';
-import {
-  IsString, IsOptional, IsEmail, IsEnum, IsArray, IsBoolean,
-} from 'class-validator';
-import { PrismaService } from 'src/prisma/prisma.service';
-
-export class UpdateContactDto {
-  @IsString() @IsOptional()
-  name?: string;
-
-  @IsEmail() @IsOptional()
-  email?: string;
-
-  @IsEnum(ContactStatus) @IsOptional()
-  status?: ContactStatus;
-
-  @IsArray() @IsOptional()
-  tags?: string[];
-
-  @IsBoolean() @IsOptional()
-  optedOut?: boolean;
-}
-
-export class ListContactsDto {
-  @IsEnum(ContactStatus) @IsOptional()
-  status?: ContactStatus;
-
-  @IsString() @IsOptional()
-  search?: string;
-}
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ContactsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(organizationId: string, filters?: ListContactsDto) {
-    const where: any = { organizationId };
-
-    if (filters?.status) where.status = filters.status;
+  async list(organizationId: string, filters?: ListContactsInput) {
+    const where: Record<string, unknown> = { organizationId };
+    if (filters?.status)  where['status'] = filters.status;
     if (filters?.search) {
-      where.OR = [
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { phone: { contains: filters.search } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
+      where['OR'] = [
+        { name:     { contains: filters.search, mode: 'insensitive' } },
+        { phone:    { contains: filters.search } },
+        { email:    { contains: filters.search, mode: 'insensitive' } },
         { username: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
-
     const contacts = await this.prisma.contact.findMany({
-      where,
+      where: where as any,
       include: { _count: { select: { conversations: true } } },
       orderBy: { lastSeenAt: 'desc' },
     });
-
     return { success: true, data: contacts };
   }
 
@@ -71,29 +41,25 @@ export class ContactsService {
         },
       },
     });
-
     if (!contact) throw new NotFoundException('Contacto no encontrado');
     return { success: true, data: contact };
   }
 
-  async update(contactId: string, organizationId: string, dto: UpdateContactDto) {
+  async update(contactId: string, organizationId: string, dto: UpdateContactInput) {
     const contact = await this.prisma.contact.findFirst({
       where: { id: contactId, organizationId },
     });
-
     if (!contact) throw new NotFoundException('Contacto no encontrado');
-
     const updated = await this.prisma.contact.update({
       where: { id: contactId },
       data: {
-        ...(dto.name      !== undefined && { name: dto.name }),
-        ...(dto.email     !== undefined && { email: dto.email }),
-        ...(dto.status    !== undefined && { status: dto.status }),
-        ...(dto.tags      !== undefined && { tags: dto.tags }),
-        ...(dto.optedOut  !== undefined && { optedOut: dto.optedOut }),
+        ...(dto.name     !== undefined && { name:     dto.name }),
+        ...(dto.email    !== undefined && { email:    dto.email }),
+        ...(dto.status   !== undefined && { status:   dto.status }),
+        ...(dto.tags     !== undefined && { tags:     dto.tags }),
+        ...(dto.optedOut !== undefined && { optedOut: dto.optedOut }),
       },
     });
-
     return { success: true, data: updated };
   }
 
@@ -107,7 +73,6 @@ export class ContactsService {
       }),
       this.prisma.contact.count({ where: { organizationId, optedOut: true } }),
     ]);
-
     return {
       success: true,
       data: {

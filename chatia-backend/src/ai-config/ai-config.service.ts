@@ -1,12 +1,12 @@
 // src/ai-config/ai-config.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { UpdateAiConfigInput } from './schemas';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   IsString, IsOptional, IsBoolean, IsNumber, IsInt,
   IsArray, Min, Max, MaxLength, MinLength,
-} from 'class-validator';
 
-export class UpdateAiConfigDto {
+export class UpdateAiConfigInput {
   @IsString() @IsOptional() @MinLength(1) @MaxLength(4000)
   systemPrompt?: string;
 
@@ -71,7 +71,7 @@ export class AiConfigService {
     return { success: true, data: created };
   }
 
-  async update(channelAccountId: string, organizationId: string, dto: UpdateAiConfigDto) {
+  async update(channelAccountId: string, organizationId: string, dto: UpdateAiConfigInput) {
     await this.verifyOwnership(channelAccountId, organizationId);
 
     const config = await this.prisma.aiConfig.upsert({

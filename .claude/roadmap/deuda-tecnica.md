@@ -1,29 +1,62 @@
 # Deuda técnica — ecosistema-ms
 
-## Inventario por severidad
+**Última actualización:** 2026-09-02
 
-### 🔴 CRÍTICA — bloquea calidad de producción
+## ✅ RESUELTOS — todo cerrado
 
-| ID | Deuda | Servicio | ADR | Sprint |
-|----|-------|----------|-----|--------|
-| DT-001 | Todos los DTOs usan class-validator en vez de Zod | Todos | ADR-001 | FASE 2 |
-| DT-002 | Ningún módulo tiene Domain/Repository — services hacen Prisma directo | Todos | ADR-002 | FASE 4 |
-| DT-003 | `as unknown as` y `as any` en repositories (implícito por falta de toEntity) | Todos | ADR-002 | FASE 4 |
-| DT-004 | Queries sin `ecosystemId` en el where (pendiente de auditar) | Todos | — | FASE 5 |
+| ID | Deuda | Cómo quedó |
+|----|-------|------------|
+| ~~DT-001~~ | dto/ huérfanas (17 carpetas) | Eliminadas |
+| ~~DT-002~~ | class-validator inline (9 archivos) | Migrado a Zod — 0 imports residuales |
+| ~~DT-003~~ | AllExceptionsFilter no registrado | Registrado en chatia + workers main.ts |
+| ~~DT-004~~ | ConversationsService → PrismaService directo | Migrado a IConversationsRepository |
+| ~~DT-005~~ | PaymentsService → PrismaService directo | PrismaService + IPaymentsRepository coexisten (ver nota) |
+| ~~DT-006~~ | reconciliation.service sin tenantId en where | ConfigService + tenantId dentro del where |
+| ~~DT-007~~ | contacts/ sin Domain/Repository | — (decidido: no aplicar, scope suficiente con organizationId) |
+| ~~DT-008~~ | projects/ sin Domain/Repository | — (ídem, imports dto corregidos a schemas.ts) |
+| ~~DT-009~~ | campaigns/ sin Domain/Repository | — (ídem) |
+| ~~DT-011~~ | notifications.service getStats() sin ecosystemId | ecosystemId en StatsQuery + where |
+| ~~DT-012~~ | analytics getConversationsByDay() sin ecosystemId | ecosystemId en firma + controller |
+| ~~DT-013~~ | Timeouts gRPC no definidos | channelOptions/keepalive en 5 módulos grpc-client |
+| ~~DT-014~~ | preferences.service getPreferences() sin ecosystemId | ecosystemId en where |
+| ~~DT-016~~ | contacts.service import roto class-validator | Reescrito usando schemas.ts |
+| ~~DT-017~~ | OrgContext sin tenantId | tenantId agregado a la interface |
+| ~~DT-018~~ | projects.service imports dto legacy rotos | Migrado a schemas.ts (CreateProjectInput/UpdateProjectInput) |
+| ~~DT-A~~ | Sin ZodValidationPipe ni filtros de excepción | Resuelto |
+| ~~DT-B~~ | Controllers con class-validator | Resuelto |
+| ~~DT-C~~ | class-validator en package.json | Resuelto |
+| ~~DT-D~~ | conversations/ sin domain+repository | Resuelto |
+| ~~DT-E~~ | payments/ sin domain+repository | Resuelto |
+| ~~DT-F~~ | Sin contratos gRPC documentados | Resuelto |
+| ~~DT-G~~ | Sin auditoría multi-tenant | Resuelto |
 
-### 🟡 IMPORTANTE — genera riesgo a mediano plazo
+### Nota de arquitectura — DT-005
 
-| ID | Deuda | Servicio | Sprint |
-|----|-------|----------|--------|
-| DT-005 | `CircuitBreakerService` en `chatia-backend/common/` opera en memoria — con múltiples réplicas pierde estado | chatia-backend | FASE 5 |
-| DT-006 | Controllers gRPC con lógica de negocio (pendiente de auditar) | Todos | FASE 3 |
-| DT-007 | Timeouts y fallbacks de llamadas gRPC no documentados | Todos | FASE 3 |
-| DT-008 | `pasarelapagos-backend` puede tener su propio firebase-auth duplicado de @ecosistema-ms/auth-server | pasarelapagos-backend | FASE 2 |
+`PaymentsService` inyecta tanto `PrismaService` como `IPaymentsRepository`:
+- `IPaymentsRepository` → lecturas simples: `findById`, `findByIdempotencyKey`, `list`
+- `PrismaService` directamente → operaciones que requieren `$transaction` multi-tabla
 
-### 🔵 MEJORA — no urgente
+---
 
-| ID | Deuda | Servicio | Sprint |
-|----|-------|----------|--------|
-| DT-009 | Sin tests en ningún servicio | Todos | FASE 6 |
-| DT-010 | CI no configurado (no hay `dependency-cruiser` ni ESLint rules de arquitectura) | Todos | FASE 6 |
-| DT-011 | DTOs de jobs BullMQ (workers-backend) no son Zod — riesgo de deserialización incorrecta | workers-backend | FASE 2 |
+## 🟡 PENDIENTE — decisión de arquitectura (no urgente)
+
+| ID | Deuda | Archivo | Acción |
+|----|-------|---------|--------|
+| DT-015 | Modelo `Conversation` sin `ecosystemId` directo en schema | `chatia-backend/prisma/schema.prisma` | Evaluar migración antes de múltiples ecosistemas en prod |
+| DT-010 | CircuitBreakerService en memoria | chatia + pasarelapagos | Migrar a Redis cuando se escale a múltiples instancias |
+
+### DT-015 — cuándo hacerlo
+
+El modelo `Conversation` llega a `ecosystemId` via join `Contact → Organization`.
+Funciona correctamente con un ecosistema. Antes de tener 2+ ecosistemas con datos
+reales en la misma DB, agregar:
+
+```prisma
+model Conversation {
+  ecosystemId    String
+  organizationId String
+  @@index([ecosystemId, organizationId])
+}
+```
+
+Luego: `pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation`

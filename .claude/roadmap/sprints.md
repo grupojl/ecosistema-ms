@@ -1,43 +1,69 @@
 # Sprints — ecosistema-ms
 
-## Orden de prioridad (derivado del roadmap de brechas)
+**Última actualización:** 2026-09-02
 
-### FASE 0 — Estructura base .claude/ ✅ COMPLETADO
-Ejecutar `x.sh` — crea toda la estructura.
+## Estado de fases
 
-### FASE 1 — Clasificar carpetas bloqueantes/dinámicas ✅ COMPLETADO
-Incluido en los archivos `services/<servicio>.md` generados por `x.sh`.
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| FASE 0 | Estructura base .claude/ | ✅ COMPLETO |
+| FASE 1 | Carpetas bloqueantes/dinámicas | ✅ COMPLETO |
+| FASE 2 | ADR-001: DTOs → Zod | ✅ COMPLETO — 0 class-validator residuales |
+| FASE 3 | Contratos gRPC documentados | ✅ COMPLETO |
+| FASE 4 | Domain/Repository MOLDE VIVO | ✅ COMPLETO |
+| FASE 5 | Multi-tenant — auditoría queries | ✅ COMPLETO |
+| FASE 6 | Build limpio + tests baseline | 🔴 PRÓXIMA |
 
-### FASE 2 — ADR-001: DTOs → Zod (BLOQUEANTE)
-**Estado:** Pendiente — es el primer sprint de código
-**Qué hacer:**
-1. Crear `ZodValidationPipe` + `ZodExceptionFilter` en cada servicio
-2. Migrar todos los DTOs de chatia-backend (~20 DTOs)
-3. Migrar DTOs de pasarelapagos-backend (2 DTOs)
-4. Migrar DTOs de workers-backend (3 DTOs)
-5. Eliminar `class-validator` y `class-transformer`
+---
 
-### FASE 3 — Contratos gRPC documentados
-**Estado:** Pendiente
-**Qué hacer:**
-1. Completar `contracts/grpc-contracts.md` con los RPCs de cada .proto
-2. Documentar timeouts y fallbacks por par consumidor→proveedor
-3. Auditar controllers gRPC — extraer lógica de negocio al Service
+## Logros totales
 
-### FASE 4 — Domain/Repository: MOLDE VIVO
-**Estado:** Pendiente (después de Fase 2)
-**Qué hacer:**
-1. Migrar `chatia-backend/conversations/` → Domain + Repository (MOLDE VIVO)
-2. Migrar `pasarelapagos-backend/payments/` → Domain + Repository (CRÍTICO)
-3. Migrar módulos restantes en orden de complejidad
+- ✅ 0 imports de class-validator residuales
+- ✅ 0 carpetas dto/ huérfanas
+- ✅ 0 imports de DTOs legacy rotos
+- ✅ AllExceptionsFilter en todos los main.ts
+- ✅ ConversationsService + PaymentsService migrados a Domain/Repository
+- ✅ DT-006: tenantId en reconciliation (bug de seguridad cerrado)
+- ✅ ecosystemId en analytics, notificaciones y preferences
+- ✅ Timeouts gRPC en los 5 módulos cliente
+- ✅ ZodValidationPipe en todos los controllers
+- ✅ OrgContext con tenantId
+- ✅ projects.service + contacts.service usando schemas.ts
 
-### FASE 5 — Multi-tenant: auditoría de queries
-**Estado:** Pendiente
-**Qué hacer:**
-1. Auditar todos los queries Prisma sin `ecosystemId`
-2. Agregar `ecosystemId` donde falte
-3. Tests de cross-tenant
+---
 
-### FASE 6 — Tests 85% + Enforcement CI
-**Estado:** Pendiente
-**Dependencia:** Fases 2-5 completadas
+## PRÓXIMA SESIÓN — FASE 6
+
+### Paso 1 — Build limpio (prioridad máxima)
+
+```bash
+pnpm -r build
+```
+
+Errores más probables si aparecen:
+- Algún controller que llame a `getPreferences()` sin pasar `ecosystemId` (nuevo parámetro)
+- Algún controller de `projects` que siga usando `CreateProjectDto` importado
+- `OrgContext` — verificar que los guards de pasarelapagos ya lo poblan con `tenantId`
+
+### Paso 2 — Tests baseline
+
+Ver: `.claude/checklists/testing-desde-cero.md`
+
+Orden sugerido:
+1. Unit tests de domain entities (`payment.entity`, `conversation.entity`)
+2. Integration tests de los repository adapters (Prisma)
+3. E2E del contrato HTTP de cada servicio (Supertest)
+4. Test de cross-tenant: request con ecosystemId A no retorna datos de ecosystemId B
+
+### Paso 3 — DT-015 (cuando haya 2+ ecosistemas en prod)
+
+```bash
+pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation
+```
+
+### Paso 4 — Observabilidad
+
+Ver: `.claude/checklists/observabilidad.md`
+- OpenTelemetry traces activos
+- Prometheus métricas expuestas en /metrics
+- Grafana dashboards por servicio

@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectQueue }        from '@nestjs/bullmq';
 import { Queue }              from 'bullmq';
-import { PrismaService }      from '../prisma/prisma.service';
+import { Inject } from '@nestjs/common';
+import { CONVERSATIONS_REPOSITORY, IConversationsRepository } from './repository/conversations.repository.interface';
 import {
   ConversationStatus, ChannelType,
   MessageDirection, MessageType, MessageStatus,
@@ -20,7 +21,7 @@ export class ConversationsService {
   private readonly logger = new Logger(ConversationsService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(CONVERSATIONS_REPOSITORY) private readonly conversationsRepo: IConversationsRepository,
     @InjectQueue(QUEUES.OUTGOING_MESSAGE ?? 'outgoing-message') private readonly outQueue: Queue,
     @Optional() private readonly analyticsEvents?: AnalyticsEventsService,
   ) {}

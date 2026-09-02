@@ -1,25 +1,12 @@
 // src/notifications/notifications.controller.ts
 import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { ListNotificationsSchema, type ListNotificationsInput } from './schemas';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { IsBoolean, IsOptional, IsInt, Min } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
 import { NotificationsService } from './notifications.service';
 import { TenantGuard } from '../common/guards/tenant.guard';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import type { TenantContext } from '../common/types/tenant-context';
-
-class ListNotificationsDto {
-  @Transform(({ value }) => value === 'true')
-  @IsBoolean()
-  @IsOptional()
-  unread?: boolean;
-
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @IsOptional()
-  page?: number;
-}
 
 @ApiTags('Notifications')
 @ApiBearerAuth()
@@ -30,9 +17,12 @@ export class NotificationsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar notificaciones del agente autenticado' })
-  list(@Tenant() tenant: TenantContext, @Query() query: ListNotificationsDto) {
+  list(
+    @Tenant() tenant: TenantContext,
+    @Query(new ZodValidationPipe(ListNotificationsSchema)) query: ListNotificationsInput,
+  ) {
     if (!tenant.agentId) return { success: true, data: [] };
-    return this.svc.list(tenant.agentId, query.unread, query.page);
+    return this.svc.list(tenant.agentId, query.read, query.page);
   }
 
   @Patch('read-all')

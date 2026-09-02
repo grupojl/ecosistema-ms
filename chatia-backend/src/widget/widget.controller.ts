@@ -3,20 +3,13 @@ import {
   Controller, Get, Post, Param, Body, Res,
   HttpCode, HttpStatus, NotFoundException,
 } from '@nestjs/common';
+import { WidgetChatSchema, type WidgetChatInput } from './schemas';
+import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { IsString, IsOptional, MinLength, MaxLength } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
 import { AssistantSessionService } from '../assistant/session/assistant-session.service';
-
-class WidgetChatDto {
-  @IsString() @MinLength(1) @MaxLength(4000)
-  message!: string;
-
-  @IsString() @MinLength(1) @MaxLength(200)
-  userId!: string;
-}
 
 @ApiTags('Widget (público)')
 @Controller('widget')
@@ -28,12 +21,10 @@ export class WidgetController {
   ) {}
 
   // ── Config pública del asistente ─────────────────────────────────────────
-
   @Get(':projectSlug/config')
   @ApiOperation({ summary: 'Config pública del asistente (sin auth)' })
   async getConfig(@Param('projectSlug') slug: string) {
     const config = await this.resolveConfig(slug);
-
     // Solo exponer campos públicos — nunca el systemPrompt
     return {
       personaName:    config.personaName,
@@ -44,16 +35,14 @@ export class WidgetController {
   }
 
   // ── Chat del widget ───────────────────────────────────────────────────────
-
   @Post(':projectSlug/chat')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Enviar mensaje al asistente (sin auth, userId anónimo)' })
   async chat(
     @Param('projectSlug') slug: string,
-    @Body() dto: WidgetChatDto,
+    @Body(new ZodValidationPipe(WidgetChatSchema)) dto: WidgetChatInput,
   ) {
     const config = await this.resolveConfig(slug);
-
     return this.chatService.chat({
       projectSlug: slug,
       organizationId: config.organizationId,
@@ -64,7 +53,6 @@ export class WidgetController {
   }
 
   // ── Historial de sesión ───────────────────────────────────────────────────
-
   @Get(':projectSlug/session/:userId')
   @ApiOperation({ summary: 'Recuperar historial de sesión (sin auth)' })
   async getSession(
@@ -72,18 +60,15 @@ export class WidgetController {
     @Param('userId') userId: string,
   ) {
     const config = await this.resolveConfig(slug);
-
     const session = await this.sessionService.findByUser(
       config.id,
       config.organizationId,
       userId,
     );
-
     return { success: true, data: session ?? null };
   }
 
   // ── Snippet JS embeddable ─────────────────────────────────────────────────
-
   @Get(':projectSlug/snippet.js')
   @ApiOperation({ summary: 'Script JS embeddable para incrustar el widget en cualquier web' })
   async getSnippet(
@@ -92,40 +77,31 @@ export class WidgetController {
   ) {
     const config = await this.resolveConfig(slug);
     const appUrl  = process.env.APP_URL ?? 'http://localhost:3000';
-
     const snippet = this.buildSnippet({
       projectSlug:    slug,
       apiUrl:         `${appUrl}/api/v1`,
       personaName:    config.personaName,
       welcomeMessage: config.welcomeMessage ?? '¡Hola! ¿En qué puedo ayudarte?',
     });
-
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.send(snippet);
   }
 
   // ── Helper: resolver config por slug (sin organizationId) ────────────────
-
   private async resolveConfig(slug: string) {
-    // Busca el proyecto por slug en cualquier organización (el slug es único por org)
-    // Para el widget no se requiere auth — el slug actúa como identificador público
     const project = await this.prisma.project.findFirst({
       where: { slug, isActive: true },
       include: { assistantConfigs: true },
     });
-
     if (!project) throw new NotFoundException(`Proyecto "${slug}" no encontrado`);
-
     const config = project.assistantConfigs[0];
     if (!config) throw new NotFoundException('Este proyecto no tiene asistente configurado');
     if (!config.isEnabled) throw new NotFoundException('El asistente no está disponible');
-
     return config;
   }
 
   // ── Snippet JS ────────────────────────────────────────────────────────────
-
   private buildSnippet(opts: {
     projectSlug: string;
     apiUrl: string;
@@ -138,8 +114,6 @@ export class WidgetController {
   var PROJECT_SLUG = '${opts.projectSlug}';
   var PERSONA_NAME = '${opts.personaName.replace(/'/g, "\\'")}';
   var WELCOME_MSG  = '${opts.welcomeMessage.replace(/'/g, "\\'")}';
-
-  // Generar userId anónimo persistido en localStorage
   function getUserId() {
     var key = 'chatia_uid_' + PROJECT_SLUG;
     var uid = localStorage.getItem(key);
@@ -149,8 +123,6 @@ export class WidgetController {
     }
     return uid;
   }
-
-  // Crear el widget
   var style = document.createElement('style');
   style.textContent = [
     '#chatia-widget { position:fixed; bottom:24px; right:24px; z-index:9999; font-family:system-ui,sans-serif; }',
@@ -168,7 +140,6 @@ export class WidgetController {
     '.chatia-typing { color:#94a3b8; font-size:13px; font-style:italic; align-self:flex-start; padding:4px 12px; }'
   ].join('');
   document.head.appendChild(style);
-
   var widget = document.createElement('div');
   widget.id = 'chatia-widget';
   widget.innerHTML = [
@@ -183,12 +154,10 @@ export class WidgetController {
     '</div>'
   ].join('');
   document.body.appendChild(widget);
-
   var box      = document.getElementById('chatia-box');
   var messages = document.getElementById('chatia-messages');
   var input    = document.getElementById('chatia-input');
   var opened   = false;
-
   function addMsg(text, role) {
     var div = document.createElement('div');
     div.className = 'chatia-msg ' + role;
@@ -196,7 +165,6 @@ export class WidgetController {
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
   }
-
   function setTyping(on) {
     var el = document.getElementById('chatia-typing-indicator');
     if (on && !el) {
@@ -206,18 +174,14 @@ export class WidgetController {
       t.textContent = PERSONA_NAME + ' está escribiendo...';
       messages.appendChild(t);
       messages.scrollTop = messages.scrollHeight;
-    } else if (!on && el) {
-      el.remove();
-    }
+    } else if (!on && el) { el.remove(); }
   }
-
   async function sendMessage() {
     var text = input.value.trim();
     if (!text) return;
     input.value = '';
     addMsg(text, 'user');
     setTyping(true);
-
     try {
       var res = await fetch(API_URL + '/widget/' + PROJECT_SLUG + '/chat', {
         method: 'POST',
@@ -232,17 +196,12 @@ export class WidgetController {
       addMsg('Error de conexión. Intentá de nuevo.', 'bot');
     }
   }
-
   document.getElementById('chatia-bubble').addEventListener('click', function() {
     opened = !opened;
     box.classList.toggle('open', opened);
-    if (opened && messages.children.length === 0) {
-      addMsg(WELCOME_MSG, 'bot');
-    }
+    if (opened && messages.children.length === 0) { addMsg(WELCOME_MSG, 'bot'); }
   });
-
   document.getElementById('chatia-send').addEventListener('click', sendMessage);
-
   input.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   });
