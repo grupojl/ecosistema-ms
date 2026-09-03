@@ -4,6 +4,7 @@ packages:
   - "workers-backend"
   - "analytics-backend"
   - "notificaciones-backend"
+  - "logistics-backend"
   - "packages/*"
 catalog:
   # ── Core ──────────────────────────────────────────────

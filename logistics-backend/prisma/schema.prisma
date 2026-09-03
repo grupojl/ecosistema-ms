@@ -1,0 +1,161 @@
+// prisma/schema.prisma — logistics-backend
+// 3 bounded contexts: Shipping · Delivery · Warehouse
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── SHIPPING ────────────────────────────────────────────────────────────────
+
+enum ShipmentStatus {
+  PENDING
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum ShipmentCarrier {
+  CORREO_ARGENTINO
+  OCA
+  ANDREANI
+  CUSTOM
+}
+
+model Shipment {
+  id             String          @id @default(uuid())
+  ecosystemId    String          @map("ecosystem_id")
+  organizationId String          @map("organization_id")
+  orderId        String?         @map("order_id")
+  carrier        ShipmentCarrier
+  trackingNumber String?         @map("tracking_number")
+  status         ShipmentStatus  @default(PENDING)
+  weightGrams    Int             @map("weight_grams")
+  lengthCm       Decimal         @map("length_cm") @db.Decimal(8, 2)
+  widthCm        Decimal         @map("width_cm")  @db.Decimal(8, 2)
+  heightCm       Decimal         @map("height_cm") @db.Decimal(8, 2)
+  street         String
+  city           String
+  province       String
+  zipCode        String          @map("zip_code")
+  country        String          @default("AR")
+  costCents      Int?            @map("cost_cents")
+  currency       String          @default("ARS")
+  labelUrl       String?         @map("label_url")
+  notes          String?
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt      @map("updated_at")
+  cancelledAt    DateTime?       @map("cancelled_at")
+  deliveredAt    DateTime?       @map("delivered_at")
+
+  @@index([ecosystemId, organizationId])
+  @@index([ecosystemId, organizationId, orderId])
+  @@index([ecosystemId, organizationId, status])
+  @@map("shipments")
+}
+
+// ─── DELIVERY ────────────────────────────────────────────────────────────────
+
+enum DeliveryStatus {
+  PENDING
+  ASSIGNED
+  PICKED_UP
+  IN_TRANSIT
+  DELIVERED
+  CANCELLED
+  FAILED
+}
+
+enum DeliveryProvider {
+  WELIVERY
+  ENVIA
+  CUSTOM
+}
+
+enum VehicleType {
+  MOTO
+  BICI
+  AUTO
+  CAMIONETA
+}
+
+model DeliveryOrder {
+  id             String           @id @default(uuid())
+  ecosystemId    String           @map("ecosystem_id")
+  organizationId String           @map("organization_id")
+  orderId        String?          @map("order_id")
+  provider       DeliveryProvider
+  externalId     String?          @map("external_id")
+  status         DeliveryStatus   @default(PENDING)
+  vehicleType    VehicleType      @default(MOTO) @map("vehicle_type")
+  originStreet   String           @map("origin_street")
+  originCity     String           @map("origin_city")
+  originLat      Decimal?         @map("origin_lat") @db.Decimal(10, 7)
+  originLng      Decimal?         @map("origin_lng") @db.Decimal(10, 7)
+  destStreet     String           @map("dest_street")
+  destCity       String           @map("dest_city")
+  destLat        Decimal?         @map("dest_lat") @db.Decimal(10, 7)
+  destLng        Decimal?         @map("dest_lng") @db.Decimal(10, 7)
+  riderName      String?          @map("rider_name")
+  riderPhone     String?          @map("rider_phone")
+  distanceKm     Decimal?         @map("distance_km") @db.Decimal(8, 2)
+  costCents      Int?             @map("cost_cents")
+  currency       String           @default("ARS")
+  notes          String?
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt      @map("updated_at")
+  pickedUpAt     DateTime?        @map("picked_up_at")
+  deliveredAt    DateTime?        @map("delivered_at")
+  cancelledAt    DateTime?        @map("cancelled_at")
+
+  @@index([ecosystemId, organizationId])
+  @@index([ecosystemId, organizationId, orderId])
+  @@index([ecosystemId, organizationId, status])
+  @@map("delivery_orders")
+}
+
+// ─── WAREHOUSE ───────────────────────────────────────────────────────────────
+
+model WarehouseLocation {
+  id             String           @id @default(uuid())
+  ecosystemId    String           @map("ecosystem_id")
+  organizationId String           @map("organization_id")
+  name           String
+  code           String
+  depot          String
+  aisle          String?
+  shelf          String?
+  capacityUnits  Int              @map("capacity_units")
+  isActive       Boolean          @default(true) @map("is_active")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt      @map("updated_at")
+  stocks         WarehouseStock[]
+
+  @@unique([organizationId, code])
+  @@index([ecosystemId, organizationId])
+  @@index([ecosystemId, organizationId, depot])
+  @@map("warehouse_locations")
+}
+
+model WarehouseStock {
+  id             String            @id @default(uuid())
+  ecosystemId    String            @map("ecosystem_id")
+  organizationId String            @map("organization_id")
+  locationId     String            @map("location_id")
+  variantId      String            @map("variant_id")
+  quantity       Int               @default(0)
+  reserved       Int               @default(0)
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt      @map("updated_at")
+  location       WarehouseLocation @relation(fields: [locationId], references: [id])
+
+  @@unique([locationId, variantId])
+  @@index([ecosystemId, organizationId])
+  @@index([ecosystemId, organizationId, variantId])
+  @@map("warehouse_stock")
+}

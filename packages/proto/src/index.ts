@@ -21,3 +21,5 @@ export const NOTIF_PACKAGE     = 'notificaciones';
 export const ANALYTICS_PACKAGE = 'analytics';
 export const WORKERS_PACKAGE   = 'workers';
 export const PAGOS_PACKAGE     = 'pagos';
+export const LOGISTICS_PROTO_PATH = join(PROTO_DIR, 'logistics.proto');
+export const LOGISTICS_PACKAGE    = 'logistics';

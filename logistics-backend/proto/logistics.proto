@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package logistics;
+
+// ─── Servicio Logistics ────────────────────────────────────────────────────
+// Puerto gRPC interno: 5006
+// Usado por: chatia-backend, workers-backend, pasarelapagos-backend
+service LogisticsService {
+  // Shipping
+  rpc CreateShipment  (CreateShipmentRequest)  returns (ShipmentResponse);
+  rpc CancelShipment  (ShipmentIdRequest)       returns (ShipmentResponse);
+  rpc GetShipment     (ShipmentIdRequest)       returns (ShipmentResponse);
+  // Delivery
+  rpc CreateDelivery  (CreateDeliveryRequest)   returns (DeliveryResponse);
+  rpc CancelDelivery  (DeliveryIdRequest)        returns (DeliveryResponse);
+  rpc GetDelivery     (DeliveryIdRequest)        returns (DeliveryResponse);
+  // Warehouse
+  rpc SetStock        (SetStockRequest)          returns (StockResponse);
+  rpc GetStock        (GetStockRequest)          returns (StockResponse);
+  // Health
+  rpc Ping            (PingRequest)              returns (PingResponse);
+}
+
+// ─── Shipping ───────────────────────────────────────────────────────────────
+
+message CreateShipmentRequest {
+  string organization_id = 1;
+  string ecosystem_id    = 2;
+  string order_id        = 3;
+  string carrier         = 4; // CORREO_ARGENTINO | OCA | ANDREANI | CUSTOM
+  int32  weight_grams    = 5;
+  double length_cm       = 6;
+  double width_cm        = 7;
+  double height_cm       = 8;
+  string street          = 9;
+  string city            = 10;
+  string province        = 11;
+  string zip_code        = 12;
+  string country         = 13;
+  string notes           = 14;
+}
+
+message ShipmentIdRequest {
+  string organization_id = 1;
+  string shipment_id     = 2;
+}
+
+message ShipmentResponse {
+  bool   success        = 1;
+  string shipment_id    = 2;
+  string status         = 3;
+  string tracking_number = 4;
+  string error          = 5;
+}
+
+// ─── Delivery ───────────────────────────────────────────────────────────────
+
+message CreateDeliveryRequest {
+  string organization_id = 1;
+  string ecosystem_id    = 2;
+  string order_id        = 3;
+  string provider        = 4; // WELIVERY | ENVIA | CUSTOM
+  string vehicle_type    = 5; // MOTO | BICI | AUTO | CAMIONETA
+  string origin_street   = 6;
+  string origin_city     = 7;
+  double origin_lat      = 8;
+  double origin_lng      = 9;
+  string dest_street     = 10;
+  string dest_city       = 11;
+  double dest_lat        = 12;
+  double dest_lng        = 13;
+  string notes           = 14;
+}
+
+message DeliveryIdRequest {
+  string organization_id = 1;
+  string delivery_id     = 2;
+}
+
+message DeliveryResponse {
+  bool   success     = 1;
+  string delivery_id = 2;
+  string status      = 3;
+  string rider_name  = 4;
+  string error       = 5;
+}
+
+// ─── Warehouse ──────────────────────────────────────────────────────────────
+
+message SetStockRequest {
+  string organization_id = 1;
+  string ecosystem_id    = 2;
+  string location_id     = 3;
+  string variant_id      = 4;
+  int32  quantity        = 5;
+}
+
+message GetStockRequest {
+  string organization_id = 1;
+  string location_id     = 2;
+  string variant_id      = 3;
+}
+
+message StockResponse {
+  bool   success     = 1;
+  string location_id = 2;
+  string variant_id  = 3;
+  int32  quantity    = 4;
+  int32  reserved    = 5;
+  string error       = 6;
+}
+
+// ─── Common ─────────────────────────────────────────────────────────────────
+
+message PingRequest  { string caller = 1; }
+message PingResponse { string status = 1; string timestamp = 2; }
