@@ -1,74 +1,59 @@
-// src/main.ts
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import helmet from 'helmet';
-import * as express from 'express';
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
 
-async function bootstrap() {
-  const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
-  // Seguridad
-  app.use(helmet());
-  app.use(
-    express.json({
-      verify: (req: any, _res, buf) => { req.rawBody = buf; },
-    }),
-  );
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
 
-  // Validación global
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      disableErrorMessages: process.env.NODE_ENV === 'production',
-    }),
-  );
-
-  // Filter + interceptor globales
-  app.useGlobalFilters(new HttpExceptionFilter());
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-  app.useGlobalInterceptors(new LoggingInterceptor());
-
-  app.setGlobalPrefix('api/v1');
-
-  // CORS
-  app.enableCors({
-    origin: (_origin, callback) => callback(null, true),
-    methods: ['GET', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
-    credentials: true,
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'chatia',
+      protoPath:  join(process.cwd(), 'proto', 'chatia.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5001'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
   });
 
-  // Swagger — solo en desarrollo
-  if (process.env.NODE_ENV !== 'production') {
-    const config = new DocumentBuilder()
-      .setTitle('Chat IA API')
-      .setDescription(
-        'API multi-tenant de mensajería con IA\n\n' +
-        '**Módulos:** Projects · Assistant · FAQ · Widget · Agents\n\n' +
-        '**Auth:** Bearer Firebase token o x-organization-id (dev)',
-      )
-      .setVersion('1.0')
-      .addBearerAuth()
-      .addApiKey({ type: 'apiKey', in: 'header', name: 'x-organization-id' }, 'x-organization-id')
-      .build();
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
 
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/v1/docs', app, document, {
-      swaggerOptions: { persistAuthorization: true },
-    });
-    logger.log('Swagger disponible en /api/v1/docs');
-  }
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('chatia-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
 
-  const port = process.env.PORT ?? 3000;
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3000';
   await app.listen(port);
-  logger.log(`🚀 Backend corriendo en http://localhost:${port}/api/v1`);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5001`,
+    'chatia-backend',
+  );
 }
 
-bootstrap();
+void bootstrap();

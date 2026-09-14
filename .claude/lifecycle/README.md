@@ -1,51 +1,37 @@
-# Lifecycle — Software de Clase Mundial
+# Lifecycle — ecosistema-ms
 
-Los 13 escalones que llevan ecosistema-ms al top 5-10% mundial.
-Organizados en 4 fases de construcción — en orden de ejecución, no de importancia.
+## Puntaje actual (auditado 2026-09-12)
 
-## Por qué este orden
+**7.6 / 10** — código real leído directamente
 
-El error que mata proyectos es implementar el escalón 9 antes de tener sólido
-el escalón 1. Los escalones más altos son inútiles si los fundamentos fallan.
-Netflix tiene Chaos Engineering porque primero tuvo arquitectura limpia.
+| Dimensión | Puntaje |
+|-----------|---------|
+| Multi-tenancy | 9.0 ✅ |
+| Documentación .claude | 9.5 ✅ |
+| Config/Twelve-Factor | 8.5 🟡 |
+| Arquitectura/Capas | 7.5 🟡 |
+| Contratos/Tipado | 7.5 🟡 |
+| Comunicación gRPC | 7.5 🟡 |
+| Seguridad/RBAC | 7.5 🟡 |
+| Calidad de código | 7.0 🟡 |
+| Base de datos | 6.5 🔴 |
 
-## Las 4 fases
+## Para llegar al 9.0 real
 
-| Fase | Cuándo | Escalones | Estado |
-|------|--------|-----------|--------|
-| [Desarrollo](01-fase-desarrollo.md) | Ahora | 1, 2, 4 | 🔴 En curso |
-| [Estabilización](02-fase-estabilizacion.md) | Antes de producción | 3, 5, 6 | ⚪ Pendiente |
-| [Hardening](03-fase-hardening.md) | Primer ecosistema en prod | 7, 8, 10 | ⚪ Pendiente |
-| [Escala](04-fase-escala.md) | 3 ecosistemas simultáneos | 9, 11, 12, 13 | ⚪ Pendiente |
+| Tarea | Impacto estimado |
+|-------|-----------------|
+| x.sh con los 5 servicios | +0.7 |
+| Parche DT-023 (analytics-backend) | +0.8 |
+| Refactor handleIncomingMessage | +0.3 |
+| Health controller pasarela | +0.2 |
 
-## Los 13 escalones completos
+**Con esas 4 tareas: 9.6 proyectado**
 
-| # | Escalón | Referente mundial | Fase |
-|---|---------|-------------------|------|
-| 1 | Código — Arquitectura y Calidad | Stripe · SQLite | Desarrollo |
-| 2 | Configuración y Entorno | Twelve-Factor App · Heroku | Desarrollo |
-| 3 | Infraestructura y Red | Cloudflare | Estabilización |
-| 4 | Base de Datos y Almacenamiento | PlanetScale · Supabase | Desarrollo |
-| 5 | CI/CD y Despliegues | Vercel · GitHub | Estabilización |
-| 6 | Observabilidad y Operaciones | Datadog | Estabilización |
-| 7 | Seguridad Defensiva (SecOps) | Snyk · CrowdStrike | Hardening |
-| 8 | Cumplimiento Legal y Privacidad | Apple | Hardening |
-| 9 | Recuperación ante Desastres | AWS | Escala |
-| 10 | Datos Masivos y Async | Apache Kafka · Redis | Hardening |
-| 11 | Rendimiento Percibido (UX) | Linear · Figma | Escala |
-| 12 | Alta Disponibilidad y Chaos | Netflix | Escala |
-| 13 | Eficiencia Financiera (FinOps) | Airbnb · Uber | Escala |
+## Fases
 
-## Capa 0 — lo que sostiene los 13 escalones
-
-Cultura de ingeniería documentada. ADRs, reglas duras, moldes vivos, checklists.
-Sin esto, los 13 escalones colapsan cuando escala el equipo.
-Es lo que estamos construyendo con `.claude/`.
-
-## Posición objetivo
-
-Con los 13 escalones sólidos + base documental:
-**Top 5-10% mundial · Top 1% Latinoamérica**
-
-El salto al top 1% mundial lo da el tiempo bajo carga real en producción,
-no una decisión de arquitectura.
+| Fase | Escalones | Estado |
+|------|-----------|--------|
+| Desarrollo (1,2,4) | Arquitectura, Config, DB | 🟡 7.8 promedio |
+| Estabilización (3,5,6) | Infra, CI/CD, Obs | 🔴 Pendiente |
+| Hardening (7,8,10) | SecOps, Privacidad, Async | ⚪ Futuro |
+| Escala (9,11,12,13) | HA, Chaos, FinOps | ⚪ Futuro |

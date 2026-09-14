@@ -1,81 +1,61 @@
-# Checklist: Observabilidad — de 4.5 a 8.0/10
+# Checklist — Observabilidad por microservicio
 
-**Score actual: 4.5/10**
-**Score objetivo: 8.0/10 — nivel Grafana stack / Datadog light**
+## Nivel 1 — Mínimo viable (antes de producción)
 
-## Que tiene el codigo HOY
+### Logs estructurados
+- [ ] `pino` instalado en el servicio
+- [ ] `main.ts` usa `createPinoLogger()` de `packages/logger`
+- [ ] En producción (`NODE_ENV=production`): JSON sin colores
+- [ ] En local: `pino-pretty` con colores
+- [ ] Todo log incluye: `service`, `requestId`, `ecosystemId` (cuando aplica)
 
-- nestjs-pino instalado solo en pasarelapagos-backend
-- @opentelemetry/sdk-node instalado solo en pasarelapagos-backend
-- metrics.service.ts existe en analytics, workers y notificaciones pero sin exporter Prometheus real
-- Sin correlationId que cruce llamadas gRPC
-- DLQ monitor alerta via gRPC a chatia — no a infraestructura (Slack/PagerDuty)
+### Request ID
+- [ ] `RequestIdMiddleware` aplicado globalmente en `app.module.ts`
+- [ ] `X-Request-Id` se lee del header entrante o se genera UUID v4
+- [ ] El requestId se propaga al AsyncLocalStorage disponible en el service
+- [ ] Los clientes gRPC incluyen `x-request-id` en el metadata del call
 
-## Fase 1 — Logging estructurado homogeneo (todos los MS)
+### Health check
+- [ ] `GET /health` retorna 200 cuando todo está ok, 503 cuando algo falla
+- [ ] Incluye: estado de DB (Prisma), Redis, BullMQ queues (si aplica)
+- [ ] Incluye: estado de circuit breakers por key
+- [ ] Railway usa este endpoint como health check del servicio
 
-- [ ] Agregar nestjs-pino + pino-http a chatia, analytics, notificaciones, workers
-- [ ] main.ts de cada MS: app.useLogger(app.get(Logger)) de nestjs-pino
-- [ ] JSON en produccion: transport: undefined cuando NODE_ENV=production
-- [ ] Pretty print en dev: transport: { target: 'pino-pretty' }
-- [ ] Campos obligatorios en cada log: { service, ecosystemId, organizationId, requestId }
+## Nivel 2 — Métricas Prometheus
 
-## Fase 2 — correlationId cross-service
+- [ ] `@willsoto/nestjs-prometheus` instalado
+- [ ] `PrometheusModule` en `app.module.ts`
+- [ ] Endpoint `/metrics` registrado (solo accesible desde red interna Railway)
+- [ ] Métricas base configuradas:
+  - [ ] `http_request_duration_seconds` (histogram por ruta y método)
+  - [ ] `http_requests_total` (counter por ruta, método y status)
+  - [ ] `bullmq_job_duration_seconds` (por queue y tipo de job)
+  - [ ] `bullmq_job_failures_total` (por queue)
+- [ ] Métricas de negocio (al menos una por servicio):
+  - chatia: `conversations_created_total`, `messages_processed_total`
+  - pagos: `payments_created_total`, `payment_provider_calls_total`
+  - analytics: `events_persisted_total`, `projections_duration_seconds`
+  - notificaciones: `notifications_sent_total`, `notifications_failed_total`
+  - workers: `jobs_processed_total`, `campaign_recipients_dispatched_total`
+- [ ] Circuit breaker state como gauge: `circuit_breaker_state{key, service}`
 
-Objetivo: un request de welver -> chatia -> analytics -> workers tiene el mismo requestId.
+## Nivel 3 — Dashboard
 
-- [ ] CorrelationIdInterceptor en @ecosistema-ms/auth-server
-  — Lee x-request-id del header HTTP o genera UUID si no viene
-  — Lo setea en AsyncLocalStorage
-- [ ] gRPC: pasar x-request-id como metadata en packages/grpc-client (todos los modulos)
-- [ ] BullMQ: pasar requestId en el payload del job
-  { ...jobData, _requestId: correlationId }
+- [ ] Grafana Cloud conectado al endpoint `/metrics` de cada servicio
+- [ ] Dashboard base con: request rate, error rate, latency p50/p95/p99
+- [ ] Alert: error rate > 5% en 5 min → alerta Slack/email
+- [ ] Alert: circuit breaker OPEN → alerta inmediata
 
-## Fase 3 — Metricas Prometheus reales
+## Comando de verificación rápida
 
-Metricas minimas por MS:
+```bash
+# Verificar que /metrics responde en cada servicio
+for port in 3000 3001 3002 3003 3004; do
+  echo "=== Puerto $port ===" && curl -s http://localhost:$port/metrics | head -5
+done
 
-chatia-backend:
-- chatia_conversations_total{status}
-- chatia_messages_total{direction,channel}
-- chatia_ai_response_duration_seconds
-- chatia_queue_depth{queue}
-
-pasarelapagos-backend:
-- pagos_payments_total{status,provider}
-- pagos_provider_duration_seconds{provider}
-- pagos_circuit_breaker_state{provider}  — 0=closed, 1=open, 2=half-open
-- pagos_reconciliation_lag_seconds
-
-notificaciones-backend:
-- notif_sent_total{channel,status}
-- notif_dlq_size (gauge)
-- notif_dedup_hits_total
-
-analytics-backend:
-- analytics_events_ingested_total{event_type}
-- analytics_sse_connections (gauge)
-- analytics_projection_duration_seconds
-
-workers-backend:
-- workers_jobs_total{queue,status}
-- workers_job_duration_seconds{queue}
-- workers_dlq_size{queue} (gauge)
-- workers_campaigns_dispatched_total
-
-Acciones:
-- [ ] @opentelemetry/exporter-prometheus en TODOS los MS (hoy solo pagos tiene la dep)
-- [ ] GET /metrics retorna formato Prometheus text en todos los MS
-
-## Fase 4 — Alertas
-
-- [ ] notif_dlq_size > 50 -> Slack (hoy solo loguea)
-- [ ] pagos_circuit_breaker_state{provider} == 1 por mas de 5 min -> PagerDuty
-- [ ] chatia_ai_response_duration_seconds p95 > 10s -> Slack
-- [ ] error rate HTTP > 1% en cualquier MS por mas de 2 min -> alerta
-
-## Fase 5 — Tracing distribuido (S4)
-
-- [ ] OpenTelemetry SDK en todos los MS (hoy solo pasarelapagos tiene la dep)
-- [ ] @opentelemetry/auto-instrumentations-node: HTTP, gRPC, Prisma, BullMQ
-- [ ] Exporter a Grafana Tempo o Jaeger
-- [ ] Trace IDs propagados via gRPC metadata y BullMQ job payload
+# Verificar /health
+for port in 3000 3001 3002 3003 3004; do
+  echo "=== /health :$port ===" && curl -s http://localhost:$port/health | jq .
+done
+```

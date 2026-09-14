@@ -71,3 +71,22 @@ Ver `services/<servicio>.md` para la clasificación por servicio.
 Cambiar la interfaz de un canal, el contrato de un provider, o los módulos
 de infraestructura requiere ADR previo.
 → Estado: convención — se hace visible en PR
+
+---
+
+## Reglas agregadas por ADR-009
+
+### 🔴 ZodExceptionFilter va ANTES que ValidationPipe en main.ts
+Sin este orden, los ZodError del body-parsing salen como HTTP 500 en producción.
+```ts
+app.useGlobalFilters(new ZodExceptionFilter());  // ← primero siempre
+app.useGlobalPipes(new ValidationPipe({ ... })); // ← después
+```
+
+### 🔴 app.module.ts sin LoggerModule o PrometheusModule no va a Railway
+Sin pino: logs ilegibles en producción. Sin /metrics: invisible para alertas.
+Verificar antes de merge: `grep -l "LoggerModule" */src/app.module.ts`
+
+### 🔴 Service con IRepository inyectado no puede tener this.prisma
+Si el service inyecta `@Inject(TOKEN) private repo: IRepo`,
+acceder a `this.prisma` rompe ADR-002. Todo acceso DB va por el repo.

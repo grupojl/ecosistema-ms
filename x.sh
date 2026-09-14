@@ -1,286 +1,305 @@
 #!/usr/bin/env bash
 # =============================================================================
-# x.sh — actualizar .claude/roadmap con cierre de FASE 5
+# x.sh — ecosistema-ms · Actualizar .claude/ con puntaje real auditado
+#
+# Uso: bash x.sh   (desde la raíz del monorepo)
+#
+# Solo escribe en .claude/ — no toca código de producción.
+# Deja el puntaje 7.6/10 documentado con la brecha vs lo proyectado.
 # =============================================================================
+
 set -euo pipefail
 
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'; BOLD='\033[1m'; NC='\033[0m'
-log()  { echo -e "${CYAN}[x.sh]${NC} $*"; }
-ok()   { echo -e "${GREEN}  ✓${NC} $*"; }
-sep()  { echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"; }
+GREEN='\033[0;32m'; CYAN='\033[0;36m'; YELLOW='\033[1;33m'; NC='\033[0m'
+ok()      { echo -e "${GREEN}  ✓${NC} $1"; }
+warn()    { echo -e "${YELLOW}  !${NC} $1"; }
+section() { echo -e "\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n${CYAN}  $1${NC}\n${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"; }
 
-DRY=false
-[[ "${1:-}" == "--dry-run" ]] && DRY=true
-[[ -f "pnpm-workspace.yaml" ]] || { echo "Ejecutar desde la raíz del monorepo"; exit 1; }
-$DRY && echo -e "${YELLOW}DRY-RUN${NC}\n"
+[[ -f "pnpm-workspace.yaml" ]] || { echo "Ejecutar desde la raíz del monorepo."; exit 1; }
 
-write_file() {
-  local path="$1"
-  $DRY && { echo -e "${YELLOW}  DRY: $path${NC}"; cat > /dev/null; return; }
-  mkdir -p "$(dirname "$path")"
-  cat > "$path"
-  ok "$path"
-}
+TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+DATE=$(date -u +"%Y-%m-%d")
 
-TODAY=$(date +%Y-%m-%d)
+mkdir -p .claude/roadmap .claude/decisions .claude/lifecycle
 
 # =============================================================================
-sep
-log "${BOLD}1/3 — deuda-tecnica.md${NC}"
+# 1. AUDIT-LAST.md — snapshot del estado real auditado hoy
 # =============================================================================
+section "1 — Escribiendo AUDIT-LAST.md"
 
-write_file ".claude/roadmap/deuda-tecnica.md" << EOF
-# Deuda técnica — ecosistema-ms
+cat > .claude/AUDIT-LAST.md << EOF
+# AUDIT-LAST — ecosistema-ms
 
-**Última actualización:** ${TODAY}
-
-## ✅ RESUELTOS — todo cerrado
-
-| ID | Deuda | Cómo quedó |
-|----|-------|------------|
-| ~~DT-001~~ | dto/ huérfanas (17 carpetas) | Eliminadas |
-| ~~DT-002~~ | class-validator inline (9 archivos) | Migrado a Zod — 0 imports residuales |
-| ~~DT-003~~ | AllExceptionsFilter no registrado | Registrado en chatia + workers main.ts |
-| ~~DT-004~~ | ConversationsService → PrismaService directo | Migrado a IConversationsRepository |
-| ~~DT-005~~ | PaymentsService → PrismaService directo | PrismaService + IPaymentsRepository coexisten (ver nota) |
-| ~~DT-006~~ | reconciliation.service sin tenantId en where | ConfigService + tenantId dentro del where |
-| ~~DT-007~~ | contacts/ sin Domain/Repository | — (decidido: no aplicar, scope suficiente con organizationId) |
-| ~~DT-008~~ | projects/ sin Domain/Repository | — (ídem, imports dto corregidos a schemas.ts) |
-| ~~DT-009~~ | campaigns/ sin Domain/Repository | — (ídem) |
-| ~~DT-011~~ | notifications.service getStats() sin ecosystemId | ecosystemId en StatsQuery + where |
-| ~~DT-012~~ | analytics getConversationsByDay() sin ecosystemId | ecosystemId en firma + controller |
-| ~~DT-013~~ | Timeouts gRPC no definidos | channelOptions/keepalive en 5 módulos grpc-client |
-| ~~DT-014~~ | preferences.service getPreferences() sin ecosystemId | ecosystemId en where |
-| ~~DT-016~~ | contacts.service import roto class-validator | Reescrito usando schemas.ts |
-| ~~DT-017~~ | OrgContext sin tenantId | tenantId agregado a la interface |
-| ~~DT-018~~ | projects.service imports dto legacy rotos | Migrado a schemas.ts (CreateProjectInput/UpdateProjectInput) |
-| ~~DT-A~~ | Sin ZodValidationPipe ni filtros de excepción | Resuelto |
-| ~~DT-B~~ | Controllers con class-validator | Resuelto |
-| ~~DT-C~~ | class-validator en package.json | Resuelto |
-| ~~DT-D~~ | conversations/ sin domain+repository | Resuelto |
-| ~~DT-E~~ | payments/ sin domain+repository | Resuelto |
-| ~~DT-F~~ | Sin contratos gRPC documentados | Resuelto |
-| ~~DT-G~~ | Sin auditoría multi-tenant | Resuelto |
-
-### Nota de arquitectura — DT-005
-
-\`PaymentsService\` inyecta tanto \`PrismaService\` como \`IPaymentsRepository\`:
-- \`IPaymentsRepository\` → lecturas simples: \`findById\`, \`findByIdempotencyKey\`, \`list\`
-- \`PrismaService\` directamente → operaciones que requieren \`\$transaction\` multi-tabla
+**Fecha:** $DATE
+**Auditor:** Claude (lectura directa del código fuente en ecosistema-ms.xml)
+**Puntaje real:** 7.6 / 10
+**Puntaje proyectado (sesiones anteriores):** 8.3 — 9.1 / 10
+**Desincronización:** +0.7 a +1.5 puntos sobre lo real
 
 ---
 
-## 🟡 PENDIENTE — decisión de arquitectura (no urgente)
+## Puntaje por dimensión (sin tests, observabilidad ni deploy)
 
-| ID | Deuda | Archivo | Acción |
-|----|-------|---------|--------|
-| DT-015 | Modelo \`Conversation\` sin \`ecosystemId\` directo en schema | \`chatia-backend/prisma/schema.prisma\` | Evaluar migración antes de múltiples ecosistemas en prod |
-| DT-010 | CircuitBreakerService en memoria | chatia + pasarelapagos | Migrar a Redis cuando se escale a múltiples instancias |
+| Dimensión            | Proyectado | **Real** | Δ     | Evidencia en código |
+|----------------------|------------|----------|-------|---------------------|
+| Arquitectura/Capas   | 9.0        | **7.5**  | -1.5  | AssignmentService, EcosystemService, KbDocumentService, AuditService todos con PrismaService directo. ConversationsService viola IConversationsRepository en handleIncomingMessage (this.prisma.channelAccount.findUnique directo) |
+| Contratos/Tipado     | 8.5        | **7.5**  | -1.0  | ZodExceptionFilter existe en auth-server y main.ts de chatia+pagos. Notificaciones, analytics, workers sin ZodFilter — ZodError sale como 500 en esos 3 servicios |
+| Multi-tenancy        | 9.0        | **9.0**  | =     | FASE 5 real. Todas las queries críticas con ecosystemId + organizationId. El único gap (DT-015 Conversation via join) es conocido y documentado |
+| Comunicación gRPC    | 7.5        | **7.5**  | =     | Protos correctos. keepalive options en chatia y pagos. Workers usa CB propio sobre Redis (distinto de opossum estándar — inconsistencia menor) |
+| Calidad de código    | 9.0        | **7.0**  | -2.0  | status as any en campaigns.service.ts, casts Prisma.AuditLogCreateInput/WhereInput (schema no generado aún), EmbeddingService es stub usando Groq chat en vez de modelo de embeddings real, FaqIngestProcessor es TODO explícito |
+| Base de datos        | 9.0        | **6.5**  | -2.5  | getAgentMetrics con take: 50_000 × 2 sigue intacto — x.sh no llegó a analytics-backend. Índices compuestos no aplicados. Health controller de pasarela retorna { status: ok } hardcodeado sin SELECT 1 |
+| Seguridad/RBAC       | 7.5        | **7.5**  | =     | Guards en auth-server correctos. RBAC documentado. Helmet pendiente de verificar en todos |
+| Config/Twelve-Factor | 9.5        | **8.5**  | -1.0  | CacheService con degradación elegante (REDIS_ENABLED=false). Pino en chatia+pagos. App.module.ts de los 5 servicios sin LoggerModule+PrometheusModule importados |
+| Documentación .claude| 9.5        | **9.5**  | =     | ADR-001..009, checklists, reglas duras, lifecycle, patches. El punto más sólido del sistema |
+| **PROMEDIO**         | **9.1**    | **7.6**  | **-1.5** | |
 
-### DT-015 — cuándo hacerlo
+---
 
-El modelo \`Conversation\` llega a \`ecosystemId\` via join \`Contact → Organization\`.
-Funciona correctamente con un ecosistema. Antes de tener 2+ ecosistemas con datos
-reales en la misma DB, agregar:
+## Causa raíz de la desincronización
 
-\`\`\`prisma
-model Conversation {
-  ecosystemId    String
-  organizationId String
-  @@index([ecosystemId, organizationId])
-}
-\`\`\`
+### Causa 1 — x.sh corrió sobre 2 de 5 servicios
+El último x.sh corrió desde un directorio que no tenía notificaciones-backend,
+analytics-backend ni workers-backend. El 60% del sistema quedó sin:
+- ZodExceptionFilter en main.ts
+- LoggerModule + PrometheusModule en app.module.ts
+- jest.config.ts con coverageThreshold
+- RequestIdMiddleware registrado
 
-Luego: \`pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation\`
+### Causa 2 — Domain/Repository más superficial de lo que parecía
+El ADR-002 dice "PENDIENTE DE IMPLEMENTAR". El código lo confirma:
+Solo conversations/ y payments/ tienen repository interface.
+El resto (assignment, ecosystem, kb-document, audit, campaigns) usa PrismaService directo.
+ConversationsService viola su propio contrato en handleIncomingMessage.
+
+### Causa 3 — Base de datos no mejoró
+getAgentMetrics con take: 50_000 sigue igual desde septiembre.
+analytics-backend no estaba en el checkout cuando corrió el x.sh de ADR-009.
+
+---
+
+## Tareas concretas para llegar al 9.0 real
+
+| Prioridad | Tarea | Impacto |
+|-----------|-------|---------|
+| P0 | Correr x.sh (ADR-009) con los 5 servicios presentes | +0.5 Contratos, +1.0 Config |
+| P0 | Aplicar parche DT-023 en analytics-backend manualmente | +2.5 Base de datos |
+| P1 | Refactorizar handleIncomingMessage para usar solo IConversationsRepository | +0.5 Arquitectura |
+| P1 | Health controller pasarela: agregar SELECT 1 a la DB | +0.3 Base de datos |
+| P2 | EmbeddingService: migrar a modelo real (Sprint 4 pendiente) | +0.5 Calidad |
+| P2 | Eliminar status as any en campaigns — usar enum cast tipado | +0.2 Calidad |
+
+---
+
+## Lo que NO está desincronizado (correcto en código Y en proyección)
+
+- Multi-tenancy: 9.0 real — auditoria FASE 5 fue real
+- Documentación .claude: 9.5 — ADRs, reglas duras, lifecycle son sólidos
+- gRPC contratos: protos correctos, keepalive en los servicios que corrió el x.sh
+- BullMQ + idempotencia: ADR-003 implementado correctamente
+- Circuit breakers: opossum en chatia+pagos+notificaciones, CB Redis propio en workers
+- Lock distribuido: SET NX EX correcto en analytics y workers (ADR-006)
 EOF
+ok "AUDIT-LAST.md escrito (puntaje 7.6)"
 
 # =============================================================================
-sep
-log "${BOLD}2/3 — sprints.md${NC}"
+# 2. CLAUDE.md — resumen ejecutivo actualizado
 # =============================================================================
+section "2 — Actualizando CLAUDE.md"
 
-write_file ".claude/roadmap/sprints.md" << EOF
-# Sprints — ecosistema-ms
+cat > .claude/CLAUDE.md << EOF
+# ecosistema-ms — Contexto para Claude
 
-**Última actualización:** ${TODAY}
+**Fecha de última auditoría:** $DATE
+**Puntaje real (código auditado):** 7.6 / 10
+**Puntaje proyectado (sesiones anteriores):** 8.3 — 9.1 ← DESINCRONIZADO
 
-## Estado de fases
-
-| Fase | Descripción | Estado |
-|------|-------------|--------|
-| FASE 0 | Estructura base .claude/ | ✅ COMPLETO |
-| FASE 1 | Carpetas bloqueantes/dinámicas | ✅ COMPLETO |
-| FASE 2 | ADR-001: DTOs → Zod | ✅ COMPLETO — 0 class-validator residuales |
-| FASE 3 | Contratos gRPC documentados | ✅ COMPLETO |
-| FASE 4 | Domain/Repository MOLDE VIVO | ✅ COMPLETO |
-| FASE 5 | Multi-tenant — auditoría queries | ✅ COMPLETO |
-| FASE 6 | Build limpio + tests baseline | 🔴 PRÓXIMA |
+> El puntaje 8.3-9.1 de sesiones anteriores asumía que el x.sh corrió
+> sobre los 5 servicios. En realidad corrió sobre 2 (chatia + pagos).
+> El puntaje real auditado directamente en el código es 7.6.
+> Ver .claude/AUDIT-LAST.md para el desglose completo.
 
 ---
 
-## Logros totales
+## Stack
 
-- ✅ 0 imports de class-validator residuales
-- ✅ 0 carpetas dto/ huérfanas
-- ✅ 0 imports de DTOs legacy rotos
-- ✅ AllExceptionsFilter en todos los main.ts
-- ✅ ConversationsService + PaymentsService migrados a Domain/Repository
-- ✅ DT-006: tenantId en reconciliation (bug de seguridad cerrado)
-- ✅ ecosystemId en analytics, notificaciones y preferences
-- ✅ Timeouts gRPC en los 5 módulos cliente
-- ✅ ZodValidationPipe en todos los controllers
-- ✅ OrgContext con tenantId
-- ✅ projects.service + contacts.service usando schemas.ts
+- NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
+- gRPC inter-servicio (@nestjs/microservices + @grpc/grpc-js)
+- pnpm 10 workspaces con catalog único
+- Deploy: Railway — 5 servicios separados, mismo repo
 
----
+## Microservicios
 
-## PRÓXIMA SESIÓN — FASE 6
+| Servicio | HTTP | gRPC | Estado |
+|----------|------|------|--------|
+| chatia-backend | 3000 | 5001 | ZodFilter + pino ✅ |
+| pasarelapagos-backend | 3001 | 5002 | ZodFilter + pino ✅ |
+| notificaciones-backend | 3002 | 5003 | Sin ZodFilter ⚠️ |
+| analytics-backend | 3003 | 5004 | Sin ZodFilter + DT-023 pendiente ⚠️ |
+| workers-backend | 3004 | 5005 | Sin ZodFilter ⚠️ |
 
-### Paso 1 — Build limpio (prioridad máxima)
+## Lo más sólido
 
-\`\`\`bash
-pnpm -r build
-\`\`\`
+- Multi-tenancy: ecosystemId + organizationId en todas las queries críticas
+- Documentación .claude: ADR-001..009, checklists, reglas duras, lifecycle
+- BullMQ: jobs idempotentes, DLQ en todos los servicios críticos
+- Circuit breakers: opossum (chatia/pagos/notificaciones), Redis CB (workers)
+- Lock distribuido: SET NX EX en analytics projections y workers campaigns
 
-Errores más probables si aparecen:
-- Algún controller que llame a \`getPreferences()\` sin pasar \`ecosystemId\` (nuevo parámetro)
-- Algún controller de \`projects\` que siga usando \`CreateProjectDto\` importado
-- \`OrgContext\` — verificar que los guards de pasarelapagos ya lo poblan con \`tenantId\`
+## Las brechas reales hoy
 
-### Paso 2 — Tests baseline
+1. Domain/Repository: solo conversations y payments tienen el patrón completo
+2. getAgentMetrics: take: 50_000 × 2 en Node — bomba de escala en analytics
+3. 3 de 5 servicios sin ZodExceptionFilter (ZodError → HTTP 500)
+4. app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule importados
+5. Health controller de pasarela: sin SELECT 1 a la DB
 
-Ver: \`.claude/checklists/testing-desde-cero.md\`
+## Próximas tareas (en orden de impacto)
 
-Orden sugerido:
-1. Unit tests de domain entities (\`payment.entity\`, \`conversation.entity\`)
-2. Integration tests de los repository adapters (Prisma)
-3. E2E del contrato HTTP de cada servicio (Supertest)
-4. Test de cross-tenant: request con ecosystemId A no retorna datos de ecosystemId B
+1. Correr x.sh con los 5 servicios presentes en el checkout
+2. Aplicar parche DT-023 (ver .claude/patches/DT-023-analytics-agent-metrics.md)
+3. Refactorizar handleIncomingMessage en ConversationsService
 
-### Paso 3 — DT-015 (cuando haya 2+ ecosistemas en prod)
+## Regla antes de nueva sesión
 
-\`\`\`bash
-pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation
-\`\`\`
-
-### Paso 4 — Observabilidad
-
-Ver: \`.claude/checklists/observabilidad.md\`
-- OpenTelemetry traces activos
-- Prometheus métricas expuestas en /metrics
-- Grafana dashboards por servicio
+Leer en orden: CLAUDE.md → AUDIT-LAST.md → decisions/ADR-009 → roadmap/deuda-tecnica.md
 EOF
+ok "CLAUDE.md actualizado"
 
 # =============================================================================
-sep
-log "${BOLD}3/3 — auditoria-multitenant.md${NC}"
+# 3. deuda-tecnica.md — agregar brechas descubiertas en auditoría
 # =============================================================================
+section "3 — deuda-tecnica.md: brechas de auditoría"
 
-write_file ".claude/roadmap/auditoria-multitenant.md" << EOF
-# Auditoría multi-tenant — queries sin ecosystemId
-
-**Última actualización:** ${TODAY}
-**Estado: FASE 5 COMPLETA ✅**
-
-## Contexto
-
-En ecosistema-ms el scope de tenant es DOBLE:
-- \`ecosystemId\` — identifica al cliente de la plataforma
-- \`organizationId\` — identifica la organización dentro del ecosistema
-
-Todo query Prisma de negocio debe llevar AMBOS filtros.
+if ! grep -q "DT-030" .claude/roadmap/deuda-tecnica.md 2>/dev/null; then
+  cat >> .claude/roadmap/deuda-tecnica.md << EOF
 
 ---
 
-## Estado final por servicio
+## Auditoría $DATE — Brechas descubiertas (no estaban documentadas)
 
-### chatia-backend ✅
-
-| Archivo | Método | ecosystemId | organizationId | Estado |
-|---------|--------|-------------|----------------|--------|
-| \`conversations.service.ts\` | todos | ⚠️ Via Contact→Org | ✅ | DT-015 pendiente (no urgente) |
-| \`contacts.service.ts\` | todos | — (Contact no tiene ecosystemId propio) | ✅ | ✅ Aceptable |
-| \`projects.service.ts\` | todos | — (Project no tiene ecosystemId propio) | ✅ | ✅ Aceptable |
-| \`messages.service.ts\` | todos | — (scope via channelAccount) | ✅ | ✅ Aceptable |
-| \`assignment.service.ts\` | todos | — (agentes son por org) | ✅ | ✅ Aceptable |
-| \`assistant-config.service.ts\` | todos | — (config es por org) | ✅ | ✅ Aceptable |
-| \`assistant-session.service.ts\` | todos | — (sesión es por org) | ✅ | ✅ Aceptable |
-
-### pasarelapagos-backend ✅
-
-| Archivo | Método | ecosystemId (tenantId) | organizationId | Estado |
-|---------|--------|------------------------|----------------|--------|
-| \`payments.service.ts\` | \`create()\` | ✅ tenantId en DB | ✅ | ✅ |
-| \`payments.service.ts\` | \`findAll()\` | ✅ via ctx.tenantId | ✅ | ✅ |
-| \`payments.service.ts\` | \`findOne()\` | ✅ via paymentsRepo | ✅ | ✅ |
-| \`reconciliation.service.ts\` | \`schedulePendingReconciliation()\` | ✅ tenantId en where | — | ✅ DT-006 |
-
-### notificaciones-backend ✅
-
-| Archivo | Método | ecosystemId | organizationId | Estado |
-|---------|--------|-------------|----------------|--------|
-| \`notifications.service.ts\` | \`enqueue()\` | ✅ en DTO | ✅ | ✅ |
-| \`notifications.service.ts\` | \`getStats()\` | ✅ en where | ✅ | ✅ DT-011 |
-| \`preferences.service.ts\` | \`getPreferences()\` | ✅ en where | ✅ | ✅ DT-014 |
-| \`preferences.service.ts\` | \`upsertPreference()\` | ✅ en create | ✅ | ✅ |
-
-### analytics-backend ✅
-
-| Archivo | Método | ecosystemId | organizationId | Estado |
-|---------|--------|-------------|----------------|--------|
-| \`analytics.service.ts\` | \`getOverview()\` | ✅ | ✅ | ✅ |
-| \`analytics.service.ts\` | \`getAgentMetrics()\` | ✅ | ✅ | ✅ |
-| \`analytics.service.ts\` | \`getConversationsByDay()\` | ✅ | ✅ | ✅ DT-012 |
-| \`projections.service.ts\` | \`recalculateForOrg()\` | ✅ | ✅ | ✅ |
-
----
-
-## Único pendiente no urgente — DT-015
-
-El modelo \`Conversation\` no tiene \`ecosystemId\` directo en Prisma.
-Llega via join \`Contact → Organization → ecosystemId\`.
-Funciona con un ecosistema. Requiere migración antes de escalar a múltiples.
-
-## Comando de auditoría rápida
-
-\`\`\`bash
-grep -rn "findMany\\|findFirst\\|findUnique" */src --include="*.ts" \\
-  | grep -v "ecosystemId\\|tenantId\\|organizationId" \\
-  | grep -v "node_modules\\|.spec.ts\\|repository.interface\\|health\\|prisma.service"
-\`\`\`
-
-## Test de cross-tenant (FASE 6)
-
-\`\`\`ts
-it('no retorna datos de otro ecosistema', async () => {
-  // Crear datos con ecosystemId = 'welver'
-  // Request con ecosystemId = 'manzana'
-  // Resultado debe ser vacío o 403
-});
-\`\`\`
+| ID | Deuda | Servicio | Severidad | Evidencia |
+|----|-------|----------|-----------|-----------|
+| DT-030 | ConversationsService.handleIncomingMessage usa this.prisma directo pese a IConversationsRepository inyectado | chatia | 🔴 | Viola ADR-002. Línea this.prisma.channelAccount.findUnique en el servicio |
+| DT-031 | Health controller pasarela retorna status ok hardcodeado sin SELECT 1 | pasarela | 🔴 | Railway no detecta caída de DB. health.controller.ts línea 8519 |
+| DT-032 | EmbeddingService genera embeddings via Groq chat prompt — no es un modelo de embeddings real | chatia | 🟡 | Sprint 4 pendiente. DIMENSIONS=384 es inventado |
+| DT-033 | FaqIngestProcessor es stub explícito (TODO Sprint W-2) | workers | 🟡 | No procesa documentos reales. Solo loguea |
+| DT-034 | status as any en campaigns.service.ts — enum cast sin tipo | workers | 🟡 | Línea 17070 — @ecosistema-ms/jsonb-cast comment ausente |
+| DT-035 | app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule | todos | 🟡 | packages creados en ADR-008 pero nunca conectados |
+| DT-036 | ZodExceptionFilter ausente en notificaciones, analytics y workers | 3 svcs | 🔴 | ZodError sale como HTTP 500 en esos servicios |
 EOF
+  ok "Brechas DT-030..036 registradas"
+else
+  warn "DT-030+ ya existen — sin cambios en deuda-tecnica.md"
+fi
 
 # =============================================================================
-sep
-log "Verificación..."
-echo ""
+# 4. roadmap/sprints.md — registrar la auditoría
+# =============================================================================
+section "4 — Registrando auditoría en sprints.md"
 
-for F in \
-  ".claude/roadmap/deuda-tecnica.md" \
-  ".claude/roadmap/sprints.md" \
-  ".claude/roadmap/auditoria-multitenant.md"; do
-  if $DRY; then
-    echo -e "${YELLOW}  DRY: $F${NC}"
-  elif [[ -f "$F" ]]; then
-    LINES=$(wc -l < "$F")
-    ok "$F ($LINES líneas)"
-  fi
-done
+cat >> .claude/roadmap/sprints.md << EOF
 
-sep
+---
+
+## Auditoría real de código — $TIMESTAMP
+
+**Método:** lectura directa del código fuente (ecosistema-ms.xml)
+**Resultado:** puntaje real 7.6/10 vs 8.3-9.1 proyectado en sesiones anteriores
+
+### Desincronización detectada: +1.5 puntos sobre la realidad
+
+La proyección de 8.3-9.1 asumía que el x.sh (ADR-009) corrió sobre los 5
+servicios. En realidad solo corrió sobre chatia-backend y pasarelapagos-backend.
+El resto del sistema no recibió los cambios.
+
+### Puntaje auditado por dimensión
+
+| Dimensión | Real |
+|-----------|------|
+| Arquitectura/Capas | 7.5 |
+| Contratos/Tipado | 7.5 |
+| Multi-tenancy | 9.0 |
+| Comunicación gRPC | 7.5 |
+| Calidad de código | 7.0 |
+| Base de datos | 6.5 |
+| Seguridad/RBAC | 7.5 |
+| Config/Twelve-Factor | 8.5 |
+| Documentación .claude | 9.5 |
+| **Promedio** | **7.6** |
+
+### Nuevas deudas documentadas: DT-030..036
+
+### Para llegar al 9.0 real (no proyectado)
+
+1. x.sh con los 5 servicios en el checkout → +0.7
+2. Parche DT-023 analytics-backend manualmente → +0.8
+3. Refactor handleIncomingMessage → IConversationsRepository → +0.3
+4. Health controller pasarela con SELECT 1 → +0.2
+EOF
+ok "Sprint de auditoría registrado"
+
+# =============================================================================
+# 5. lifecycle/README.md — puntaje corriente visible al inicio de sesión
+# =============================================================================
+section "5 — lifecycle/README.md con puntaje visible"
+
+cat > .claude/lifecycle/README.md << EOF
+# Lifecycle — ecosistema-ms
+
+## Puntaje actual (auditado $DATE)
+
+**7.6 / 10** — código real leído directamente
+
+| Dimensión | Puntaje |
+|-----------|---------|
+| Multi-tenancy | 9.0 ✅ |
+| Documentación .claude | 9.5 ✅ |
+| Config/Twelve-Factor | 8.5 🟡 |
+| Arquitectura/Capas | 7.5 🟡 |
+| Contratos/Tipado | 7.5 🟡 |
+| Comunicación gRPC | 7.5 🟡 |
+| Seguridad/RBAC | 7.5 🟡 |
+| Calidad de código | 7.0 🟡 |
+| Base de datos | 6.5 🔴 |
+
+## Para llegar al 9.0 real
+
+| Tarea | Impacto estimado |
+|-------|-----------------|
+| x.sh con los 5 servicios | +0.7 |
+| Parche DT-023 (analytics-backend) | +0.8 |
+| Refactor handleIncomingMessage | +0.3 |
+| Health controller pasarela | +0.2 |
+
+**Con esas 4 tareas: 9.6 proyectado**
+
+## Fases
+
+| Fase | Escalones | Estado |
+|------|-----------|--------|
+| Desarrollo (1,2,4) | Arquitectura, Config, DB | 🟡 7.8 promedio |
+| Estabilización (3,5,6) | Infra, CI/CD, Obs | 🔴 Pendiente |
+| Hardening (7,8,10) | SecOps, Privacidad, Async | ⚪ Futuro |
+| Escala (9,11,12,13) | HA, Chaos, FinOps | ⚪ Futuro |
+EOF
+ok "lifecycle/README.md con puntaje visible"
+
+# =============================================================================
+# Resumen
+# =============================================================================
 echo ""
-log "${GREEN}${BOLD}.claude/roadmap al día — FASE 5 documentada.${NC}"
+echo -e "${CYAN}╔══════════════════════════════════════════════════════╗${NC}"
+echo -e "${CYAN}║  .claude/ actualizado — puntaje real 7.6 / 10       ║${NC}"
+echo -e "${CYAN}╚══════════════════════════════════════════════════════╝${NC}"
 echo ""
-echo "  Mañana empezar por:"
-echo "  pnpm -r build"
+echo "  Archivos escritos:"
+echo "    .claude/AUDIT-LAST.md          ← desglose completo con evidencia"
+echo "    .claude/CLAUDE.md              ← resumen ejecutivo actualizado"
+echo "    .claude/roadmap/deuda-tecnica.md  ← DT-030..036 agregadas"
+echo "    .claude/roadmap/sprints.md     ← auditoría registrada"
+echo "    .claude/lifecycle/README.md    ← puntaje visible al inicio de sesión"
+echo ""
+echo "  Puntaje anterior (proyectado): 8.3 — 9.1"
+echo "  Puntaje real auditado:         7.6"
+echo "  Desincronización:              +1.5 puntos sobre la realidad"
 echo ""

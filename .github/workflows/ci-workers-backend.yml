@@ -1,0 +1,62 @@
+name: CI — workers-backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'workers-backend/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig.base.json'
+  pull_request:
+    paths:
+      - 'workers-backend/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+
+concurrency:
+  group: ci-workers-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: Lint · TypeCheck · Test · Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: '10'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm --filter=workers-backend run lint
+
+      - name: TypeCheck
+        run: pnpm --filter=workers-backend run typecheck
+
+      - name: Tests con cobertura
+        run: pnpm --filter=workers-backend run test:cov
+        env:
+          NODE_ENV: test
+
+      - name: Build Docker image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker build \
+            -f workers-backend/Dockerfile \
+            -t workers-backend:${{ github.sha }} \
+            .

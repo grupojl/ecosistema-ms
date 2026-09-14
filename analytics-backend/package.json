@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:migrate": "prisma migrate deploy && node dist/main",
@@ -11,9 +12,13 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",

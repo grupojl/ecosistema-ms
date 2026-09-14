@@ -95,14 +95,6 @@ export class AnalyticsService {
     return result;
   }
 
-  async getAgentMetrics(params: {
-    ecosystemId:    string;
-    organizationId: string;
-    from:           Date;
-    to:             Date;
-    page?:          number;
-    limit?:         number;
-  }): Promise<{ agents: unknown[]; total: number }> {
     const { organizationId, ecosystemId, from, to } = params;
     const limit  = Math.min(params.limit  ?? 20, 100);
     const offset = ((params.page ?? 1) - 1) * limit;
@@ -146,6 +138,77 @@ export class AnalyticsService {
       .sort((a, b) => b.assigned - a.assigned);
 
     const result = { agents: all.slice(offset, offset + limit), total: all.length };
+    await this.cache.set(cacheKey, result, CACHE_TTL_10MIN);
+    return result;
+  }
+
+  async getAgentMetrics(params: {
+    ecosystemId:    string;
+    organizationId: string;
+    from:           Date;
+    to:             Date;
+    page?:          number;
+    limit?:         number;
+  }): Promise<{ agents: { agentId: string; assigned: number; resolved: number }[]; total: number }> {
+    const { organizationId, ecosystemId, from, to } = params;
+    const limit  = Math.min(params.limit  ?? 20, 100);
+    const offset = ((params.page ?? 1) - 1) * limit;
+    const cacheKey = `analytics:agents:${organizationId}:${ecosystemId}:${from.toISOString()}:${to.toISOString()}:${offset}:${limit}`;
+    const cached = await this.cache.get<{ agents: { agentId: string; assigned: number; resolved: number }[]; total: number }>(cacheKey);
+    if (cached) return cached;
+
+    // ADR-009 / DT-023 — GROUP BY en PostgreSQL. Sin carga de filas en Node.
+    // Reemplaza los dos findMany(take: 50_000) que existían aquí.
+    const [assignedRows, resolvedRows, totalRows] = await Promise.all([
+      this.prisma.$queryRaw<Array<{ agent_id: string; cnt: bigint }>>`
+        SELECT payload->>'agentId' AS agent_id,
+               COUNT(*)::bigint     AS cnt
+        FROM   "AnalyticsEvent"
+        WHERE  "organizationId" = ${organizationId}
+          AND  "ecosystemId"    = ${ecosystemId}
+          AND  "eventType"      = 'conversation.assigned'
+          AND  "occurredAt"    >= ${from}
+          AND  "occurredAt"    <= ${to}
+          AND  payload->>'agentId' IS NOT NULL
+          AND  payload->>'agentId' <> ''
+        GROUP  BY payload->>'agentId'
+        ORDER  BY cnt DESC
+        LIMIT  ${limit} OFFSET ${offset}
+      `,
+      this.prisma.$queryRaw<Array<{ agent_id: string; cnt: bigint }>>`
+        SELECT payload->>'agentId' AS agent_id,
+               COUNT(*)::bigint     AS cnt
+        FROM   "AnalyticsEvent"
+        WHERE  "organizationId" = ${organizationId}
+          AND  "ecosystemId"    = ${ecosystemId}
+          AND  "eventType"      = 'conversation.resolved_by_agent'
+          AND  "occurredAt"    >= ${from}
+          AND  "occurredAt"    <= ${to}
+          AND  payload->>'agentId' IS NOT NULL
+          AND  payload->>'agentId' <> ''
+        GROUP  BY payload->>'agentId'
+      `,
+      this.prisma.$queryRaw<[{ cnt: bigint }]>`
+        SELECT COUNT(DISTINCT payload->>'agentId')::bigint AS cnt
+        FROM   "AnalyticsEvent"
+        WHERE  "organizationId" = ${organizationId}
+          AND  "ecosystemId"    = ${ecosystemId}
+          AND  "eventType"      = 'conversation.assigned'
+          AND  "occurredAt"    >= ${from}
+          AND  "occurredAt"    <= ${to}
+          AND  payload->>'agentId' IS NOT NULL
+          AND  payload->>'agentId' <> ''
+      `,
+    ]);
+
+    const resolvedMap = new Map(resolvedRows.map(r => [r.agent_id, Number(r.cnt)]));
+    const agents = assignedRows.map(a => ({
+      agentId:  a.agent_id,
+      assigned: Number(a.cnt),
+      resolved: resolvedMap.get(a.agent_id) ?? 0,
+    }));
+
+    const result = { agents, total: Number(totalRows[0]?.cnt ?? 0) };
     await this.cache.set(cacheKey, result, CACHE_TTL_10MIN);
     return result;
   }

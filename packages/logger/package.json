@@ -1,0 +1,19 @@
+{
+  "name": "@ecosistema-ms/logger",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "pino": "catalog:",
+    "pino-pretty": "catalog:",
+    "nestjs-pino": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

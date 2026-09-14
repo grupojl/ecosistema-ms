@@ -5,3 +5,4 @@
 export * from "./decorators/public.decorator";
 export * from "./decorators/tenant.decorator";
 export * from "./types/tenant-context";
+export { ZodExceptionFilter } from './filters/zod-exception.filter.js';

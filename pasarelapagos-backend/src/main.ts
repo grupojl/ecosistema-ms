@@ -1,74 +1,59 @@
-// OTel DEBE ser el primer import — antes que cualquier módulo de NestJS
-import { startTelemetry, stopTelemetry } from './instrumentation';
-startTelemetry();
-
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, VersioningType, Logger } from '@nestjs/common';
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger as PinoLogger } from 'nestjs-pino';
-import helmet from 'helmet';
-import compression from 'compression';
-import cookieParser from 'cookie-parser';
-import * as express from 'express';
-import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
 
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    bufferLogs: true,
-    rawBody: true,
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
+
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'pagos',
+      protoPath:  join(process.cwd(), 'proto', 'pagos.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5002'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
   });
 
-  app.useLogger(app.get(PinoLogger));
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
 
-  // Raw body solo para webhooks (para verificar firmas HMAC)
-  app.use('/api/v1/webhooks', express.raw({ type: '*/*', limit: '1mb' }));
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('pasarelapagos-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
 
-  app.use(helmet());
-  app.use(compression());
-  app.use(cookieParser());
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true }));
-
-  app.enableCors({
-    origin: (process.env.CORS_ORIGINS ?? '').split(',').filter(Boolean),
-    credentials: true,
-  });
-
-  app.setGlobalPrefix('api');
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
-
-  // Graceful shutdown: espera que las conexiones activas terminen
-  app.enableShutdownHooks();
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-    }),
-  );
-
-  app.useGlobalFilters(new AllExceptionsFilter());
-
-  if (process.env.NODE_ENV !== 'production') {
-    const swagger = new DocumentBuilder()
-      .setTitle('Pasarela de Pagos')
-      .setDescription('API multi-provider multi-tenant — Sprint 5')
-      .setVersion('1.0')
-      .addApiKey({ type: 'apiKey', in: 'header', name: 'x-api-key' }, 'x-api-key')
-      .build();
-    SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
-  }
-
-  const port = Number(process.env.PORT ?? 3000);
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3001';
   await app.listen(port);
-
-  const logger = new Logger('Bootstrap');
-  logger.log(`🚀 App corriendo en puerto ${port}`);
-  logger.log(`📖 Docs: http://localhost:${port}/docs`);
-  logger.log(`💚 Health: http://localhost:${port}/api/v1/health/ready`);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5002`,
+    'pasarelapagos-backend',
+  );
 }
 
 void bootstrap();

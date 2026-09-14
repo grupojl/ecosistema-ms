@@ -12,6 +12,8 @@ import { MetricsModule }        from './metrics/metrics.module.js';
 
 @Module({
   imports: [
+    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
+    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     BullModule.forRootAsync({
@@ -31,4 +33,10 @@ import { MetricsModule }        from './metrics/metrics.module.js';
     GrpcModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: "*", method: RequestMethod.ALL });
+  }
+}

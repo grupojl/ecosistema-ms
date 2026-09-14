@@ -818,93 +818,6 @@ model AuditLog {
 }
 </file>
 
-<file path="workers-backend/package.json">
-{
-  "name": "workers-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
-  }
-}
-</file>
-
 <file path="workers-backend/tsconfig.build.json">
 {
   "extends": "./tsconfig.json",
@@ -1937,6 +1850,246 @@ model KbChunk {
 }
 </file>
 
+<file path="notificaciones-backend/prisma/schema.prisma">
+// schema.prisma — notificaciones-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
+model Notification {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  templateKey    String
+  payload        Json
+  idempotencyKey String              @unique
+  status         NotificationStatus  @default(PENDING)
+  attempts       Int                 @default(0)
+  sentAt         DateTime?
+  failureReason  String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([createdAt])
+}
+
+/// Preferencias de canal por contacto — se chequea antes de cada envio
+model ContactPreference {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  optedOut       Boolean             @default(false)
+  optedOutAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, contactId, channel])
+  @@index([organizationId, contactId])
+}
+</file>
+
+<file path="notificaciones-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="workers-backend/package.json">
+{
+  "name": "workers-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="workers-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="tsconfig.base.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
 <file path="chatia-backend/package.json">
 {
   "name": "chatia-backend",
@@ -2036,101 +2189,6 @@ model KbChunk {
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
-}
-</file>
-
-<file path="notificaciones-backend/prisma/schema.prisma">
-// schema.prisma — notificaciones-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-enum NotificationChannel {
-  WHATSAPP
-  EMAIL
-  PUSH
-}
-
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-  SKIPPED
-}
-
-/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
-model Notification {
-  id             String              @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  contactId      String
-  channel        NotificationChannel
-  templateKey    String
-  payload        Json
-  idempotencyKey String              @unique
-  status         NotificationStatus  @default(PENDING)
-  attempts       Int                 @default(0)
-  sentAt         DateTime?
-  failureReason  String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  @@index([organizationId, contactId])
-  @@index([organizationId, status])
-  @@index([createdAt])
-}
-
-/// Preferencias de canal por contacto — se chequea antes de cada envio
-model ContactPreference {
-  id             String              @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  contactId      String
-  channel        NotificationChannel
-  optedOut       Boolean             @default(false)
-  optedOutAt     DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  @@unique([organizationId, contactId, channel])
-  @@index([organizationId, contactId])
-}
-</file>
-
-<file path="notificaciones-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
 }
 </file>
 
@@ -2248,64 +2306,6 @@ model ContactPreference {
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"
   }
-}
-</file>
-
-<file path="workers-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
-<file path="tsconfig.base.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
 }
 </file>
 

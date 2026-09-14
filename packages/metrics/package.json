@@ -1,0 +1,17 @@
+{
+  "name": "@ecosistema-ms/metrics",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@willsoto/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

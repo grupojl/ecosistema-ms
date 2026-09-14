@@ -12,7 +12,8 @@ datasource db {
 }
 
 /// Evento operacional raw — append-only, nunca se actualiza
-model AnalyticsEvent {
+
+          model AnalyticsEvent {
   id             String   @id @default(cuid())
   ecosystemId    String
   organizationId String
@@ -24,6 +25,8 @@ model AnalyticsEvent {
   @@index([organizationId, eventType, occurredAt])
   @@index([occurredAt])
   @@index([organizationId, occurredAt])
+  @@index([organizationId, ecosystemId, eventType, occurredAt])
+  @@index([organizationId, ecosystemId, occurredAt])
 }
 
 /// Proyeccion materializada — recalculada cada hora por ProjectionsService

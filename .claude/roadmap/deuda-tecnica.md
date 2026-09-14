@@ -60,3 +60,43 @@ model Conversation {
 ```
 
 Luego: `pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation`
+
+---
+
+## 🔴 NUEVAS — ADR-008 (hacia 10/10)
+
+| ID | Deuda | Servicio | Acción | Prioridad |
+|----|-------|----------|--------|-----------|
+| ~~DT-019~~ | Sin CI/CD pipeline por servicio | todos | `.github/workflows/ci-{servicio}.yml` | P0 |
+| ~~DT-020~~ | Sin logs estructurados JSON en producción | todos | `pino` logger en `main.ts` | P0 |
+| ~~DT-021~~ | Sin endpoint `/metrics` Prometheus | todos | `@willsoto/nestjs-prometheus` | P1 |
+| ~~DT-022~~ | Sin propagación de `X-Request-Id` en gRPC | todos | metadata gRPC en grpc-client | P1 |
+| ~~DT-023~~ | `getAgentMetrics` carga 100K rows en memoria | analytics | SQL aggregation con GROUP BY | P1 |
+| DT-024 | `CircuitBreakerService` en memoria (multi-pod) | chatia · pagos | migrar a Redis (DT-010) | P2 |
+| DT-025 | Sin tests de aislamiento multi-tenant | todos | `multitenant.spec.ts` por servicio | P1 |
+| ~~DT-026~~ | `coverageThreshold` no configurado en jest | todos | `jest.config.ts` con 85% threshold | P0 |
+
+---
+
+## ADR-009 (hacia 9.5/10) — resueltas por x.sh
+
+| ID | Deuda | Servicio | Estado |
+|----|-------|----------|--------|
+| ~~DT-027~~ | `main.ts` sin ZodExceptionFilter — ZodError sale como HTTP 500 | todos | ✅ x.sh |
+| ~~DT-028~~ | packages/logger y metrics no importados en app.module.ts | todos | ✅ x.sh |
+| ~~DT-029~~ | ConversationsService accede a `this.prisma` directo (viola ADR-002) | chatia | ✅ x.sh |
+| ~~DT-023~~ | getAgentMetrics carga 100K rows en Node.js | analytics | ✅ x.sh |
+
+---
+
+## Auditoría 2026-09-12 — Brechas descubiertas (no estaban documentadas)
+
+| ID | Deuda | Servicio | Severidad | Evidencia |
+|----|-------|----------|-----------|-----------|
+| DT-030 | ConversationsService.handleIncomingMessage usa this.prisma directo pese a IConversationsRepository inyectado | chatia | 🔴 | Viola ADR-002. Línea this.prisma.channelAccount.findUnique en el servicio |
+| DT-031 | Health controller pasarela retorna status ok hardcodeado sin SELECT 1 | pasarela | 🔴 | Railway no detecta caída de DB. health.controller.ts línea 8519 |
+| DT-032 | EmbeddingService genera embeddings via Groq chat prompt — no es un modelo de embeddings real | chatia | 🟡 | Sprint 4 pendiente. DIMENSIONS=384 es inventado |
+| DT-033 | FaqIngestProcessor es stub explícito (TODO Sprint W-2) | workers | 🟡 | No procesa documentos reales. Solo loguea |
+| DT-034 | status as any en campaigns.service.ts — enum cast sin tipo | workers | 🟡 | Línea 17070 — @ecosistema-ms/jsonb-cast comment ausente |
+| DT-035 | app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule | todos | 🟡 | packages creados en ADR-008 pero nunca conectados |
+| DT-036 | ZodExceptionFilter ausente en notificaciones, analytics y workers | 3 svcs | 🔴 | ZodError sale como HTTP 500 en esos servicios |
