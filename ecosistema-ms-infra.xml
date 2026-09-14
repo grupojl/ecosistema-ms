@@ -120,95 +120,6 @@ This section contains the contents of the repository's files.
 }
 </file>
 
-<file path="analytics-backend/package.json">
-{
-  "name": "analytics-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
-  }
-}
-</file>
-
 <file path="analytics-backend/tsconfig.build.json">
 {
   "extends": "./tsconfig.json",
@@ -278,95 +189,6 @@ This section contains the contents of the repository's files.
   "compilerOptions": {
     "deleteOutDir": true,
     "assets": [{ "include": "../packages/proto/proto/*.proto", "outDir": "./dist/proto", "watchAssets": true }]
-  }
-}
-</file>
-
-<file path="notificaciones-backend/package.json">
-{
-  "name": "notificaciones-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
   }
 }
 </file>
@@ -1254,50 +1076,97 @@ setup: install docker-up migrate-all
 }
 </file>
 
-<file path="analytics-backend/prisma/schema.prisma">
-// schema.prisma — analytics-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-/// Evento operacional raw — append-only, nunca se actualiza
-model AnalyticsEvent {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  eventType      String
-  payload        Json
-  occurredAt     DateTime
-  processedAt    DateTime @default(now())
-
-  @@index([organizationId, eventType, occurredAt])
-  @@index([occurredAt])
-  @@index([organizationId, occurredAt])
-}
-
-/// Proyeccion materializada — recalculada cada hora por ProjectionsService
-model DailyConversationSummary {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  date           DateTime @db.Date
-  channel        String
-  total          Int      @default(0)
-  resolved       Int      @default(0)
-  escalated      Int      @default(0)
-  avgResponseMin Float    @default(0)
-  calculatedAt   DateTime @default(now())
-
-  @@unique([organizationId, date, channel])
-  @@index([organizationId, date])
+<file path="analytics-backend/package.json">
+{
+  "name": "analytics-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
 }
 </file>
 
@@ -1916,42 +1785,14 @@ model ContactPreference {
 }
 </file>
 
-<file path="notificaciones-backend/tsconfig.json">
+<file path="notificaciones-backend/package.json">
 {
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
-<file path="workers-backend/package.json">
-{
-  "name": "workers-backend",
+  "name": "notificaciones-backend",
   "version": "0.0.1",
   "private": true,
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:migrate": "prisma migrate deploy && node dist/main",
@@ -1959,9 +1800,13 @@ model ContactPreference {
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",
@@ -1981,6 +1826,8 @@ model ContactPreference {
     "@prisma/client": "catalog:",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
     "dotenv": "catalog:",
     "firebase-admin": "catalog:",
     "helmet": "catalog:",
@@ -2029,6 +1876,35 @@ model ContactPreference {
     },
     "testEnvironment": "node"
   }
+}
+</file>
+
+<file path="notificaciones-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
 }
 </file>
 
@@ -2090,222 +1966,53 @@ model ContactPreference {
 }
 </file>
 
-<file path="chatia-backend/package.json">
-{
-  "name": "chatia-backend",
-  "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "scripts": {
-    "build": "prisma generate && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "start:migrate": "prisma migrate deploy",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/event-emitter": "catalog:",
-    "@nestjs/mapped-types": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@nestjs/throttler": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bcryptjs": "catalog:",
-    "bullmq": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "pg": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "socket.io": "^4.8.1",
-    "swagger-ui-express": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "catalog:",
-    "@eslint/js": "catalog:",
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/bcryptjs": "catalog:",
-    "@types/express": "catalog:",
-    "@types/jest": "catalog:",
-    "@types/multer": "^1.4.12",
-    "@types/node": "catalog:",
-    "@types/supertest": "catalog:",
-    "@types/uuid": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "globals": "catalog:",
-    "jest": "catalog:",
-    "prettier": "catalog:",
-    "prisma": "catalog:",
-    "source-map-support": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
-}
-</file>
+<file path="analytics-backend/prisma/schema.prisma">
+// schema.prisma — analytics-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
 
-<file path="pasarelapagos-backend/package.json">
-{
-  "name": "pasarelapagos-backend",
-  "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "scripts": {
-    "build": "prisma generate && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "start:migrate": "prisma migrate deploy",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/event-emitter": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@nestjs/throttler": "catalog:",
-    "@opentelemetry/auto-instrumentations-node": "catalog:",
-    "@opentelemetry/exporter-prometheus": "catalog:",
-    "@opentelemetry/sdk-node": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "@types/compression": "^1.7.5",
-    "@types/cookie-parser": "^1.4.8",
-    "axios": "catalog:",
-    "bcryptjs": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "compression": "^1.7.5",
-    "cookie-parser": "^1.4.7",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "mercadopago": "catalog:",
-    "nanoid": "^5.1.5",
-    "nestjs-pino": "catalog:",
-    "opossum": "^8.1.4",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "stripe": "catalog:",
-    "swagger-ui-express": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "catalog:",
-    "@eslint/js": "catalog:",
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/bcryptjs": "catalog:",
-    "@types/express": "catalog:",
-    "@types/jest": "catalog:",
-    "@types/node": "catalog:",
-    "@types/supertest": "catalog:",
-    "@types/uuid": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "globals": "catalog:",
-    "jest": "catalog:",
-    "prettier": "catalog:",
-    "prisma": "catalog:",
-    "source-map-support": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Evento operacional raw — append-only, nunca se actualiza
+
+          model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  eventType      String
+  payload        Json
+  occurredAt     DateTime
+  processedAt    DateTime @default(now())
+
+  @@index([organizationId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, ecosystemId, eventType, occurredAt])
+  @@index([organizationId, ecosystemId, occurredAt])
+}
+
+/// Proyeccion materializada — recalculada cada hora por ProjectionsService
+model DailyConversationSummary {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  date           DateTime @db.Date
+  channel        String
+  total          Int      @default(0)
+  resolved       Int      @default(0)
+  escalated      Int      @default(0)
+  avgResponseMin Float    @default(0)
+  calculatedAt   DateTime @default(now())
+
+  @@unique([organizationId, date, channel])
+  @@index([organizationId, date])
 }
 </file>
 
@@ -2414,6 +2121,325 @@ model CampaignRecipient {
 }
 </file>
 
+<file path="workers-backend/package.json">
+{
+  "name": "workers-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="chatia-backend/package.json">
+{
+  "name": "chatia-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/mapped-types": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/multer": "^1.4.12",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="pasarelapagos-backend/package.json">
+{
+  "name": "pasarelapagos-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@opentelemetry/auto-instrumentations-node": "catalog:",
+    "@opentelemetry/exporter-prometheus": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@types/compression": "^1.7.5",
+    "@types/cookie-parser": "^1.4.8",
+    "axios": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "compression": "^1.7.5",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "mercadopago": "catalog:",
+    "nanoid": "^5.1.5",
+    "nestjs-pino": "catalog:",
+    "opossum": "^8.1.4",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "stripe": "catalog:",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
 <file path="pnpm-workspace.yaml">
 packages:
   - "chatia-backend"
@@ -2489,6 +2515,8 @@ catalog:
   "@opentelemetry/sdk-node": "^0.57.2"
   "@opentelemetry/auto-instrumentations-node": "^0.58.0"
   "@opentelemetry/exporter-prometheus": "^0.57.2"
+  "@willsoto/nestjs-prometheus": "^6.0.0"
+  "prom-client": "^15.0.0"
   # ── Dev / Build ───────────────────────────────────────
   "@eslint/js": "^9.18.0"
   "@eslint/eslintrc": "^3.2.0"

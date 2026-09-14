@@ -62,6 +62,7 @@ The content is organized as follows:
     deploy-railway.md
     ms-capa-1-auth-tenant.md
     ms-capa-2-contratos-http.md
+    ms-capa-2-zod-migracion.md
     ms-capa-3-domain-service.md
     ms-capa-4-grpc-contratos.md
     ms-capa-5-multitenant.md
@@ -93,6 +94,7 @@ The content is organized as follows:
     ADR-007-tipos-explicitos.md
     ADR-008-hacia-10-tests-obs-cicd.md
     ADR-009-hacia-9-5-codigo.md
+    ADR-011-plan-10-10-codigo-estructura.md
     TEMPLATE.md
   lifecycle/
     01-fase-desarrollo.md
@@ -101,6 +103,7 @@ The content is organized as follows:
     04-fase-escala.md
     05-tasks.md
     README.md
+    tasks.md
   modules/
     analytics-backend/
       README.md
@@ -218,6 +221,8 @@ chatia-backend/
         embedding.service.ts
       common.module.ts
     contacts/
+      repository/
+        contacts.repository.interface.ts
       types/
         contact.types.ts
       contacts.controller.ts
@@ -529,515 +534,165 @@ tsconfig.base.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path=".claude/checklists/ci-cd-github-actions.md">
-# Checklist — CI/CD con GitHub Actions por servicio
+<file path=".claude/checklists/ms-capa-2-zod-migracion.md">
+# Checklist — Migración class-validator → Zod (ADR-011 Sprint 1)
 
-## Antes de crear el workflow
+## Para cada controller migrado, verificar:
 
-- [ ] El servicio tiene `scripts.test` en su `package.json`
-- [ ] El servicio tiene `scripts.test:cov` que corre jest con `--coverage`
-- [ ] El servicio tiene `scripts.typecheck` que corre `tsc --noEmit`
-- [ ] El servicio tiene `scripts.lint` que corre eslint
-- [ ] `jest.config.ts` tiene `coverageThreshold` configurado (85%)
+- [ ] Schema Zod definido inline en el mismo archivo del controller
+- [ ] `z.infer<typeof Schema>` como tipo del parámetro (no una clase DTO)
+- [ ] `ZodValidationPipe` en cada endpoint que recibe body
+- [ ] `class-validator` eliminado de los imports del archivo
+- [ ] El schema incluye `.optional()` solo donde el campo realmente es opcional
+- [ ] `z.coerce.number()` para query params numéricos (vienen como string en HTTP)
+- [ ] El schema tiene `.min()` / `.max()` en strings — nunca validación implícita
 
-## Estructura del workflow (copiar y adaptar)
+## Verificación final del servicio
 
-```yaml
-# .github/workflows/ci-{servicio}.yml
-name: CI — {servicio}
+```bash
+# Cero class-validator fuera de schemas/ (si los hay)
+grep -r "@IsString\|@IsEnum\|@IsOptional\|class-validator" \
+  <servicio>/src --include="*.ts" | grep -v "schemas\|.spec." | wc -l
+# → 0
 
-on:
-  push:
-    branches: [main]
-    paths:
-      - '{servicio}/**'
-      - 'packages/**'
-      - 'package.json'
-      - 'pnpm-workspace.yaml'
-  pull_request:
-    paths:
-      - '{servicio}/**'
-      - 'packages/**'
+# ZodValidationPipe presente en todos los endpoints con body
+grep -rn "ZodValidationPipe" <servicio>/src --include="*.controller.ts" | wc -l
+# → igual al número de endpoints con @Body()
 
-jobs:
-  ci:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: '10' }
-      - uses: actions/setup-node@v4
-        with: { node-version: '24', cache: 'pnpm' }
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter={servicio} lint
-      - run: pnpm --filter={servicio} typecheck
-      - run: pnpm --filter={servicio} test:cov
-      - run: docker build -f {servicio}/Dockerfile -t {servicio}:ci .
-        if: github.ref == 'refs/heads/main'
+# class-validator eliminado de package.json
+grep "class-validator" <servicio>/package.json
+# → no debe aparecer
 ```
 
-## Branch protection en GitHub
+## Servicios por migrar (ADR-011)
 
-Settings → Branches → Branch protection rules → `main`:
-- [x] Require status checks before merging
-  - [x] ci (de cada workflow activo)
-- [x] Require pull request reviews before merging (1 aprobación)
-- [x] Do not allow bypassing the above settings
-
-## Criterio de completado
-
-- El PR de un servicio que falla typecheck no puede mergearse
-- El PR que baja coverage < 85% no puede mergearse
-- El merge a main dispara el build Docker y verifica que la imagen se construye
+| Servicio | Estado | Done cuando |
+|---------|--------|-------------|
+| pasarelapagos-backend | ✅ Completado (Sprint 1) | grep class-validator → 0 ✅ |
+| workers-backend | ✅ Completado (Sprint 1) | grep class-validator → 0 ✅ |
+| notificaciones-backend | ✅ Ya migrado | — |
+| chatia-backend | ✅ Ya migrado | — |
+| analytics-backend | ✅ Sin DTOs con class-validator | — |
 </file>
 
-<file path=".claude/decisions/ADR-008-hacia-10-tests-obs-cicd.md">
-# ADR-008 — Plan hacia 10/10: Tests · Observabilidad · CI/CD
-
-**Estado:** Aceptado — En ejecución
-**Fecha:** 2025-Q3
-**Owner:** Equipo ecosistema-ms
-
----
-
-## Contexto
-
-Evaluación puntual de ecosistema-ms (sept 2025):
-
-| Dimensión              | Puntaje antes |
-|------------------------|---------------|
-| Arquitectura/Capas     | 7.2 / 10      |
-| Tests                  | 3.5 / 10      |
-| Observabilidad         | 2.5 / 10      |
-| Deploy / CI/CD         | 6.0 / 10      |
-| **Promedio real**      | **~5.8 / 10** |
-
-Los tres pilares que arrastran el promedio son exactamente los que este
-ADR ataca. La base arquitectónica es correcta — el problema es que sin tests,
-sin trazas y sin CI, no se puede operar con confianza en producción.
-
----
-
-## Decisiones
-
-### D1 — Tests: cobertura real y enforcement en CI
-
-**Objetivo:** 3.5 → 9.0
-
-**Qué implementamos:**
-
-1. **Unit tests de dominio** — lógica de negocio pura sin mocks de Prisma.
-   Cada `domain/*.entity.ts` tiene su suite en `*.entity.spec.ts`.
-   Cada `*.service.ts` tiene su suite con el repository mockeado via interface.
-
-2. **Integration tests de contratos HTTP** — `supertest` contra el módulo
-   completo de NestJS con Prisma mockeado vía `@prisma/client` mock.
-   Paths críticos: payments, conversations, auth.
-
-3. **Cobertura mínima enforceada en CI:**
-   - Statements: 85%
-   - Branches: 80%
-   - Functions: 85%
-   - Lines: 85%
-   Configurado en `jest.config.ts` de cada servicio con `coverageThreshold`.
-
-4. **Test de aislamiento multi-tenant** — suite que verifica que un request con
-   `ecosystemId=welver` nunca retorna datos con `ecosystemId=manzana`.
-   Vive en `*/src/test/multitenant.spec.ts` de cada servicio.
-
-**Por qué no pytest / Vitest:**
-Jest es el estándar del monorepo. Cambiar en este punto introduce overhead
-de configuración sin ganancia real. Se descarta.
-
-**Por qué no solo integration tests:**
-Los tests de dominio puro validan invariantes de negocio sin levantar la app.
-Son 10x más rápidos y sobreviven refactors de infraestructura.
-
----
-
-### D2 — Observabilidad: trazas distribuidas y métricas estructuradas
-
-**Objetivo:** 2.5 → 8.5
-
-**Qué implementamos:**
-
-1. **Request ID propagado entre servicios**
-   - Cada request HTTP entrante recibe un `X-Request-Id` (UUID v4) si no trae uno.
-   - El `TenantGuard` lo agrega al contexto de AsyncLocalStorage.
-   - Los clientes gRPC lo propagan en el metadata del call.
-   - Todos los logs incluyen `{ requestId, ecosystemId, organizationId, service }`.
-
-2. **Logs estructurados (JSON) en producción**
-   - `pino` como logger de NestJS en producción. En local: `pino-pretty`.
-   - Se configura en `main.ts` de cada servicio con `createPinoLogger()`.
-   - Formato: `{ timestamp, level, service, requestId, ecosystemId, message, ...context }`.
-
-3. **Métricas Prometheus en `/metrics`**
-   - `@willsoto/nestjs-prometheus` en cada servicio.
-   - Métricas base: `http_request_duration_seconds`, `http_requests_total`,
-     `bullmq_job_duration_seconds`, `bullmq_job_failures_total`.
-   - Métricas de negocio: `grpc_calls_total`, `circuit_breaker_state` (open/closed/half-open).
-   - El endpoint `/metrics` es interno (no expuesto públicamente en Railway).
-
-4. **Health check enriquecido**
-   - `GET /health` retorna estado de: DB, Redis, BullMQ, circuit breakers por canal.
-   - Formato compatible con Railway health checks.
-
-5. **Circuit breaker state en métricas**
-   - `CircuitBreakerService` expone estado via gauge Prometheus.
-   - Cuando un CB está OPEN, hay alerta automática en el dashboard.
-
-**Por qué no OpenTelemetry completo ahora:**
-OTEL con collector distribuido (Jaeger/Tempo) requiere infraestructura Railway adicional.
-El approach pino + Prometheus cubre el 90% del valor con el 20% de la complejidad.
-OTEL queda en Fase Hardening como upgrade natural.
-
-**Por qué no Datadog/New Relic:**
-Costo operacional. Prometheus + Grafana Cloud free tier cubre la fase actual.
-
----
-
-### D3 — CI/CD: pipeline que bloquea antes de Railway
-
-**Objetivo:** 6.0 → 9.0
-
-**Qué implementamos:**
-
-1. **GitHub Actions — pipeline por servicio afectado**
-
-   Trigger: push a `main` o PR abierto.
-   Detección de cambios: `dorny/paths-filter` por carpeta de servicio.
-   Solo corre el pipeline del servicio que cambió + `packages/`.
-
-   Jobs en orden:
-   ```
-   lint → typecheck → test (con cobertura) → build → [deploy en main]
-   ```
-
-2. **Lint + typecheck en cada PR (< 2 min)**
-   ```yaml
-   - pnpm run lint --filter={servicio}
-   - pnpm run typecheck --filter={servicio}
-   ```
-   Un PR que no pasa typecheck no se puede mergear.
-
-3. **Tests con cobertura mínima (bloquea merge)**
-   ```yaml
-   - pnpm run test:cov --filter={servicio}
-   ```
-   Si coverage < threshold configurado en jest → workflow falla → no se mergea.
-
-4. **Build Docker por servicio (verifica que la imagen se construye)**
-   ```yaml
-   - docker build -f {servicio}/Dockerfile -t {servicio}:${{ github.sha }} .
-   ```
-   Corre en `main` antes del deploy. Si el build falla, Railway no recibe el push.
-
-5. **Deploy automático en Railway solo desde `main`**
-   Railway ya escucha el repo. El CI no dispara Railway — Railway detecta el merge.
-   El valor del CI es **bloquear antes** de que llegue a Railway.
-
-6. **Branch protection rules en GitHub**
-   - Required status checks: `lint`, `typecheck`, `test`, `build`
-   - Require PR review: 1 aprobación mínima
-   - No force push a `main`
-
-**Regla permanente:**
-Un push directo a `main` sin pasar el pipeline es un accidente, no un shortcut.
-Railway puede desplegar código roto si el CI no existe — ese riesgo se elimina aquí.
-
----
-
-## Tabla de impacto por decisión
-
-| Decisión | Tests | Observabilidad | Deploy | Arquitectura |
-|----------|-------|----------------|--------|--------------|
-| D1 Tests | +5.5  | —              | —      | +0.3         |
-| D2 Obs   | —     | +6.0           | —      | +0.2         |
-| D3 CI/CD | +0.5  | —              | +3.0   | —            |
-
-## Proyección post-implementación
-
-| Dimensión          | Antes | Después |
-|--------------------|-------|---------|
-| Arquitectura       | 7.2   | 8.5     |
-| Tests              | 3.5   | 9.0     |
-| Observabilidad     | 2.5   | 8.5     |
-| Deploy / CI/CD     | 6.0   | 9.0     |
-| **Promedio real**  | 5.8   | **8.8** |
-
-El salto al 9.5+ viene del tiempo bajo carga real en producción,
-no de una decisión de arquitectura.
-
----
-
-## Orden de ejecución recomendado
-
-1. D3 CI/CD — bloquea regresiones desde el primer día (valor inmediato)
-2. D2 Observabilidad — sin esto operar en producción es ciego
-3. D1 Tests — la cobertura se construye módulo a módulo en paralelo con features
-
----
-
-## Alternativas descartadas
-
-| Alternativa | Por qué se descartó |
-|---|---|
-| Playwright E2E como suite principal | Los servicios son APIs — E2E tiene valor pero no es el cuello de botella ahora |
-| OpenTelemetry completo desde el inicio | Requiere collector, storage, dashboard — overhead alto. Pino+Prometheus cubre el valor inmediato |
-| Turborepo para CI | pnpm --filter ya resuelve el problema. Turborepo agrega complejidad sin ganancia suficiente ahora |
-| Jest → Vitest | El costo de migración supera la ganancia de velocidad en este tamaño de suite |
-
-## Referencias
-
-- `checklists/testing-desde-cero.md`
-- `checklists/observabilidad.md`
-- `conventions/testing.md`
-- `conventions/deploy.md`
-- `lifecycle/02-fase-estabilizacion.md`
-</file>
-
-<file path=".claude/decisions/ADR-009-hacia-9-5-codigo.md">
-# ADR-009 — Hacia 9.5/10: código producción-ready
-
-**Estado:** Aceptado — Implementado — 2026-09-12T19:29:30Z
-**Fecha:** 2025-Q3
-**Puntaje antes:** 8.0 / 10 (sin tests/obs/deploy)
-**Puntaje objetivo:** 9.5 / 10
-
----
-
-## Contexto
-
-Con ADR-008 se resolvió infraestructura base (logger, metrics, middleware, CI/CD estructura).
-Quedan cuatro brechas que impiden superar el 8.5:
-
-| ID | Brecha | Dimensión impactada |
-|----|--------|---------------------|
-| DT-023 | `getAgentMetrics` carga 100K rows en Node.js | Base de datos: 6.5 → 9.0 |
-| DT-027 | `main.ts` sin `ZodExceptionFilter` (ZodError sale como 500) | Calidad código: 7.5 → 9.0 |
-| DT-028 | packages/logger + metrics existen pero no se importan en app.module | Config: 9.0 → 9.5 |
-| DT-029 | ConversationsService usa `this.prisma` directamente pese a IRepository | Arquitectura: 8.5 → 9.0 |
-
-## Decisiones
-
-### D1 — DT-023: getAgentMetrics → $queryRaw GROUP BY PostgreSQL
-Reemplaza `findMany(take: 50_000)` × 2 por tres `$queryRaw` paralelos con
-GROUP BY. La paginación ocurre en SQL (LIMIT/OFFSET). Sin carga de filas en Node.
-Índices compuestos sobre `(organizationId, ecosystemId, eventType, occurredAt)`.
-
-**Por qué $queryRaw y no Prisma groupBy:**
-`groupBy` no soporta acceso a campos JSON anidados (`payload->>'agentId'`).
-
-### D2 — DT-027: ZodExceptionFilter global — orden correcto en main.ts
-Se crea `packages/auth-server/src/filters/zod-exception.filter.ts`.
-En cada `main.ts`: `useGlobalFilters(new ZodExceptionFilter())` ANTES de `useGlobalPipes`.
-Sin este orden los ZodError salen como HTTP 500.
-
-### D3 — DT-028: LoggerModule + PrometheusModule en app.module.ts
-Cada `app.module.ts` importa pino y prometheus.
-`RequestIdMiddleware` se registra via `configure()` del NestModule.
-
-### D4 — DT-029: ConversationsService sin PrismaService directo
-El acceso `this.prisma` en `handleIncomingMessage` se elimina.
-Todo el acceso a DB va por `IConversationsRepository`. Cierra ADR-002.
-
-## Proyección de puntaje (sin tests/obs/deploy)
-
-| Dimensión            | v8.0 | v9.5 |
-|----------------------|------|------|
-| Arquitectura/Capas   | 8.5  | 9.0  |
-| Contratos/Tipado     | 8.0  | 8.5  |
-| Multi-tenancy        | 9.0  | 9.0  |
-| Comunicación gRPC    | 7.5  | 7.5  |
-| Calidad de código    | 7.5  | 9.0  |
-| Base de datos        | 6.5  | 9.0  |
-| Seguridad/RBAC       | 7.0  | 7.5  |
-| Config/Twelve-Factor | 9.0  | 9.5  |
-| Documentación .claude| 9.5  | 9.5  |
-| **Promedio**         | **8.0** | **9.1** |
-
-## Alternativas descartadas
-
-| Alternativa | Por qué se descartó |
-|---|---|
-| Prisma `groupBy` para agentMetrics | No soporta payload JSON — $queryRaw obligatorio |
-| Mantener ValidationPipe sin ZodFilter | ZodError → HTTP 500 en producción |
-| Herencia de AppModule base | NestJS no tiene herencia limpia de módulos |
-</file>
-
-<file path=".claude/patches/DT-023-analytics-agent-metrics.md">
-# Parche DT-023 — getAgentMetrics: reemplazar in-memory aggregation por SQL
-
-## Problema
-
-`getAgentMetrics` en `analytics-backend/src/analytics/analytics.service.ts`
-carga hasta 100K rows en memoria con dos `findMany(..., take: 50_000)` separados
-y los agrega en Node.js. En producción con múltiples organizaciones esto es
-una bomba de tiempo de memoria y latencia.
-
-## Solución
-
-Reemplazar los dos `findMany` por dos `groupBy` de Prisma que hacen la
-agregación en PostgreSQL:
-
-```typescript
-// ANTES — dos findMany con take 50_000 (bug de escala)
-const [assigned, resolved] = await Promise.all([
-  this.prisma.analyticsEvent.findMany({
-    where: { organizationId, ecosystemId, eventType: 'conversation.assigned', ... },
-    select: { payload: true },
-    take: 50_000,
-  }),
-  this.prisma.analyticsEvent.findMany({ ... take: 50_000 }),
-]);
-// ... agrupación en Node.js
-
-// DESPUÉS — GROUP BY en PostgreSQL
-const [assignedGroups, resolvedGroups] = await Promise.all([
-  this.prisma.$queryRaw<Array<{ agent_id: string; count: bigint }>>`
-    SELECT
-      payload->>'agentId' AS agent_id,
-      COUNT(*) AS count
-    FROM "AnalyticsEvent"
-    WHERE
-      "organizationId" = ${organizationId}
-      AND "ecosystemId"  = ${ecosystemId}
-      AND "eventType"    = 'conversation.assigned'
-      AND "occurredAt" BETWEEN ${from} AND ${to}
-      AND payload->>'agentId' IS NOT NULL
-    GROUP BY payload->>'agentId'
-    ORDER BY count DESC
-    LIMIT ${limit} OFFSET ${offset}
-  `,
-  this.prisma.$queryRaw<Array<{ agent_id: string; count: bigint }>>`
-    SELECT
-      payload->>'agentId' AS agent_id,
-      COUNT(*) AS count
-    FROM "AnalyticsEvent"
-    WHERE
-      "organizationId" = ${organizationId}
-      AND "ecosystemId"  = ${ecosystemId}
-      AND "eventType"    = 'conversation.resolved_by_agent'
-      AND "occurredAt" BETWEEN ${from} AND ${to}
-      AND payload->>'agentId' IS NOT NULL
-    GROUP BY payload->>'agentId'
-  `,
-]);
-
-const resolvedMap = new Map(resolvedGroups.map(r => [r.agent_id, Number(r.count)]));
-const agents = assignedGroups.map(a => ({
-  agentId:  a.agent_id,
-  assigned: Number(a.count),
-  resolved: resolvedMap.get(a.agent_id) ?? 0,
-}));
-
-const [{ count: total }] = await this.prisma.$queryRaw<[{ count: bigint }]>`
-  SELECT COUNT(DISTINCT payload->>'agentId') AS count
-  FROM "AnalyticsEvent"
-  WHERE "organizationId" = ${organizationId}
-    AND "ecosystemId"    = ${ecosystemId}
-    AND "eventType"      = 'conversation.assigned'
-    AND "occurredAt" BETWEEN ${from} AND ${to}
-`;
-
-return { agents, total: Number(total) };
+<file path=".claude/decisions/ADR-011-plan-10-10-codigo-estructura.md">
+# ADR-011 — Plan estructural para score 10/10 (sin observabilidad, testing ni deploy)
+
+**Fecha:** 2026-09-10
+**Estado:** Aceptado — en ejecución
+**Repo:** grupojl/ecosistema-ms
+
+## Gaps a cerrar (4)
+
+- G1: class-validator en pasarela/workers + getAgentMetrics 100K rows en memoria
+- G2: Domain/Repository incompleto (contacts, agents, campaigns, notifications)
+- G3: CircuitBreaker sin capturar CircuitOpenError en AssistantChatService
+- G4: toOutput() definido pero no conectado en services de negocio
+
+## Sprints
+
+### Sprint 1 — Zod completo + getAgentMetrics
+- Migrar pasarelapagos-backend a Zod (CreatePaymentSchema, ListPaymentsSchema, RefundSchema)
+- Migrar workers-backend a Zod (campaigns/dto, jobs/dto)
+- Corregir getAgentMetrics: groupBy en DB, no cargar 100K rows
+
+### Sprint 2 — Domain/Repository completo
+- chatia-backend/contacts/ → domain/ + repository/
+- chatia-backend/agents/ → domain/ + repository/
+- workers-backend/campaigns/ → domain/ + repository/
+- notificaciones-backend/notifications/ → domain/ + repository/
+
+### Sprint 3 — Circuit Breaker en path crítico
+- AssistantChatService: capturar CircuitOpenError → fallback + escalar humano
+- OutgoingMessageProcessor: CB por channelType
+- HealthExtendedController: incluir estado del CB por servicio
+
+### Sprint 4 — toOutput() conectado
+- conversations.service.ts: toOutput() en todos los métodos public
+- contacts.service.ts: toOutput() en todos los métodos public
+- Tipo de retorno declarado en payments.service.ts serialize()
+
+## Verificación completa
+
+```bash
+./x.sh --check
 ```
 
-## Índice requerido en schema.prisma
+## Reglas permanentes
 
-```prisma
-model AnalyticsEvent {
-  // ... campos existentes
-  @@index([organizationId, ecosystemId, eventType, occurredAt])
-  @@index([organizationId, ecosystemId, occurredAt])
+- Un service public que devuelve tipo Prisma directo es bug de capa → PR bloqueado
+- Un controller con class-validator es bug de arquitectura → PR bloqueado
+- CircuitOpenError sin captura en paths de proveedores externos → PR bloqueado
+- findMany sin ecosystemId en where → PR bloqueado
+</file>
+
+<file path=".claude/lifecycle/tasks.md">
+# tasks.md — Checklist ejecutable ecosistema-ms
+
+**Última actualización:** 2026-09-10
+
+---
+
+## S4 — En curso (bloqueante)
+
+### Testing (P0)
+- [ ] **S4-T01** Crear `ADR-011-testing-strategy-ms.md`
+  - Criterio: define scope por ms, cómo mockear gRPC client, cobertura mínima 85%
+- [ ] **S4-T02** Unit test: invariante multi-tenant `analytics.service.ts`
+  - Criterio: test que llama `getConversationsByDay` sin `ecosystemId` y verifica que el where lo incluye
+  - Criterio: test que verifica que datos de ecosistema A no aparecen en consulta de ecosistema B
+  - Archivo: `analytics-backend/src/analytics/analytics.service.spec.ts`
+- [ ] **S4-T03** Unit test: idempotencia BullMQ en workers-backend
+  - Criterio: job ya procesado no se reprocesa
+  - Archivo: `workers-backend/src/jobs/jobs.processor.spec.ts`
+- [ ] **S4-T04** Integration test: `AnalyticsController`
+  - Criterio: GET /analytics/overview con organizationId + ecosystemId → 200
+  - Criterio: GET sin ecosystemId → 400 (si hay validación) o resultado scoped
+  - Archivo: `analytics-backend/src/analytics/analytics.controller.spec.ts`
+- [ ] **S4-T05** Fix tipo: `AgentMetric` interface
+  - Criterio: `getAgentMetrics` retorna `{ agents: AgentMetric[]; total: number }` tipado
+  - Archivo: `analytics-backend/src/analytics/analytics.service.ts`
+
+### CI (P0)
+- [ ] **S4-T06** `.github/workflows/ci.yml`
+  - Criterio: `pnpm typecheck` + `pnpm test` por cada ms en cada PR
+  - Criterio: matrix strategy: chatia | pasarela | notificaciones | analytics | workers
+
+### OpenTelemetry (P2)
+- [ ] **S4-T07** SDK básico en analytics-backend (primera referencia)
+- [ ] **S4-T08** Correlación trace-id entre chatia → analytics
+
+---
+
+## Completado
+
+- ✅ chatia-backend: conversaciones, agentes, canales, FAQ/RAG, asignación, AI config
+- ✅ pasarelapagos-backend: pagos, providers, webhooks, retry
+- ✅ notificaciones-backend: adaptadores email/push/SMS
+- ✅ analytics-backend: eventos, proyecciones, SSE, gRPC
+- ✅ workers-backend: BullMQ, DLQ, scheduler, circuit breaker
+- ✅ packages/proto + grpc-client
+- ✅ ADR-010: bug ecosystemId corregido
+</file>
+
+<file path="chatia-backend/src/contacts/repository/contacts.repository.interface.ts">
+// chatia-backend/src/contacts/repository/contacts.repository.interface.ts
+// ADR-011 Sprint 2 — Puerto del repositorio de contactos
+import type { Contact } from '../domain/contact.entity.js';
+export const CONTACTS_REPOSITORY = Symbol('CONTACTS_REPOSITORY');
+export interface IContactsRepository {
+  findById(id: string, organizationId: string, ecosystemId: string): Promise<Contact | null>;
+  findByPhone(phone: string, organizationId: string, ecosystemId: string): Promise<Contact | null>;
+  list(params: {
+    organizationId: string;
+    ecosystemId:    string;
+    page?:          number;
+    limit?:         number;
+    search?:        string;
+  }): Promise<{ data: Contact[]; total: number }>;
+  create(input: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>): Promise<Contact>;
+  update(id: string, organizationId: string, data: Partial<Pick<Contact, 'name' | 'email' | 'metadata'>>): Promise<Contact>;
 }
-```
-
-## Test requerido
-
-```typescript
-it('no carga rows en memoria para organización con 100K eventos', async () => {
-  // Mock del prisma.$queryRaw para verificar que se llama con GROUP BY
-  const queryRawSpy = jest.spyOn(prisma, '$queryRaw').mockResolvedValue([]);
-  await service.getAgentMetrics({ organizationId: 'org1', ecosystemId: 'eco1', from, to });
-  expect(queryRawSpy).toHaveBeenCalled();
-  expect(prisma.analyticsEvent.findMany).not.toHaveBeenCalled();
-});
-```
-</file>
-
-<file path=".claude/AUDIT-LAST.md">
-# AUDIT-LAST — ecosistema-ms
-
-**Fecha:** 2026-09-12
-**Auditor:** Claude (lectura directa del código fuente en ecosistema-ms.xml)
-**Puntaje real:** 7.6 / 10
-**Puntaje proyectado (sesiones anteriores):** 8.3 — 9.1 / 10
-**Desincronización:** +0.7 a +1.5 puntos sobre lo real
-
----
-
-## Puntaje por dimensión (sin tests, observabilidad ni deploy)
-
-| Dimensión            | Proyectado | **Real** | Δ     | Evidencia en código |
-|----------------------|------------|----------|-------|---------------------|
-| Arquitectura/Capas   | 9.0        | **7.5**  | -1.5  | AssignmentService, EcosystemService, KbDocumentService, AuditService todos con PrismaService directo. ConversationsService viola IConversationsRepository en handleIncomingMessage (this.prisma.channelAccount.findUnique directo) |
-| Contratos/Tipado     | 8.5        | **7.5**  | -1.0  | ZodExceptionFilter existe en auth-server y main.ts de chatia+pagos. Notificaciones, analytics, workers sin ZodFilter — ZodError sale como 500 en esos 3 servicios |
-| Multi-tenancy        | 9.0        | **9.0**  | =     | FASE 5 real. Todas las queries críticas con ecosystemId + organizationId. El único gap (DT-015 Conversation via join) es conocido y documentado |
-| Comunicación gRPC    | 7.5        | **7.5**  | =     | Protos correctos. keepalive options en chatia y pagos. Workers usa CB propio sobre Redis (distinto de opossum estándar — inconsistencia menor) |
-| Calidad de código    | 9.0        | **7.0**  | -2.0  | status as any en campaigns.service.ts, casts Prisma.AuditLogCreateInput/WhereInput (schema no generado aún), EmbeddingService es stub usando Groq chat en vez de modelo de embeddings real, FaqIngestProcessor es TODO explícito |
-| Base de datos        | 9.0        | **6.5**  | -2.5  | getAgentMetrics con take: 50_000 × 2 sigue intacto — x.sh no llegó a analytics-backend. Índices compuestos no aplicados. Health controller de pasarela retorna { status: ok } hardcodeado sin SELECT 1 |
-| Seguridad/RBAC       | 7.5        | **7.5**  | =     | Guards en auth-server correctos. RBAC documentado. Helmet pendiente de verificar en todos |
-| Config/Twelve-Factor | 9.5        | **8.5**  | -1.0  | CacheService con degradación elegante (REDIS_ENABLED=false). Pino en chatia+pagos. App.module.ts de los 5 servicios sin LoggerModule+PrometheusModule importados |
-| Documentación .claude| 9.5        | **9.5**  | =     | ADR-001..009, checklists, reglas duras, lifecycle, patches. El punto más sólido del sistema |
-| **PROMEDIO**         | **9.1**    | **7.6**  | **-1.5** | |
-
----
-
-## Causa raíz de la desincronización
-
-### Causa 1 — x.sh corrió sobre 2 de 5 servicios
-El último x.sh corrió desde un directorio que no tenía notificaciones-backend,
-analytics-backend ni workers-backend. El 60% del sistema quedó sin:
-- ZodExceptionFilter en main.ts
-- LoggerModule + PrometheusModule en app.module.ts
-- jest.config.ts con coverageThreshold
-- RequestIdMiddleware registrado
-
-### Causa 2 — Domain/Repository más superficial de lo que parecía
-El ADR-002 dice "PENDIENTE DE IMPLEMENTAR". El código lo confirma:
-Solo conversations/ y payments/ tienen repository interface.
-El resto (assignment, ecosystem, kb-document, audit, campaigns) usa PrismaService directo.
-ConversationsService viola su propio contrato en handleIncomingMessage.
-
-### Causa 3 — Base de datos no mejoró
-getAgentMetrics con take: 50_000 sigue igual desde septiembre.
-analytics-backend no estaba en el checkout cuando corrió el x.sh de ADR-009.
-
----
-
-## Tareas concretas para llegar al 9.0 real
-
-| Prioridad | Tarea | Impacto |
-|-----------|-------|---------|
-| P0 | Correr x.sh (ADR-009) con los 5 servicios presentes | +0.5 Contratos, +1.0 Config |
-| P0 | Aplicar parche DT-023 en analytics-backend manualmente | +2.5 Base de datos |
-| P1 | Refactorizar handleIncomingMessage para usar solo IConversationsRepository | +0.5 Arquitectura |
-| P1 | Health controller pasarela: agregar SELECT 1 a la DB | +0.3 Base de datos |
-| P2 | EmbeddingService: migrar a modelo real (Sprint 4 pendiente) | +0.5 Calidad |
-| P2 | Eliminar status as any en campaigns — usar enum cast tipado | +0.2 Calidad |
-
----
-
-## Lo que NO está desincronizado (correcto en código Y en proyección)
-
-- Multi-tenancy: 9.0 real — auditoria FASE 5 fue real
-- Documentación .claude: 9.5 — ADRs, reglas duras, lifecycle son sólidos
-- gRPC contratos: protos correctos, keepalive en los servicios que corrió el x.sh
-- BullMQ + idempotencia: ADR-003 implementado correctamente
-- Circuit breakers: opossum en chatia+pagos+notificaciones, CB Redis propio en workers
-- Lock distribuido: SET NX EX correcto en analytics y workers (ADR-006)
 </file>
 
 <file path=".claude/architecture/01-backend-capas.md">
@@ -1338,6 +993,68 @@ Replicar en los demas MS para facilitar desarrollo local.
 - [ ] Deploy del servidor primero (nuevo método disponible)
 - [ ] Deploy de los clientes (empiezan a usar el nuevo método)
 - [ ] Verificar en Railway que todos los health checks pasan
+</file>
+
+<file path=".claude/checklists/ci-cd-github-actions.md">
+# Checklist — CI/CD con GitHub Actions por servicio
+
+## Antes de crear el workflow
+
+- [ ] El servicio tiene `scripts.test` en su `package.json`
+- [ ] El servicio tiene `scripts.test:cov` que corre jest con `--coverage`
+- [ ] El servicio tiene `scripts.typecheck` que corre `tsc --noEmit`
+- [ ] El servicio tiene `scripts.lint` que corre eslint
+- [ ] `jest.config.ts` tiene `coverageThreshold` configurado (85%)
+
+## Estructura del workflow (copiar y adaptar)
+
+```yaml
+# .github/workflows/ci-{servicio}.yml
+name: CI — {servicio}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '{servicio}/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+  pull_request:
+    paths:
+      - '{servicio}/**'
+      - 'packages/**'
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: '10' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '24', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter={servicio} lint
+      - run: pnpm --filter={servicio} typecheck
+      - run: pnpm --filter={servicio} test:cov
+      - run: docker build -f {servicio}/Dockerfile -t {servicio}:ci .
+        if: github.ref == 'refs/heads/main'
+```
+
+## Branch protection en GitHub
+
+Settings → Branches → Branch protection rules → `main`:
+- [x] Require status checks before merging
+  - [x] ci (de cada workflow activo)
+- [x] Require pull request reviews before merging (1 aprobación)
+- [x] Do not allow bypassing the above settings
+
+## Criterio de completado
+
+- El PR de un servicio que falla typecheck no puede mergearse
+- El PR que baja coverage < 85% no puede mergearse
+- El merge a main dispara el build Docker y verifica que la imagen se construye
 </file>
 
 <file path=".claude/checklists/circuit-breaker-adapters.md">
@@ -1870,70 +1587,6 @@ Ninguna de las dos cosas se aprueba en PR.
 ## Variables de entorno
 - [ ] Credenciales agregadas a `.env.example`
 - [ ] Documentadas en `.claude/services/pasarelapagos-backend.md`
-</file>
-
-<file path=".claude/checklists/observabilidad.md">
-# Checklist — Observabilidad por microservicio
-
-## Nivel 1 — Mínimo viable (antes de producción)
-
-### Logs estructurados
-- [ ] `pino` instalado en el servicio
-- [ ] `main.ts` usa `createPinoLogger()` de `packages/logger`
-- [ ] En producción (`NODE_ENV=production`): JSON sin colores
-- [ ] En local: `pino-pretty` con colores
-- [ ] Todo log incluye: `service`, `requestId`, `ecosystemId` (cuando aplica)
-
-### Request ID
-- [ ] `RequestIdMiddleware` aplicado globalmente en `app.module.ts`
-- [ ] `X-Request-Id` se lee del header entrante o se genera UUID v4
-- [ ] El requestId se propaga al AsyncLocalStorage disponible en el service
-- [ ] Los clientes gRPC incluyen `x-request-id` en el metadata del call
-
-### Health check
-- [ ] `GET /health` retorna 200 cuando todo está ok, 503 cuando algo falla
-- [ ] Incluye: estado de DB (Prisma), Redis, BullMQ queues (si aplica)
-- [ ] Incluye: estado de circuit breakers por key
-- [ ] Railway usa este endpoint como health check del servicio
-
-## Nivel 2 — Métricas Prometheus
-
-- [ ] `@willsoto/nestjs-prometheus` instalado
-- [ ] `PrometheusModule` en `app.module.ts`
-- [ ] Endpoint `/metrics` registrado (solo accesible desde red interna Railway)
-- [ ] Métricas base configuradas:
-  - [ ] `http_request_duration_seconds` (histogram por ruta y método)
-  - [ ] `http_requests_total` (counter por ruta, método y status)
-  - [ ] `bullmq_job_duration_seconds` (por queue y tipo de job)
-  - [ ] `bullmq_job_failures_total` (por queue)
-- [ ] Métricas de negocio (al menos una por servicio):
-  - chatia: `conversations_created_total`, `messages_processed_total`
-  - pagos: `payments_created_total`, `payment_provider_calls_total`
-  - analytics: `events_persisted_total`, `projections_duration_seconds`
-  - notificaciones: `notifications_sent_total`, `notifications_failed_total`
-  - workers: `jobs_processed_total`, `campaign_recipients_dispatched_total`
-- [ ] Circuit breaker state como gauge: `circuit_breaker_state{key, service}`
-
-## Nivel 3 — Dashboard
-
-- [ ] Grafana Cloud conectado al endpoint `/metrics` de cada servicio
-- [ ] Dashboard base con: request rate, error rate, latency p50/p95/p99
-- [ ] Alert: error rate > 5% en 5 min → alerta Slack/email
-- [ ] Alert: circuit breaker OPEN → alerta inmediata
-
-## Comando de verificación rápida
-
-```bash
-# Verificar que /metrics responde en cada servicio
-for port in 3000 3001 3002 3003 3004; do
-  echo "=== Puerto $port ===" && curl -s http://localhost:$port/metrics | head -5
-done
-
-# Verificar /health
-for port in 3000 3001 3002 3003 3004; do
-  echo "=== /health :$port ===" && curl -s http://localhost:$port/health | jq .
-done
-```
 </file>
 
 <file path=".claude/checklists/testing-desde-cero.md">
@@ -2537,6 +2190,281 @@ Sin ese comentario, cualquier cast es bloqueante en code review.
 | Excepcion: `// @real/jsonb-cast` | Excepcion: `// @ecosistema-ms/jsonb-cast` |
 </file>
 
+<file path=".claude/decisions/ADR-008-hacia-10-tests-obs-cicd.md">
+# ADR-008 — Plan hacia 10/10: Tests · Observabilidad · CI/CD
+
+**Estado:** Aceptado — En ejecución
+**Fecha:** 2025-Q3
+**Owner:** Equipo ecosistema-ms
+
+---
+
+## Contexto
+
+Evaluación puntual de ecosistema-ms (sept 2025):
+
+| Dimensión              | Puntaje antes |
+|------------------------|---------------|
+| Arquitectura/Capas     | 7.2 / 10      |
+| Tests                  | 3.5 / 10      |
+| Observabilidad         | 2.5 / 10      |
+| Deploy / CI/CD         | 6.0 / 10      |
+| **Promedio real**      | **~5.8 / 10** |
+
+Los tres pilares que arrastran el promedio son exactamente los que este
+ADR ataca. La base arquitectónica es correcta — el problema es que sin tests,
+sin trazas y sin CI, no se puede operar con confianza en producción.
+
+---
+
+## Decisiones
+
+### D1 — Tests: cobertura real y enforcement en CI
+
+**Objetivo:** 3.5 → 9.0
+
+**Qué implementamos:**
+
+1. **Unit tests de dominio** — lógica de negocio pura sin mocks de Prisma.
+   Cada `domain/*.entity.ts` tiene su suite en `*.entity.spec.ts`.
+   Cada `*.service.ts` tiene su suite con el repository mockeado via interface.
+
+2. **Integration tests de contratos HTTP** — `supertest` contra el módulo
+   completo de NestJS con Prisma mockeado vía `@prisma/client` mock.
+   Paths críticos: payments, conversations, auth.
+
+3. **Cobertura mínima enforceada en CI:**
+   - Statements: 85%
+   - Branches: 80%
+   - Functions: 85%
+   - Lines: 85%
+   Configurado en `jest.config.ts` de cada servicio con `coverageThreshold`.
+
+4. **Test de aislamiento multi-tenant** — suite que verifica que un request con
+   `ecosystemId=welver` nunca retorna datos con `ecosystemId=manzana`.
+   Vive en `*/src/test/multitenant.spec.ts` de cada servicio.
+
+**Por qué no pytest / Vitest:**
+Jest es el estándar del monorepo. Cambiar en este punto introduce overhead
+de configuración sin ganancia real. Se descarta.
+
+**Por qué no solo integration tests:**
+Los tests de dominio puro validan invariantes de negocio sin levantar la app.
+Son 10x más rápidos y sobreviven refactors de infraestructura.
+
+---
+
+### D2 — Observabilidad: trazas distribuidas y métricas estructuradas
+
+**Objetivo:** 2.5 → 8.5
+
+**Qué implementamos:**
+
+1. **Request ID propagado entre servicios**
+   - Cada request HTTP entrante recibe un `X-Request-Id` (UUID v4) si no trae uno.
+   - El `TenantGuard` lo agrega al contexto de AsyncLocalStorage.
+   - Los clientes gRPC lo propagan en el metadata del call.
+   - Todos los logs incluyen `{ requestId, ecosystemId, organizationId, service }`.
+
+2. **Logs estructurados (JSON) en producción**
+   - `pino` como logger de NestJS en producción. En local: `pino-pretty`.
+   - Se configura en `main.ts` de cada servicio con `createPinoLogger()`.
+   - Formato: `{ timestamp, level, service, requestId, ecosystemId, message, ...context }`.
+
+3. **Métricas Prometheus en `/metrics`**
+   - `@willsoto/nestjs-prometheus` en cada servicio.
+   - Métricas base: `http_request_duration_seconds`, `http_requests_total`,
+     `bullmq_job_duration_seconds`, `bullmq_job_failures_total`.
+   - Métricas de negocio: `grpc_calls_total`, `circuit_breaker_state` (open/closed/half-open).
+   - El endpoint `/metrics` es interno (no expuesto públicamente en Railway).
+
+4. **Health check enriquecido**
+   - `GET /health` retorna estado de: DB, Redis, BullMQ, circuit breakers por canal.
+   - Formato compatible con Railway health checks.
+
+5. **Circuit breaker state en métricas**
+   - `CircuitBreakerService` expone estado via gauge Prometheus.
+   - Cuando un CB está OPEN, hay alerta automática en el dashboard.
+
+**Por qué no OpenTelemetry completo ahora:**
+OTEL con collector distribuido (Jaeger/Tempo) requiere infraestructura Railway adicional.
+El approach pino + Prometheus cubre el 90% del valor con el 20% de la complejidad.
+OTEL queda en Fase Hardening como upgrade natural.
+
+**Por qué no Datadog/New Relic:**
+Costo operacional. Prometheus + Grafana Cloud free tier cubre la fase actual.
+
+---
+
+### D3 — CI/CD: pipeline que bloquea antes de Railway
+
+**Objetivo:** 6.0 → 9.0
+
+**Qué implementamos:**
+
+1. **GitHub Actions — pipeline por servicio afectado**
+
+   Trigger: push a `main` o PR abierto.
+   Detección de cambios: `dorny/paths-filter` por carpeta de servicio.
+   Solo corre el pipeline del servicio que cambió + `packages/`.
+
+   Jobs en orden:
+   ```
+   lint → typecheck → test (con cobertura) → build → [deploy en main]
+   ```
+
+2. **Lint + typecheck en cada PR (< 2 min)**
+   ```yaml
+   - pnpm run lint --filter={servicio}
+   - pnpm run typecheck --filter={servicio}
+   ```
+   Un PR que no pasa typecheck no se puede mergear.
+
+3. **Tests con cobertura mínima (bloquea merge)**
+   ```yaml
+   - pnpm run test:cov --filter={servicio}
+   ```
+   Si coverage < threshold configurado en jest → workflow falla → no se mergea.
+
+4. **Build Docker por servicio (verifica que la imagen se construye)**
+   ```yaml
+   - docker build -f {servicio}/Dockerfile -t {servicio}:${{ github.sha }} .
+   ```
+   Corre en `main` antes del deploy. Si el build falla, Railway no recibe el push.
+
+5. **Deploy automático en Railway solo desde `main`**
+   Railway ya escucha el repo. El CI no dispara Railway — Railway detecta el merge.
+   El valor del CI es **bloquear antes** de que llegue a Railway.
+
+6. **Branch protection rules en GitHub**
+   - Required status checks: `lint`, `typecheck`, `test`, `build`
+   - Require PR review: 1 aprobación mínima
+   - No force push a `main`
+
+**Regla permanente:**
+Un push directo a `main` sin pasar el pipeline es un accidente, no un shortcut.
+Railway puede desplegar código roto si el CI no existe — ese riesgo se elimina aquí.
+
+---
+
+## Tabla de impacto por decisión
+
+| Decisión | Tests | Observabilidad | Deploy | Arquitectura |
+|----------|-------|----------------|--------|--------------|
+| D1 Tests | +5.5  | —              | —      | +0.3         |
+| D2 Obs   | —     | +6.0           | —      | +0.2         |
+| D3 CI/CD | +0.5  | —              | +3.0   | —            |
+
+## Proyección post-implementación
+
+| Dimensión          | Antes | Después |
+|--------------------|-------|---------|
+| Arquitectura       | 7.2   | 8.5     |
+| Tests              | 3.5   | 9.0     |
+| Observabilidad     | 2.5   | 8.5     |
+| Deploy / CI/CD     | 6.0   | 9.0     |
+| **Promedio real**  | 5.8   | **8.8** |
+
+El salto al 9.5+ viene del tiempo bajo carga real en producción,
+no de una decisión de arquitectura.
+
+---
+
+## Orden de ejecución recomendado
+
+1. D3 CI/CD — bloquea regresiones desde el primer día (valor inmediato)
+2. D2 Observabilidad — sin esto operar en producción es ciego
+3. D1 Tests — la cobertura se construye módulo a módulo en paralelo con features
+
+---
+
+## Alternativas descartadas
+
+| Alternativa | Por qué se descartó |
+|---|---|
+| Playwright E2E como suite principal | Los servicios son APIs — E2E tiene valor pero no es el cuello de botella ahora |
+| OpenTelemetry completo desde el inicio | Requiere collector, storage, dashboard — overhead alto. Pino+Prometheus cubre el valor inmediato |
+| Turborepo para CI | pnpm --filter ya resuelve el problema. Turborepo agrega complejidad sin ganancia suficiente ahora |
+| Jest → Vitest | El costo de migración supera la ganancia de velocidad en este tamaño de suite |
+
+## Referencias
+
+- `checklists/testing-desde-cero.md`
+- `checklists/observabilidad.md`
+- `conventions/testing.md`
+- `conventions/deploy.md`
+- `lifecycle/02-fase-estabilizacion.md`
+</file>
+
+<file path=".claude/decisions/ADR-009-hacia-9-5-codigo.md">
+# ADR-009 — Hacia 9.5/10: código producción-ready
+
+**Estado:** Aceptado — Implementado — 2026-09-12T19:29:30Z
+**Fecha:** 2025-Q3
+**Puntaje antes:** 8.0 / 10 (sin tests/obs/deploy)
+**Puntaje objetivo:** 9.5 / 10
+
+---
+
+## Contexto
+
+Con ADR-008 se resolvió infraestructura base (logger, metrics, middleware, CI/CD estructura).
+Quedan cuatro brechas que impiden superar el 8.5:
+
+| ID | Brecha | Dimensión impactada |
+|----|--------|---------------------|
+| DT-023 | `getAgentMetrics` carga 100K rows en Node.js | Base de datos: 6.5 → 9.0 |
+| DT-027 | `main.ts` sin `ZodExceptionFilter` (ZodError sale como 500) | Calidad código: 7.5 → 9.0 |
+| DT-028 | packages/logger + metrics existen pero no se importan en app.module | Config: 9.0 → 9.5 |
+| DT-029 | ConversationsService usa `this.prisma` directamente pese a IRepository | Arquitectura: 8.5 → 9.0 |
+
+## Decisiones
+
+### D1 — DT-023: getAgentMetrics → $queryRaw GROUP BY PostgreSQL
+Reemplaza `findMany(take: 50_000)` × 2 por tres `$queryRaw` paralelos con
+GROUP BY. La paginación ocurre en SQL (LIMIT/OFFSET). Sin carga de filas en Node.
+Índices compuestos sobre `(organizationId, ecosystemId, eventType, occurredAt)`.
+
+**Por qué $queryRaw y no Prisma groupBy:**
+`groupBy` no soporta acceso a campos JSON anidados (`payload->>'agentId'`).
+
+### D2 — DT-027: ZodExceptionFilter global — orden correcto en main.ts
+Se crea `packages/auth-server/src/filters/zod-exception.filter.ts`.
+En cada `main.ts`: `useGlobalFilters(new ZodExceptionFilter())` ANTES de `useGlobalPipes`.
+Sin este orden los ZodError salen como HTTP 500.
+
+### D3 — DT-028: LoggerModule + PrometheusModule en app.module.ts
+Cada `app.module.ts` importa pino y prometheus.
+`RequestIdMiddleware` se registra via `configure()` del NestModule.
+
+### D4 — DT-029: ConversationsService sin PrismaService directo
+El acceso `this.prisma` en `handleIncomingMessage` se elimina.
+Todo el acceso a DB va por `IConversationsRepository`. Cierra ADR-002.
+
+## Proyección de puntaje (sin tests/obs/deploy)
+
+| Dimensión            | v8.0 | v9.5 |
+|----------------------|------|------|
+| Arquitectura/Capas   | 8.5  | 9.0  |
+| Contratos/Tipado     | 8.0  | 8.5  |
+| Multi-tenancy        | 9.0  | 9.0  |
+| Comunicación gRPC    | 7.5  | 7.5  |
+| Calidad de código    | 7.5  | 9.0  |
+| Base de datos        | 6.5  | 9.0  |
+| Seguridad/RBAC       | 7.0  | 7.5  |
+| Config/Twelve-Factor | 9.0  | 9.5  |
+| Documentación .claude| 9.5  | 9.5  |
+| **Promedio**         | **8.0** | **9.1** |
+
+## Alternativas descartadas
+
+| Alternativa | Por qué se descartó |
+|---|---|
+| Prisma `groupBy` para agentMetrics | No soporta payload JSON — $queryRaw obligatorio |
+| Mantener ValidationPipe sin ZodFilter | ZodError → HTTP 500 en producción |
+| Herencia de AppModule base | NestJS no tiene herencia limpia de módulos |
+</file>
+
 <file path=".claude/lifecycle/01-fase-desarrollo.md">
 # Fase 1 — Desarrollo
 ## Escalones 1, 2, 4 — La base que hace cosmético todo lo demás
@@ -2705,62 +2633,6 @@ backups automáticos, schema como fuente de verdad.
 Migraciones sin tiempo de inactividad, branching de schema, connection pooling
 automático. El estándar que Railway intenta aproximar. El principio clave:
 el schema nunca es una sorpresa — está versionado y la migración es atómica.
-</file>
-
-<file path=".claude/lifecycle/02-fase-estabilizacion.md">
-# Fase 2 — Estabilización (antes de producción multitenante)
-
-## Objetivo
-
-Que el sistema sea operable en producción con confianza.
-No es sobre features nuevos — es sobre saber cuándo algo se rompe
-y poder arreglarlo antes de que el cliente lo note.
-
-## Escalones en esta fase
-
-| # | Escalón | Estado | ADR |
-|---|---------|--------|-----|
-| 3 | Infraestructura y Red | ⚠️ Parcial | — |
-| 5 | CI/CD y Despliegues | 🔴 En ejecución | ADR-008 |
-| 6 | Observabilidad y Operaciones | 🔴 En ejecución | ADR-008 |
-
-## Tareas concretas (en orden)
-
-### CI/CD (Escalón 5)
-
-- [x] `.github/workflows/ci-chatia.yml` — lint + typecheck + test + build
-- [x] `.github/workflows/ci-pasarelapagos.yml`
-- [x] `.github/workflows/ci-notificaciones.yml`
-- [x] `.github/workflows/ci-analytics.yml`
-- [x] `.github/workflows/ci-workers.yml`
-- [ ] `.github/workflows/ci-packages.yml` — proto + auth-server + grpc-client
-- [ ] Branch protection rules en GitHub (bloquear merge sin CI verde)
-- [x] `jest.config.ts` con `coverageThreshold` en cada servicio
-
-### Observabilidad (Escalón 6)
-
-- [x] `packages/logger/` — `createPinoLogger()` compartido
-- [x] `packages/metrics/` — `createPrometheusModule()` compartido
-- [x] `X-Request-Id` middleware en cada servicio
-- [ ] Propagación de requestId en metadata gRPC
-- [x] `/metrics` endpoint en cada servicio
-- [ ] Health check enriquecido (DB + Redis + BullMQ + CBs)
-- [ ] Dashboard Grafana Cloud con métricas base
-
-### Tests (Escalón 1 — completar)
-
-- [ ] `jest.config.ts` base en `packages/` reutilizable
-- [ ] Tests de dominio: `conversations`, `payments`
-- [ ] Integration tests: contratos HTTP críticos (payments, conversations, auth)
-- [ ] Suite multi-tenant: cross-ecosystem isolation test por servicio
-- [ ] 85% cobertura enforceada en CI
-
-## Criterio de salida de esta fase
-
-- Todo PR en `main` pasa CI completo (lint + type + test + build)
-- Todos los servicios tienen `/metrics` con al menos request_duration y errors
-- Logs en JSON en producción con requestId trazable
-- Health checks usados por Railway para restart automático
 </file>
 
 <file path=".claude/lifecycle/03-fase-hardening.md">
@@ -3287,46 +3159,6 @@ y cómo saber que está hecho. En orden de ejecución dentro de cada fase.
 Actualizar este resumen en cada sprint.
 </file>
 
-<file path=".claude/lifecycle/README.md">
-# Lifecycle — ecosistema-ms
-
-## Puntaje actual (auditado 2026-09-12)
-
-**7.6 / 10** — código real leído directamente
-
-| Dimensión | Puntaje |
-|-----------|---------|
-| Multi-tenancy | 9.0 ✅ |
-| Documentación .claude | 9.5 ✅ |
-| Config/Twelve-Factor | 8.5 🟡 |
-| Arquitectura/Capas | 7.5 🟡 |
-| Contratos/Tipado | 7.5 🟡 |
-| Comunicación gRPC | 7.5 🟡 |
-| Seguridad/RBAC | 7.5 🟡 |
-| Calidad de código | 7.0 🟡 |
-| Base de datos | 6.5 🔴 |
-
-## Para llegar al 9.0 real
-
-| Tarea | Impacto estimado |
-|-------|-----------------|
-| x.sh con los 5 servicios | +0.7 |
-| Parche DT-023 (analytics-backend) | +0.8 |
-| Refactor handleIncomingMessage | +0.3 |
-| Health controller pasarela | +0.2 |
-
-**Con esas 4 tareas: 9.6 proyectado**
-
-## Fases
-
-| Fase | Escalones | Estado |
-|------|-----------|--------|
-| Desarrollo (1,2,4) | Arquitectura, Config, DB | 🟡 7.8 promedio |
-| Estabilización (3,5,6) | Infra, CI/CD, Obs | 🔴 Pendiente |
-| Hardening (7,8,10) | SecOps, Privacidad, Async | ⚪ Futuro |
-| Escala (9,11,12,13) | HA, Chaos, FinOps | ⚪ Futuro |
-</file>
-
 <file path=".claude/modules/chatia-backend/agents.md">
 # Módulo: agents (Agentes IA)
 
@@ -3616,6 +3448,107 @@ El `RoutingService` decide qué proveedor usar según la configuración del tena
 **No modificar la interface sin ADR.**
 </file>
 
+<file path=".claude/patches/DT-023-analytics-agent-metrics.md">
+# Parche DT-023 — getAgentMetrics: reemplazar in-memory aggregation por SQL
+
+## Problema
+
+`getAgentMetrics` en `analytics-backend/src/analytics/analytics.service.ts`
+carga hasta 100K rows en memoria con dos `findMany(..., take: 50_000)` separados
+y los agrega en Node.js. En producción con múltiples organizaciones esto es
+una bomba de tiempo de memoria y latencia.
+
+## Solución
+
+Reemplazar los dos `findMany` por dos `groupBy` de Prisma que hacen la
+agregación en PostgreSQL:
+
+```typescript
+// ANTES — dos findMany con take 50_000 (bug de escala)
+const [assigned, resolved] = await Promise.all([
+  this.prisma.analyticsEvent.findMany({
+    where: { organizationId, ecosystemId, eventType: 'conversation.assigned', ... },
+    select: { payload: true },
+    take: 50_000,
+  }),
+  this.prisma.analyticsEvent.findMany({ ... take: 50_000 }),
+]);
+// ... agrupación en Node.js
+
+// DESPUÉS — GROUP BY en PostgreSQL
+const [assignedGroups, resolvedGroups] = await Promise.all([
+  this.prisma.$queryRaw<Array<{ agent_id: string; count: bigint }>>`
+    SELECT
+      payload->>'agentId' AS agent_id,
+      COUNT(*) AS count
+    FROM "AnalyticsEvent"
+    WHERE
+      "organizationId" = ${organizationId}
+      AND "ecosystemId"  = ${ecosystemId}
+      AND "eventType"    = 'conversation.assigned'
+      AND "occurredAt" BETWEEN ${from} AND ${to}
+      AND payload->>'agentId' IS NOT NULL
+    GROUP BY payload->>'agentId'
+    ORDER BY count DESC
+    LIMIT ${limit} OFFSET ${offset}
+  `,
+  this.prisma.$queryRaw<Array<{ agent_id: string; count: bigint }>>`
+    SELECT
+      payload->>'agentId' AS agent_id,
+      COUNT(*) AS count
+    FROM "AnalyticsEvent"
+    WHERE
+      "organizationId" = ${organizationId}
+      AND "ecosystemId"  = ${ecosystemId}
+      AND "eventType"    = 'conversation.resolved_by_agent'
+      AND "occurredAt" BETWEEN ${from} AND ${to}
+      AND payload->>'agentId' IS NOT NULL
+    GROUP BY payload->>'agentId'
+  `,
+]);
+
+const resolvedMap = new Map(resolvedGroups.map(r => [r.agent_id, Number(r.count)]));
+const agents = assignedGroups.map(a => ({
+  agentId:  a.agent_id,
+  assigned: Number(a.count),
+  resolved: resolvedMap.get(a.agent_id) ?? 0,
+}));
+
+const [{ count: total }] = await this.prisma.$queryRaw<[{ count: bigint }]>`
+  SELECT COUNT(DISTINCT payload->>'agentId') AS count
+  FROM "AnalyticsEvent"
+  WHERE "organizationId" = ${organizationId}
+    AND "ecosystemId"    = ${ecosystemId}
+    AND "eventType"      = 'conversation.assigned'
+    AND "occurredAt" BETWEEN ${from} AND ${to}
+`;
+
+return { agents, total: Number(total) };
+```
+
+## Índice requerido en schema.prisma
+
+```prisma
+model AnalyticsEvent {
+  // ... campos existentes
+  @@index([organizationId, ecosystemId, eventType, occurredAt])
+  @@index([organizationId, ecosystemId, occurredAt])
+}
+```
+
+## Test requerido
+
+```typescript
+it('no carga rows en memoria para organización con 100K eventos', async () => {
+  // Mock del prisma.$queryRaw para verificar que se llama con GROUP BY
+  const queryRawSpy = jest.spyOn(prisma, '$queryRaw').mockResolvedValue([]);
+  await service.getAgentMetrics({ organizationId: 'org1', ecosystemId: 'eco1', from, to });
+  expect(queryRawSpy).toHaveBeenCalled();
+  expect(prisma.analyticsEvent.findMany).not.toHaveBeenCalled();
+});
+```
+</file>
+
 <file path=".claude/roadmap/auditoria-multitenant.md">
 # Auditoría multi-tenant — queries sin ecosystemId
 
@@ -3698,6 +3631,79 @@ it('no retorna datos de otro ecosistema', async () => {
   // Resultado debe ser vacío o 403
 });
 ```
+</file>
+
+<file path=".claude/AUDIT-LAST.md">
+# AUDIT-LAST — ecosistema-ms
+
+**Fecha:** 2026-09-12
+**Auditor:** Claude (lectura directa del código fuente en ecosistema-ms.xml)
+**Puntaje real:** 7.6 / 10
+**Puntaje proyectado (sesiones anteriores):** 8.3 — 9.1 / 10
+**Desincronización:** +0.7 a +1.5 puntos sobre lo real
+
+---
+
+## Puntaje por dimensión (sin tests, observabilidad ni deploy)
+
+| Dimensión            | Proyectado | **Real** | Δ     | Evidencia en código |
+|----------------------|------------|----------|-------|---------------------|
+| Arquitectura/Capas   | 9.0        | **7.5**  | -1.5  | AssignmentService, EcosystemService, KbDocumentService, AuditService todos con PrismaService directo. ConversationsService viola IConversationsRepository en handleIncomingMessage (this.prisma.channelAccount.findUnique directo) |
+| Contratos/Tipado     | 8.5        | **7.5**  | -1.0  | ZodExceptionFilter existe en auth-server y main.ts de chatia+pagos. Notificaciones, analytics, workers sin ZodFilter — ZodError sale como 500 en esos 3 servicios |
+| Multi-tenancy        | 9.0        | **9.0**  | =     | FASE 5 real. Todas las queries críticas con ecosystemId + organizationId. El único gap (DT-015 Conversation via join) es conocido y documentado |
+| Comunicación gRPC    | 7.5        | **7.5**  | =     | Protos correctos. keepalive options en chatia y pagos. Workers usa CB propio sobre Redis (distinto de opossum estándar — inconsistencia menor) |
+| Calidad de código    | 9.0        | **7.0**  | -2.0  | status as any en campaigns.service.ts, casts Prisma.AuditLogCreateInput/WhereInput (schema no generado aún), EmbeddingService es stub usando Groq chat en vez de modelo de embeddings real, FaqIngestProcessor es TODO explícito |
+| Base de datos        | 9.0        | **6.5**  | -2.5  | getAgentMetrics con take: 50_000 × 2 sigue intacto — x.sh no llegó a analytics-backend. Índices compuestos no aplicados. Health controller de pasarela retorna { status: ok } hardcodeado sin SELECT 1 |
+| Seguridad/RBAC       | 7.5        | **7.5**  | =     | Guards en auth-server correctos. RBAC documentado. Helmet pendiente de verificar en todos |
+| Config/Twelve-Factor | 9.5        | **8.5**  | -1.0  | CacheService con degradación elegante (REDIS_ENABLED=false). Pino en chatia+pagos. App.module.ts de los 5 servicios sin LoggerModule+PrometheusModule importados |
+| Documentación .claude| 9.5        | **9.5**  | =     | ADR-001..009, checklists, reglas duras, lifecycle, patches. El punto más sólido del sistema |
+| **PROMEDIO**         | **9.1**    | **7.6**  | **-1.5** | |
+
+---
+
+## Causa raíz de la desincronización
+
+### Causa 1 — x.sh corrió sobre 2 de 5 servicios
+El último x.sh corrió desde un directorio que no tenía notificaciones-backend,
+analytics-backend ni workers-backend. El 60% del sistema quedó sin:
+- ZodExceptionFilter en main.ts
+- LoggerModule + PrometheusModule en app.module.ts
+- jest.config.ts con coverageThreshold
+- RequestIdMiddleware registrado
+
+### Causa 2 — Domain/Repository más superficial de lo que parecía
+El ADR-002 dice "PENDIENTE DE IMPLEMENTAR". El código lo confirma:
+Solo conversations/ y payments/ tienen repository interface.
+El resto (assignment, ecosystem, kb-document, audit, campaigns) usa PrismaService directo.
+ConversationsService viola su propio contrato en handleIncomingMessage.
+
+### Causa 3 — Base de datos no mejoró
+getAgentMetrics con take: 50_000 sigue igual desde septiembre.
+analytics-backend no estaba en el checkout cuando corrió el x.sh de ADR-009.
+
+---
+
+## Tareas concretas para llegar al 9.0 real
+
+| Prioridad | Tarea | Impacto |
+|-----------|-------|---------|
+| P0 | Correr x.sh (ADR-009) con los 5 servicios presentes | +0.5 Contratos, +1.0 Config |
+| P0 | Aplicar parche DT-023 en analytics-backend manualmente | +2.5 Base de datos |
+| P1 | Refactorizar handleIncomingMessage para usar solo IConversationsRepository | +0.5 Arquitectura |
+| P1 | Health controller pasarela: agregar SELECT 1 a la DB | +0.3 Base de datos |
+| P2 | EmbeddingService: migrar a modelo real (Sprint 4 pendiente) | +0.5 Calidad |
+| P2 | Eliminar status as any en campaigns — usar enum cast tipado | +0.2 Calidad |
+
+---
+
+## Lo que NO está desincronizado (correcto en código Y en proyección)
+
+- Multi-tenancy: 9.0 real — auditoria FASE 5 fue real
+- Documentación .claude: 9.5 — ADRs, reglas duras, lifecycle son sólidos
+- gRPC contratos: protos correctos, keepalive en los servicios que corrió el x.sh
+- BullMQ + idempotencia: ADR-003 implementado correctamente
+- Circuit breakers: opossum en chatia+pagos+notificaciones, CB Redis propio en workers
+- Lock distribuido: SET NX EX correcto en analytics y workers (ADR-006)
 </file>
 
 <file path=".claude/README.md">
@@ -4225,142 +4231,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleDestroy() {
     await this.$disconnect();
     await this.pool.end();
-  }
-}
-</file>
-
-<file path="analytics-backend/src/app.module.ts">
-// analytics-backend/src/app.module.ts
-import { Module }         from '@nestjs/common';
-import { ConfigModule }   from '@nestjs/config';
-import { BullModule }     from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
-import { CacheModule }    from '@nestjs/cache-manager';
-import { PrismaModule }    from './prisma/prisma.module.js';
-import { HealthModule }    from './health/health.module.js';
-import { AnalyticsModule } from './analytics/analytics.module.js';
-import { GrpcModule }      from './grpc/grpc.module.js';
-@Module({
-  imports: [
-    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
-    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
-    ConfigModule.forRoot({ isGlobal: true }),
-    ScheduleModule.forRoot(),
-    CacheModule.register({ isGlobal: true, ttl: 5 * 60 * 1_000 }),
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
-    }),
-    PrismaModule,
-    HealthModule,
-    AnalyticsModule,
-    GrpcModule,
-  ],
-})
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(RequestIdMiddleware)
-      .forRoutes({ path: "*", method: RequestMethod.ALL });
-  }
-}
-</file>
-
-<file path="analytics-backend/package.json">
-{
-  "name": "analytics-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "typecheck": "tsc --noEmit",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
   }
 }
 </file>
@@ -7904,144 +7774,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
 }
 </file>
 
-<file path="notificaciones-backend/src/app.module.ts">
-// notificaciones-backend/src/app.module.ts
-import { Module }               from '@nestjs/common';
-import { ConfigModule }         from '@nestjs/config';
-import { BullModule }           from '@nestjs/bullmq';
-import { ScheduleModule }       from '@nestjs/schedule';
-import { PrismaModule }         from './prisma/prisma.module.js';
-import { HealthModule }         from './health/health.module.js';
-import { NotificationsModule }  from './notifications/notifications.module.js';
-import { PreferencesModule }    from './preferences/preferences.module.js';
-import { GrpcModule }           from './grpc/grpc.module.js';
-import { MetricsModule }        from './metrics/metrics.module.js';
-@Module({
-  imports: [
-    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
-    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
-    ConfigModule.forRoot({ isGlobal: true }),
-    ScheduleModule.forRoot(),
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
-    }),
-    PrismaModule,
-    MetricsModule,
-    HealthModule,
-    NotificationsModule,
-    PreferencesModule,
-    GrpcModule,
-  ],
-})
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(RequestIdMiddleware)
-      .forRoutes({ path: "*", method: RequestMethod.ALL });
-  }
-}
-</file>
-
-<file path="notificaciones-backend/package.json">
-{
-  "name": "notificaciones-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "typecheck": "tsc --noEmit",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
-  }
-}
-</file>
-
 <file path="packages/auth-server/src/decorators/public.decorator.ts">
 import { SetMetadata } from "@nestjs/common";
 export const IS_PUBLIC_KEY = "isPublic";
@@ -10385,61 +10117,6 @@ import { TenantThrottlerGuard } from './common/guards/tenant-throttler.guard';
 export class AppModule {}
 </file>
 
-<file path="pasarelapagos-backend/src/main.ts">
-import 'reflect-metadata';
-import { NestFactory }         from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { ValidationPipe }      from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger }              from 'nestjs-pino';
-import { join }                from 'path';
-import { AppModule }           from './app.module.js';
-import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  // ── Pino structured logger ─────────────────────────────────────────────
-  app.useLogger(app.get(Logger));
-  // ── gRPC microservice ──────────────────────────────────────────────────
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package:   'pagos',
-      protoPath:  join(process.cwd(), 'proto', 'pagos.proto'),
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5002'}`,
-      channelOptions: {
-        'grpc.keepalive_time_ms':             10_000,
-        'grpc.keepalive_timeout_ms':           5_000,
-        'grpc.keepalive_permit_without_calls':     1,
-        'grpc.http2.max_pings_without_data':       0,
-      },
-    },
-  });
-  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
-  app.useGlobalFilters(new ZodExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist:            true,
-    forbidNonWhitelisted: true,
-    transform:            true,
-  }));
-  // ── Swagger ────────────────────────────────────────────────────────────
-  const swaggerCfg = new DocumentBuilder()
-    .setTitle('pasarelapagos-backend')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
-  // ── Arranque ───────────────────────────────────────────────────────────
-  await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3001';
-  await app.listen(port);
-  app.get(Logger).log(
-    `HTTP:${port}  gRPC:5002`,
-    'pasarelapagos-backend',
-  );
-}
-void bootstrap();
-</file>
-
 <file path="workers-backend/src/campaigns/campaigns.module.ts">
 // workers-backend/src/campaigns/campaigns.module.ts
 import { Module }       from '@nestjs/common';
@@ -11044,99 +10721,68 @@ Cada decisión de degradación debe estar documentada aquí antes de llegar a pr
    compartida entre réplicas, va a Redis.
 </file>
 
-<file path=".claude/architecture/03-reglas-duras.md">
-# Reglas duras — checklist de code review
+<file path=".claude/checklists/observabilidad.md">
+# Checklist — Observabilidad por microservicio
 
-## Severidades
+## Nivel 1 — Mínimo viable (antes de producción)
 
-- 🔴 BLOQUEANTE — no se mergea hasta resolver
-- 🟡 WARNING — se mergea con ticket de deuda abierto
-- 🔵 CONVENCIÓN — se comenta en PR pero no bloquea
+### Logs estructurados
+- [ ] `pino` instalado en el servicio
+- [ ] `main.ts` usa `createPinoLogger()` de `packages/logger`
+- [ ] En producción (`NODE_ENV=production`): JSON sin colores
+- [ ] En local: `pino-pretty` con colores
+- [ ] Todo log incluye: `service`, `requestId`, `ecosystemId` (cuando aplica)
 
----
+### Request ID
+- [ ] `RequestIdMiddleware` aplicado globalmente en `app.module.ts`
+- [ ] `X-Request-Id` se lee del header entrante o se genera UUID v4
+- [ ] El requestId se propaga al AsyncLocalStorage disponible en el service
+- [ ] Los clientes gRPC incluyen `x-request-id` en el metadata del call
 
-## Backend — todas las reglas aplican a los 5 microservicios
+### Health check
+- [ ] `GET /health` retorna 200 cuando todo está ok, 503 cuando algo falla
+- [ ] Incluye: estado de DB (Prisma), Redis, BullMQ queues (si aplica)
+- [ ] Incluye: estado de circuit breakers por key
+- [ ] Railway usa este endpoint como health check del servicio
 
-### 🔴 Ningún servicio reimplementa firebaseAuth/tenantContext a mano
-Usar los guards de `@ecosistema-ms/auth-server`.
-→ Enforcement objetivo: `dependency-cruiser` rule `no-local-firebase-verify`
-→ Estado: manual (pendiente)
+## Nivel 2 — Métricas Prometheus
 
-### 🔴 Cero DTOs nuevos con class-validator
-Todo input nuevo = schema Zod colocado inline en el controller REST.
-Los controllers gRPC no necesitan Zod (protobuf valida el transporte).
-→ Enforcement objetivo: ESLint rule `@ecosistema-ms/no-new-class-validator`
-→ Estado: BLOQUEANTE activo — ver ADR-001
+- [ ] `@willsoto/nestjs-prometheus` instalado
+- [ ] `PrometheusModule` en `app.module.ts`
+- [ ] Endpoint `/metrics` registrado (solo accesible desde red interna Railway)
+- [ ] Métricas base configuradas:
+  - [ ] `http_request_duration_seconds` (histogram por ruta y método)
+  - [ ] `http_requests_total` (counter por ruta, método y status)
+  - [ ] `bullmq_job_duration_seconds` (por queue y tipo de job)
+  - [ ] `bullmq_job_failures_total` (por queue)
+- [ ] Métricas de negocio (al menos una por servicio):
+  - chatia: `conversations_created_total`, `messages_processed_total`
+  - pagos: `payments_created_total`, `payment_provider_calls_total`
+  - analytics: `events_persisted_total`, `projections_duration_seconds`
+  - notificaciones: `notifications_sent_total`, `notifications_failed_total`
+  - workers: `jobs_processed_total`, `campaign_recipients_dispatched_total`
+- [ ] Circuit breaker state como gauge: `circuit_breaker_state{key, service}`
 
-### 🔴 Todo query Prisma lleva ecosystemId + organizationId en el where
-Un query sin scope es filtración de datos entre clientes.
-→ Enforcement objetivo: ESLint rule `@ecosistema-ms/no-unscoped-prisma-query`
-→ Estado: manual — revisión obligatoria en PR
+## Nivel 3 — Dashboard
 
-### 🔴 Ningún service importa PrismaService directamente (post-migración)
-Una vez que un módulo migra a Repository, el service no puede importar Prisma.
-→ Enforcement objetivo: `dependency-cruiser` rule `no-prisma-in-service`
-→ Estado: no aplica aún — Domain/Repository pendiente en todos los servicios
+- [ ] Grafana Cloud conectado al endpoint `/metrics` de cada servicio
+- [ ] Dashboard base con: request rate, error rate, latency p50/p95/p99
+- [ ] Alert: error rate > 5% en 5 min → alerta Slack/email
+- [ ] Alert: circuit breaker OPEN → alerta inmediata
 
-### 🔴 Ningún import cruza la frontera entre microservicios
-Un servicio solo puede importar de: su propia carpeta + `packages/*`.
-→ Enforcement objetivo: `dependency-cruiser` rule `no-cross-service-import`
-→ Estado: manual
+## Comando de verificación rápida
 
-### 🔴 Cero `as any` y `as unknown as` en repositories
-Usar `toEntity()` privado que mapea Prisma → dominio campo por campo.
-Excepción documentada: campos JSONB de Prisma marcados con `// @ecosistema-ms/jsonb-cast`.
-→ Enforcement objetivo: ESLint `no-explicit-any` + `no-unsafe-assignment`
-→ Estado: manual — molde a crear en conversations/ de chatia-backend
+```bash
+# Verificar que /metrics responde en cada servicio
+for port in 3000 3001 3002 3003 3004; do
+  echo "=== Puerto $port ===" && curl -s http://localhost:$port/metrics | head -5
+done
 
-### 🔴 Ningún controller gRPC con lógica de negocio
-El controller gRPC es un adaptador de transporte.
-Toda lógica condicional, toda validación de negocio → va en el Service.
-→ Estado: manual — revisión en PR
-
-### 🔴 Todo .proto nuevo tiene su módulo en packages/grpc-client
-Agregar el .proto sin el módulo cliente es dejar el contrato sin consumidor tipado.
-→ Estado: manual
-
-### 🔴 Ningún servicio llama a otro por HTTP si existe el .proto
-Si el contrato gRPC está definido, la llamada HTTP es un bypass del contrato.
-Excepción documentada: cuando el .proto no existe aún → `// TODO(grpc): ...`
-→ Estado: manual
-
-### 🟡 Un test de domain nunca importa @nestjs/* ni @prisma/client
-El domain es lógica pura — si necesita NestJS para testearse, la separación falló.
-→ Estado: no aplica aún — Domain pendiente
-
-### 🟡 Circuit-breaker debe tener timeout y fallback documentados
-El `CircuitBreakerService` en `chatia-backend/common/` opera en memoria.
-Con más de 1 réplica en Railway, el circuit-breaker pierde estado entre réplicas.
-Documentar el comportamiento esperado con múltiples réplicas antes de escalar.
-→ Estado: pendiente de decisión antes de escalar
-
-### 🔵 Carpetas BLOQUEANTES no se modifican sin ADR
-Ver `services/<servicio>.md` para la clasificación por servicio.
-Cambiar la interfaz de un canal, el contrato de un provider, o los módulos
-de infraestructura requiere ADR previo.
-→ Estado: convención — se hace visible en PR
-
----
-
-## Reglas agregadas por ADR-009
-
-### 🔴 ZodExceptionFilter va ANTES que ValidationPipe en main.ts
-Sin este orden, los ZodError del body-parsing salen como HTTP 500 en producción.
-```ts
-app.useGlobalFilters(new ZodExceptionFilter());  // ← primero siempre
-app.useGlobalPipes(new ValidationPipe({ ... })); // ← después
+# Verificar /health
+for port in 3000 3001 3002 3003 3004; do
+  echo "=== /health :$port ===" && curl -s http://localhost:$port/health | jq .
+done
 ```
-
-### 🔴 app.module.ts sin LoggerModule o PrometheusModule no va a Railway
-Sin pino: logs ilegibles en producción. Sin /metrics: invisible para alertas.
-Verificar antes de merge: `grep -l "LoggerModule" */src/app.module.ts`
-
-### 🔴 Service con IRepository inyectado no puede tener this.prisma
-Si el service inyecta `@Inject(TOKEN) private repo: IRepo`,
-acceder a `this.prisma` rompe ADR-002. Todo acceso DB va por el repo.
 </file>
 
 <file path=".claude/contracts/tenant-context.md">
@@ -11347,6 +10993,102 @@ Ser específico — el "qué", no el "cómo".
 - Archivos clave afectados
 - Otros ADRs relacionados
 - Checklists actualizados por este ADR
+</file>
+
+<file path=".claude/lifecycle/02-fase-estabilizacion.md">
+# Fase 2 — Estabilización (antes de producción multitenante)
+
+## Objetivo
+
+Que el sistema sea operable en producción con confianza.
+No es sobre features nuevos — es sobre saber cuándo algo se rompe
+y poder arreglarlo antes de que el cliente lo note.
+
+## Escalones en esta fase
+
+| # | Escalón | Estado | ADR |
+|---|---------|--------|-----|
+| 3 | Infraestructura y Red | ⚠️ Parcial | — |
+| 5 | CI/CD y Despliegues | 🔴 En ejecución | ADR-008 |
+| 6 | Observabilidad y Operaciones | 🔴 En ejecución | ADR-008 |
+
+## Tareas concretas (en orden)
+
+### CI/CD (Escalón 5)
+
+- [x] `.github/workflows/ci-chatia.yml` — lint + typecheck + test + build
+- [x] `.github/workflows/ci-pasarelapagos.yml`
+- [x] `.github/workflows/ci-notificaciones.yml`
+- [x] `.github/workflows/ci-analytics.yml`
+- [x] `.github/workflows/ci-workers.yml`
+- [ ] `.github/workflows/ci-packages.yml` — proto + auth-server + grpc-client
+- [ ] Branch protection rules en GitHub (bloquear merge sin CI verde)
+- [x] `jest.config.ts` con `coverageThreshold` en cada servicio
+
+### Observabilidad (Escalón 6)
+
+- [x] `packages/logger/` — `createPinoLogger()` compartido
+- [x] `packages/metrics/` — `createPrometheusModule()` compartido
+- [x] `X-Request-Id` middleware en cada servicio
+- [ ] Propagación de requestId en metadata gRPC
+- [x] `/metrics` endpoint en cada servicio
+- [ ] Health check enriquecido (DB + Redis + BullMQ + CBs)
+- [ ] Dashboard Grafana Cloud con métricas base
+
+### Tests (Escalón 1 — completar)
+
+- [ ] `jest.config.ts` base en `packages/` reutilizable
+- [ ] Tests de dominio: `conversations`, `payments`
+- [ ] Integration tests: contratos HTTP críticos (payments, conversations, auth)
+- [ ] Suite multi-tenant: cross-ecosystem isolation test por servicio
+- [ ] 85% cobertura enforceada en CI
+
+## Criterio de salida de esta fase
+
+- Todo PR en `main` pasa CI completo (lint + type + test + build)
+- Todos los servicios tienen `/metrics` con al menos request_duration y errors
+- Logs en JSON en producción con requestId trazable
+- Health checks usados por Railway para restart automático
+</file>
+
+<file path=".claude/lifecycle/README.md">
+# Lifecycle — ecosistema-ms
+
+## Puntaje actual (auditado 2026-09-12)
+
+**7.6 / 10** — código real leído directamente
+
+| Dimensión | Puntaje |
+|-----------|---------|
+| Multi-tenancy | 9.0 ✅ |
+| Documentación .claude | 9.5 ✅ |
+| Config/Twelve-Factor | 8.5 🟡 |
+| Arquitectura/Capas | 7.5 🟡 |
+| Contratos/Tipado | 7.5 🟡 |
+| Comunicación gRPC | 7.5 🟡 |
+| Seguridad/RBAC | 7.5 🟡 |
+| Calidad de código | 7.0 🟡 |
+| Base de datos | 6.5 🔴 |
+
+## Para llegar al 9.0 real
+
+| Tarea | Impacto estimado |
+|-------|-----------------|
+| x.sh con los 5 servicios | +0.7 |
+| Parche DT-023 (analytics-backend) | +0.8 |
+| Refactor handleIncomingMessage | +0.3 |
+| Health controller pasarela | +0.2 |
+
+**Con esas 4 tareas: 9.6 proyectado**
+
+## Fases
+
+| Fase | Escalones | Estado |
+|------|-----------|--------|
+| Desarrollo (1,2,4) | Arquitectura, Config, DB | 🟡 7.8 promedio |
+| Estabilización (3,5,6) | Infra, CI/CD, Obs | 🔴 Pendiente |
+| Hardening (7,8,10) | SecOps, Privacidad, Async | ⚪ Futuro |
+| Escala (9,11,12,13) | HA, Chaos, FinOps | ⚪ Futuro |
 </file>
 
 <file path=".claude/modules/analytics-backend/README.md">
@@ -11771,114 +11513,6 @@ indexación de vectores para RAG, DLQ monitoring.
 | `src/jobs/dto/` | Migrar a Zod (son DTOs de payload de BullMQ, no de controllers REST) |
 </file>
 
-<file path=".claude/CLAUDE.md">
-# ecosistema-ms — Contexto para Claude
-
-**Fecha de última auditoría:** 2026-09-12
-**Puntaje real (código auditado):** 7.6 / 10
-**Puntaje proyectado (sesiones anteriores):** 8.3 — 9.1 ← DESINCRONIZADO
-
-> El puntaje 8.3-9.1 de sesiones anteriores asumía que el x.sh corrió
-> sobre los 5 servicios. En realidad corrió sobre 2 (chatia + pagos).
-> El puntaje real auditado directamente en el código es 7.6.
-> Ver .claude/AUDIT-LAST.md para el desglose completo.
-
----
-
-## Stack
-
-- NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
-- gRPC inter-servicio (@nestjs/microservices + @grpc/grpc-js)
-- pnpm 10 workspaces con catalog único
-- Deploy: Railway — 5 servicios separados, mismo repo
-
-## Microservicios
-
-| Servicio | HTTP | gRPC | Estado |
-|----------|------|------|--------|
-| chatia-backend | 3000 | 5001 | ZodFilter + pino ✅ |
-| pasarelapagos-backend | 3001 | 5002 | ZodFilter + pino ✅ |
-| notificaciones-backend | 3002 | 5003 | Sin ZodFilter ⚠️ |
-| analytics-backend | 3003 | 5004 | Sin ZodFilter + DT-023 pendiente ⚠️ |
-| workers-backend | 3004 | 5005 | Sin ZodFilter ⚠️ |
-
-## Lo más sólido
-
-- Multi-tenancy: ecosystemId + organizationId en todas las queries críticas
-- Documentación .claude: ADR-001..009, checklists, reglas duras, lifecycle
-- BullMQ: jobs idempotentes, DLQ en todos los servicios críticos
-- Circuit breakers: opossum (chatia/pagos/notificaciones), Redis CB (workers)
-- Lock distribuido: SET NX EX en analytics projections y workers campaigns
-
-## Las brechas reales hoy
-
-1. Domain/Repository: solo conversations y payments tienen el patrón completo
-2. getAgentMetrics: take: 50_000 × 2 en Node — bomba de escala en analytics
-3. 3 de 5 servicios sin ZodExceptionFilter (ZodError → HTTP 500)
-4. app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule importados
-5. Health controller de pasarela: sin SELECT 1 a la DB
-
-## Próximas tareas (en orden de impacto)
-
-1. Correr x.sh con los 5 servicios presentes en el checkout
-2. Aplicar parche DT-023 (ver .claude/patches/DT-023-analytics-agent-metrics.md)
-3. Refactorizar handleIncomingMessage en ConversationsService
-
-## Regla antes de nueva sesión
-
-Leer en orden: CLAUDE.md → AUDIT-LAST.md → decisions/ADR-009 → roadmap/deuda-tecnica.md
-</file>
-
-<file path="analytics-backend/prisma/schema.prisma">
-// schema.prisma — analytics-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-/// Evento operacional raw — append-only, nunca se actualiza
-
-          model AnalyticsEvent {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  eventType      String
-  payload        Json
-  occurredAt     DateTime
-  processedAt    DateTime @default(now())
-
-  @@index([organizationId, eventType, occurredAt])
-  @@index([occurredAt])
-  @@index([organizationId, occurredAt])
-  @@index([organizationId, ecosystemId, eventType, occurredAt])
-  @@index([organizationId, ecosystemId, occurredAt])
-}
-
-/// Proyeccion materializada — recalculada cada hora por ProjectionsService
-model DailyConversationSummary {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  date           DateTime @db.Date
-  channel        String
-  total          Int      @default(0)
-  resolved       Int      @default(0)
-  escalated      Int      @default(0)
-  avgResponseMin Float    @default(0)
-  calculatedAt   DateTime @default(now())
-
-  @@unique([organizationId, date, channel])
-  @@index([organizationId, date])
-}
-</file>
-
 <file path="analytics-backend/src/analytics/analytics.controller.ts">
 // analytics-backend/src/analytics/analytics.controller.ts
 //
@@ -11998,59 +11632,140 @@ import { PrismaModule }     from '../prisma/prisma.module.js';
 export class HealthModule {}
 </file>
 
-<file path="analytics-backend/src/main.ts">
-import 'reflect-metadata';
-import { NestFactory }         from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { ValidationPipe }      from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger }              from 'nestjs-pino';
-import { join }                from 'path';
-import { AppModule }           from './app.module.js';
-import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  // ── Pino structured logger ─────────────────────────────────────────────
-  app.useLogger(app.get(Logger));
-  // ── gRPC microservice ──────────────────────────────────────────────────
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package:   'analytics',
-      protoPath:  join(process.cwd(), 'proto', 'analytics.proto'),
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5004'}`,
-      channelOptions: {
-        'grpc.keepalive_time_ms':             10_000,
-        'grpc.keepalive_timeout_ms':           5_000,
-        'grpc.keepalive_permit_without_calls':     1,
-        'grpc.http2.max_pings_without_data':       0,
-      },
-    },
-  });
-  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
-  app.useGlobalFilters(new ZodExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist:            true,
-    forbidNonWhitelisted: true,
-    transform:            true,
-  }));
-  // ── Swagger ────────────────────────────────────────────────────────────
-  const swaggerCfg = new DocumentBuilder()
-    .setTitle('analytics-backend')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
-  // ── Arranque ───────────────────────────────────────────────────────────
-  await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3003';
-  await app.listen(port);
-  app.get(Logger).log(
-    `HTTP:${port}  gRPC:5004`,
-    'analytics-backend',
-  );
+<file path="analytics-backend/src/app.module.ts">
+// analytics-backend/src/app.module.ts
+import { Module }         from '@nestjs/common';
+import { ConfigModule }   from '@nestjs/config';
+import { BullModule }     from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
+import { CacheModule }    from '@nestjs/cache-manager';
+import { PrismaModule }    from './prisma/prisma.module.js';
+import { HealthModule }    from './health/health.module.js';
+import { AnalyticsModule } from './analytics/analytics.module.js';
+import { GrpcModule }      from './grpc/grpc.module.js';
+@Module({
+  imports: [
+    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
+    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    CacheModule.register({ isGlobal: true, ttl: 5 * 60 * 1_000 }),
+    BullModule.forRootAsync({
+      useFactory: () => ({
+        connection: {
+          host:     process.env['REDIS_HOST']     ?? 'localhost',
+          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
+          password: process.env['REDIS_PASSWORD'],
+        },
+      }),
+    }),
+    PrismaModule,
+    HealthModule,
+    AnalyticsModule,
+    GrpcModule,
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: "*", method: RequestMethod.ALL });
+  }
 }
-void bootstrap();
+</file>
+
+<file path="analytics-backend/package.json">
+{
+  "name": "analytics-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
 </file>
 
 <file path="chatia-backend/prisma/schema.prisma">
@@ -13379,146 +13094,6 @@ export class WebhooksController {
 }
 </file>
 
-<file path="chatia-backend/src/app.module.ts">
-// chatia-backend/src/app.module.ts
-import { Module }           from '@nestjs/common';
-import { ConfigModule }     from '@nestjs/config';
-import { BullModule }       from '@nestjs/bullmq';
-// Analytics events — ADR-003 A-1.4
-import { AnalyticsEventsModule } from './analytics-events/analytics-events.module.js';
-// Analytics proxy deprecated (eliminar en semana 6 cuando welver migre)
-import { AnalyticsModule }       from './analytics/analytics.module.js';
-// Core modules
-import { PrismaModule }         from './prisma/prisma.module.js';
-import { HealthModule }         from './health/health.module.js';
-import { CommonModule }         from './common/common.module.js';
-import { FirebaseModule }       from './firebase/firebase.module.js';
-import { GroqModule }           from './groq/groq.module.js';
-import { EventsModule }         from './events/events.module.js';
-// Business modules
-import { EcosystemModule }      from './ecosystem/ecosystem.module.js';
-import { OrganizationsModule }  from './organizations/organizations.module.js';
-import { AgentsModule }         from './agents/agents.module.js';
-import { ContactsModule }       from './contacts/contacts.module.js';
-import { ConversationsModule }  from './conversations/conversations.module.js';
-import { MessagesModule }       from './messages/messages.module.js';
-import { ChannelsModule }        from './channels/channel.module.js';
-import { ChannelAccountsModule } from './channel-accounts/channel-accounts.module.js';
-import { AssistantModule }      from './assistant/assistant.module.js';
-import { FaqModule }            from './faq/faq.module.js';
-import { WebhooksModule }       from './webhooks/webhooks.module.js';
-import { NotificationsModule }  from './notifications/notifications.module.js';
-import { WidgetModule }         from './widget/widget.module.js';
-import { InternalModule }       from './internal/internal.module.js';
-import { QueueModule }          from './queue/queue.module.js';
-import { AiConfigModule }       from './ai-config/ai-config.module.js';
-@Module({
-  imports: [
-    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
-    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
-    ConfigModule.forRoot({ isGlobal: true }),
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
-    }),
-    // Infraestructura
-    PrismaModule,
-    FirebaseModule,
-    CommonModule,
-    GroqModule,
-    EventsModule,
-    QueueModule,
-    // Analytics — ADR-003
-    AnalyticsEventsModule,   // producer de eventos hacia analytics-backend
-    AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
-    // Negocio
-    HealthModule,
-    EcosystemModule,
-    OrganizationsModule,
-    AgentsModule,
-    ContactsModule,
-    ConversationsModule,
-    MessagesModule,
-    ChannelsModule,
-    ChannelAccountsModule,
-    AssistantModule,
-    FaqModule,
-    WebhooksModule,
-    NotificationsModule,
-    WidgetModule,
-    InternalModule,
-    AiConfigModule,
-  ],
-})
-export class AppModule implements NestModule {
-  configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(RequestIdMiddleware)
-      .forRoutes({ path: "*", method: RequestMethod.ALL });
-  }
-}
-</file>
-
-<file path="chatia-backend/src/main.ts">
-import 'reflect-metadata';
-import { NestFactory }         from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { ValidationPipe }      from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger }              from 'nestjs-pino';
-import { join }                from 'path';
-import { AppModule }           from './app.module.js';
-import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  // ── Pino structured logger ─────────────────────────────────────────────
-  app.useLogger(app.get(Logger));
-  // ── gRPC microservice ──────────────────────────────────────────────────
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package:   'chatia',
-      protoPath:  join(process.cwd(), 'proto', 'chatia.proto'),
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5001'}`,
-      channelOptions: {
-        'grpc.keepalive_time_ms':             10_000,
-        'grpc.keepalive_timeout_ms':           5_000,
-        'grpc.keepalive_permit_without_calls':     1,
-        'grpc.http2.max_pings_without_data':       0,
-      },
-    },
-  });
-  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
-  app.useGlobalFilters(new ZodExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist:            true,
-    forbidNonWhitelisted: true,
-    transform:            true,
-  }));
-  // ── Swagger ────────────────────────────────────────────────────────────
-  const swaggerCfg = new DocumentBuilder()
-    .setTitle('chatia-backend')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
-  // ── Arranque ───────────────────────────────────────────────────────────
-  await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3000';
-  await app.listen(port);
-  app.get(Logger).log(
-    `HTTP:${port}  gRPC:5001`,
-    'chatia-backend',
-  );
-}
-void bootstrap();
-</file>
-
 <file path="notificaciones-backend/prisma/schema.prisma">
 // schema.prisma — notificaciones-backend
 // Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
@@ -14134,59 +13709,142 @@ export class PreferencesService {
 }
 </file>
 
-<file path="notificaciones-backend/src/main.ts">
-import 'reflect-metadata';
-import { NestFactory }         from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { ValidationPipe }      from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger }              from 'nestjs-pino';
-import { join }                from 'path';
-import { AppModule }           from './app.module.js';
-import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  // ── Pino structured logger ─────────────────────────────────────────────
-  app.useLogger(app.get(Logger));
-  // ── gRPC microservice ──────────────────────────────────────────────────
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package:   'notificaciones',
-      protoPath:  join(process.cwd(), 'proto', 'notificaciones.proto'),
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5003'}`,
-      channelOptions: {
-        'grpc.keepalive_time_ms':             10_000,
-        'grpc.keepalive_timeout_ms':           5_000,
-        'grpc.keepalive_permit_without_calls':     1,
-        'grpc.http2.max_pings_without_data':       0,
-      },
-    },
-  });
-  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
-  app.useGlobalFilters(new ZodExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist:            true,
-    forbidNonWhitelisted: true,
-    transform:            true,
-  }));
-  // ── Swagger ────────────────────────────────────────────────────────────
-  const swaggerCfg = new DocumentBuilder()
-    .setTitle('notificaciones-backend')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
-  // ── Arranque ───────────────────────────────────────────────────────────
-  await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3002';
-  await app.listen(port);
-  app.get(Logger).log(
-    `HTTP:${port}  gRPC:5003`,
-    'notificaciones-backend',
-  );
+<file path="notificaciones-backend/src/app.module.ts">
+// notificaciones-backend/src/app.module.ts
+import { Module }               from '@nestjs/common';
+import { ConfigModule }         from '@nestjs/config';
+import { BullModule }           from '@nestjs/bullmq';
+import { ScheduleModule }       from '@nestjs/schedule';
+import { PrismaModule }         from './prisma/prisma.module.js';
+import { HealthModule }         from './health/health.module.js';
+import { NotificationsModule }  from './notifications/notifications.module.js';
+import { PreferencesModule }    from './preferences/preferences.module.js';
+import { GrpcModule }           from './grpc/grpc.module.js';
+import { MetricsModule }        from './metrics/metrics.module.js';
+@Module({
+  imports: [
+    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
+    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    BullModule.forRootAsync({
+      useFactory: () => ({
+        connection: {
+          host:     process.env['REDIS_HOST']     ?? 'localhost',
+          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
+          password: process.env['REDIS_PASSWORD'],
+        },
+      }),
+    }),
+    PrismaModule,
+    MetricsModule,
+    HealthModule,
+    NotificationsModule,
+    PreferencesModule,
+    GrpcModule,
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: "*", method: RequestMethod.ALL });
+  }
 }
-void bootstrap();
+</file>
+
+<file path="notificaciones-backend/package.json">
+{
+  "name": "notificaciones-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
 </file>
 
 <file path="packages/grpc-client/src/chatia/chatia-grpc.module.ts">
@@ -14935,6 +14593,61 @@ export class PagosGrpcController {
 }
 </file>
 
+<file path="pasarelapagos-backend/src/main.ts">
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'pagos',
+      protoPath:  join(process.cwd(), 'proto', 'pagos.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5002'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
+  });
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('pasarelapagos-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3001';
+  await app.listen(port);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5002`,
+    'pasarelapagos-backend',
+  );
+}
+void bootstrap();
+</file>
+
 <file path="workers-backend/src/campaigns/campaigns.controller.ts">
 // workers-backend/src/campaigns/campaigns.controller.ts
 // Migrado de class-validator → Zod inline (ADR-001)
@@ -15653,98 +15366,6 @@ const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';
 export class JobsModule {}
 </file>
 
-<file path="workers-backend/package.json">
-{
-  "name": "workers-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "typecheck": "tsc --noEmit",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
-  }
-}
-</file>
-
 <file path="tsconfig.base.json">
 {
   "compilerOptions": {
@@ -15772,6 +15393,101 @@ export class JobsModule {}
   },
   "extends": "../tsconfig.base.json"
 }
+</file>
+
+<file path=".claude/architecture/03-reglas-duras.md">
+# Reglas duras — checklist de code review
+
+## Severidades
+
+- 🔴 BLOQUEANTE — no se mergea hasta resolver
+- 🟡 WARNING — se mergea con ticket de deuda abierto
+- 🔵 CONVENCIÓN — se comenta en PR pero no bloquea
+
+---
+
+## Backend — todas las reglas aplican a los 5 microservicios
+
+### 🔴 Ningún servicio reimplementa firebaseAuth/tenantContext a mano
+Usar los guards de `@ecosistema-ms/auth-server`.
+→ Enforcement objetivo: `dependency-cruiser` rule `no-local-firebase-verify`
+→ Estado: manual (pendiente)
+
+### 🔴 Cero DTOs nuevos con class-validator
+Todo input nuevo = schema Zod colocado inline en el controller REST.
+Los controllers gRPC no necesitan Zod (protobuf valida el transporte).
+→ Enforcement objetivo: ESLint rule `@ecosistema-ms/no-new-class-validator`
+→ Estado: BLOQUEANTE activo — ver ADR-001
+
+### 🔴 Todo query Prisma lleva ecosystemId + organizationId en el where
+Un query sin scope es filtración de datos entre clientes.
+→ Enforcement objetivo: ESLint rule `@ecosistema-ms/no-unscoped-prisma-query`
+→ Estado: manual — revisión obligatoria en PR
+
+### 🔴 Ningún service importa PrismaService directamente (post-migración)
+Una vez que un módulo migra a Repository, el service no puede importar Prisma.
+→ Enforcement objetivo: `dependency-cruiser` rule `no-prisma-in-service`
+→ Estado: no aplica aún — Domain/Repository pendiente en todos los servicios
+
+### 🔴 Ningún import cruza la frontera entre microservicios
+Un servicio solo puede importar de: su propia carpeta + `packages/*`.
+→ Enforcement objetivo: `dependency-cruiser` rule `no-cross-service-import`
+→ Estado: manual
+
+### 🔴 Cero `as any` y `as unknown as` en repositories
+Usar `toEntity()` privado que mapea Prisma → dominio campo por campo.
+Excepción documentada: campos JSONB de Prisma marcados con `// @ecosistema-ms/jsonb-cast`.
+→ Enforcement objetivo: ESLint `no-explicit-any` + `no-unsafe-assignment`
+→ Estado: manual — molde a crear en conversations/ de chatia-backend
+
+### 🔴 Ningún controller gRPC con lógica de negocio
+El controller gRPC es un adaptador de transporte.
+Toda lógica condicional, toda validación de negocio → va en el Service.
+→ Estado: manual — revisión en PR
+
+### 🔴 Todo .proto nuevo tiene su módulo en packages/grpc-client
+Agregar el .proto sin el módulo cliente es dejar el contrato sin consumidor tipado.
+→ Estado: manual
+
+### 🔴 Ningún servicio llama a otro por HTTP si existe el .proto
+Si el contrato gRPC está definido, la llamada HTTP es un bypass del contrato.
+Excepción documentada: cuando el .proto no existe aún → `// TODO(grpc): ...`
+→ Estado: manual
+
+### 🟡 Un test de domain nunca importa @nestjs/* ni @prisma/client
+El domain es lógica pura — si necesita NestJS para testearse, la separación falló.
+→ Estado: no aplica aún — Domain pendiente
+
+### 🟡 Circuit-breaker debe tener timeout y fallback documentados
+El `CircuitBreakerService` en `chatia-backend/common/` opera en memoria.
+Con más de 1 réplica en Railway, el circuit-breaker pierde estado entre réplicas.
+Documentar el comportamiento esperado con múltiples réplicas antes de escalar.
+→ Estado: pendiente de decisión antes de escalar
+
+### 🔵 Carpetas BLOQUEANTES no se modifican sin ADR
+Ver `services/<servicio>.md` para la clasificación por servicio.
+Cambiar la interfaz de un canal, el contrato de un provider, o los módulos
+de infraestructura requiere ADR previo.
+→ Estado: convención — se hace visible en PR
+
+---
+
+## Reglas agregadas por ADR-009
+
+### 🔴 ZodExceptionFilter va ANTES que ValidationPipe en main.ts
+Sin este orden, los ZodError del body-parsing salen como HTTP 500 en producción.
+```ts
+app.useGlobalFilters(new ZodExceptionFilter());  // ← primero siempre
+app.useGlobalPipes(new ValidationPipe({ ... })); // ← después
+```
+
+### 🔴 app.module.ts sin LoggerModule o PrometheusModule no va a Railway
+Sin pino: logs ilegibles en producción. Sin /metrics: invisible para alertas.
+Verificar antes de merge: `grep -l "LoggerModule" */src/app.module.ts`
+
+### 🔴 Service con IRepository inyectado no puede tener this.prisma
+Si el service inyecta `@Inject(TOKEN) private repo: IRepo`,
+acceder a `this.prisma` rompe ADR-002. Todo acceso DB va por el repo.
 </file>
 
 <file path=".claude/checklists/README.md">
@@ -15953,293 +15669,112 @@ Para datos críticos (pagos, notificaciones), el patrón es diferente.
 Cero lógica condicional de negocio, cero imports de PrismaService, cero acceso a Redis.
 </file>
 
-<file path=".claude/roadmap/deuda-tecnica.md">
-# Deuda técnica — ecosistema-ms
+<file path=".claude/CLAUDE.md">
+# ecosistema-ms — Contexto para Claude
 
-**Última actualización:** 2026-09-02
+**Fecha de última auditoría:** 2026-09-12
+**Puntaje real (código auditado):** 7.6 / 10
+**Puntaje proyectado (sesiones anteriores):** 8.3 — 9.1 ← DESINCRONIZADO
 
-## ✅ RESUELTOS — todo cerrado
-
-| ID | Deuda | Cómo quedó |
-|----|-------|------------|
-| ~~DT-001~~ | dto/ huérfanas (17 carpetas) | Eliminadas |
-| ~~DT-002~~ | class-validator inline (9 archivos) | Migrado a Zod — 0 imports residuales |
-| ~~DT-003~~ | AllExceptionsFilter no registrado | Registrado en chatia + workers main.ts |
-| ~~DT-004~~ | ConversationsService → PrismaService directo | Migrado a IConversationsRepository |
-| ~~DT-005~~ | PaymentsService → PrismaService directo | PrismaService + IPaymentsRepository coexisten (ver nota) |
-| ~~DT-006~~ | reconciliation.service sin tenantId en where | ConfigService + tenantId dentro del where |
-| ~~DT-007~~ | contacts/ sin Domain/Repository | — (decidido: no aplicar, scope suficiente con organizationId) |
-| ~~DT-008~~ | projects/ sin Domain/Repository | — (ídem, imports dto corregidos a schemas.ts) |
-| ~~DT-009~~ | campaigns/ sin Domain/Repository | — (ídem) |
-| ~~DT-011~~ | notifications.service getStats() sin ecosystemId | ecosystemId en StatsQuery + where |
-| ~~DT-012~~ | analytics getConversationsByDay() sin ecosystemId | ecosystemId en firma + controller |
-| ~~DT-013~~ | Timeouts gRPC no definidos | channelOptions/keepalive en 5 módulos grpc-client |
-| ~~DT-014~~ | preferences.service getPreferences() sin ecosystemId | ecosystemId en where |
-| ~~DT-016~~ | contacts.service import roto class-validator | Reescrito usando schemas.ts |
-| ~~DT-017~~ | OrgContext sin tenantId | tenantId agregado a la interface |
-| ~~DT-018~~ | projects.service imports dto legacy rotos | Migrado a schemas.ts (CreateProjectInput/UpdateProjectInput) |
-| ~~DT-A~~ | Sin ZodValidationPipe ni filtros de excepción | Resuelto |
-| ~~DT-B~~ | Controllers con class-validator | Resuelto |
-| ~~DT-C~~ | class-validator en package.json | Resuelto |
-| ~~DT-D~~ | conversations/ sin domain+repository | Resuelto |
-| ~~DT-E~~ | payments/ sin domain+repository | Resuelto |
-| ~~DT-F~~ | Sin contratos gRPC documentados | Resuelto |
-| ~~DT-G~~ | Sin auditoría multi-tenant | Resuelto |
-
-### Nota de arquitectura — DT-005
-
-`PaymentsService` inyecta tanto `PrismaService` como `IPaymentsRepository`:
-- `IPaymentsRepository` → lecturas simples: `findById`, `findByIdempotencyKey`, `list`
-- `PrismaService` directamente → operaciones que requieren `$transaction` multi-tabla
+> El puntaje 8.3-9.1 de sesiones anteriores asumía que el x.sh corrió
+> sobre los 5 servicios. En realidad corrió sobre 2 (chatia + pagos).
+> El puntaje real auditado directamente en el código es 7.6.
+> Ver .claude/AUDIT-LAST.md para el desglose completo.
 
 ---
 
-## 🟡 PENDIENTE — decisión de arquitectura (no urgente)
+## Stack
 
-| ID | Deuda | Archivo | Acción |
-|----|-------|---------|--------|
-| DT-015 | Modelo `Conversation` sin `ecosystemId` directo en schema | `chatia-backend/prisma/schema.prisma` | Evaluar migración antes de múltiples ecosistemas en prod |
-| DT-010 | CircuitBreakerService en memoria | chatia + pasarelapagos | Migrar a Redis cuando se escale a múltiples instancias |
+- NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
+- gRPC inter-servicio (@nestjs/microservices + @grpc/grpc-js)
+- pnpm 10 workspaces con catalog único
+- Deploy: Railway — 5 servicios separados, mismo repo
 
-### DT-015 — cuándo hacerlo
+## Microservicios
 
-El modelo `Conversation` llega a `ecosystemId` via join `Contact → Organization`.
-Funciona correctamente con un ecosistema. Antes de tener 2+ ecosistemas con datos
-reales en la misma DB, agregar:
+| Servicio | HTTP | gRPC | Estado |
+|----------|------|------|--------|
+| chatia-backend | 3000 | 5001 | ZodFilter + pino ✅ |
+| pasarelapagos-backend | 3001 | 5002 | ZodFilter + pino ✅ |
+| notificaciones-backend | 3002 | 5003 | Sin ZodFilter ⚠️ |
+| analytics-backend | 3003 | 5004 | Sin ZodFilter + DT-023 pendiente ⚠️ |
+| workers-backend | 3004 | 5005 | Sin ZodFilter ⚠️ |
 
-```prisma
-model Conversation {
-  ecosystemId    String
-  organizationId String
-  @@index([ecosystemId, organizationId])
-}
-```
+## Lo más sólido
 
-Luego: `pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation`
+- Multi-tenancy: ecosystemId + organizationId en todas las queries críticas
+- Documentación .claude: ADR-001..009, checklists, reglas duras, lifecycle
+- BullMQ: jobs idempotentes, DLQ en todos los servicios críticos
+- Circuit breakers: opossum (chatia/pagos/notificaciones), Redis CB (workers)
+- Lock distribuido: SET NX EX en analytics projections y workers campaigns
 
----
+## Las brechas reales hoy
 
-## 🔴 NUEVAS — ADR-008 (hacia 10/10)
+1. Domain/Repository: solo conversations y payments tienen el patrón completo
+2. getAgentMetrics: take: 50_000 × 2 en Node — bomba de escala en analytics
+3. 3 de 5 servicios sin ZodExceptionFilter (ZodError → HTTP 500)
+4. app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule importados
+5. Health controller de pasarela: sin SELECT 1 a la DB
 
-| ID | Deuda | Servicio | Acción | Prioridad |
-|----|-------|----------|--------|-----------|
-| ~~DT-019~~ | Sin CI/CD pipeline por servicio | todos | `.github/workflows/ci-{servicio}.yml` | P0 |
-| ~~DT-020~~ | Sin logs estructurados JSON en producción | todos | `pino` logger en `main.ts` | P0 |
-| ~~DT-021~~ | Sin endpoint `/metrics` Prometheus | todos | `@willsoto/nestjs-prometheus` | P1 |
-| ~~DT-022~~ | Sin propagación de `X-Request-Id` en gRPC | todos | metadata gRPC en grpc-client | P1 |
-| ~~DT-023~~ | `getAgentMetrics` carga 100K rows en memoria | analytics | SQL aggregation con GROUP BY | P1 |
-| DT-024 | `CircuitBreakerService` en memoria (multi-pod) | chatia · pagos | migrar a Redis (DT-010) | P2 |
-| DT-025 | Sin tests de aislamiento multi-tenant | todos | `multitenant.spec.ts` por servicio | P1 |
-| ~~DT-026~~ | `coverageThreshold` no configurado en jest | todos | `jest.config.ts` con 85% threshold | P0 |
+## Próximas tareas (en orden de impacto)
 
----
+1. Correr x.sh con los 5 servicios presentes en el checkout
+2. Aplicar parche DT-023 (ver .claude/patches/DT-023-analytics-agent-metrics.md)
+3. Refactorizar handleIncomingMessage en ConversationsService
 
-## ADR-009 (hacia 9.5/10) — resueltas por x.sh
+## Regla antes de nueva sesión
 
-| ID | Deuda | Servicio | Estado |
-|----|-------|----------|--------|
-| ~~DT-027~~ | `main.ts` sin ZodExceptionFilter — ZodError sale como HTTP 500 | todos | ✅ x.sh |
-| ~~DT-028~~ | packages/logger y metrics no importados en app.module.ts | todos | ✅ x.sh |
-| ~~DT-029~~ | ConversationsService accede a `this.prisma` directo (viola ADR-002) | chatia | ✅ x.sh |
-| ~~DT-023~~ | getAgentMetrics carga 100K rows en Node.js | analytics | ✅ x.sh |
-
----
-
-## Auditoría 2026-09-12 — Brechas descubiertas (no estaban documentadas)
-
-| ID | Deuda | Servicio | Severidad | Evidencia |
-|----|-------|----------|-----------|-----------|
-| DT-030 | ConversationsService.handleIncomingMessage usa this.prisma directo pese a IConversationsRepository inyectado | chatia | 🔴 | Viola ADR-002. Línea this.prisma.channelAccount.findUnique en el servicio |
-| DT-031 | Health controller pasarela retorna status ok hardcodeado sin SELECT 1 | pasarela | 🔴 | Railway no detecta caída de DB. health.controller.ts línea 8519 |
-| DT-032 | EmbeddingService genera embeddings via Groq chat prompt — no es un modelo de embeddings real | chatia | 🟡 | Sprint 4 pendiente. DIMENSIONS=384 es inventado |
-| DT-033 | FaqIngestProcessor es stub explícito (TODO Sprint W-2) | workers | 🟡 | No procesa documentos reales. Solo loguea |
-| DT-034 | status as any en campaigns.service.ts — enum cast sin tipo | workers | 🟡 | Línea 17070 — @ecosistema-ms/jsonb-cast comment ausente |
-| DT-035 | app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule | todos | 🟡 | packages creados en ADR-008 pero nunca conectados |
-| DT-036 | ZodExceptionFilter ausente en notificaciones, analytics y workers | 3 svcs | 🔴 | ZodError sale como HTTP 500 en esos servicios |
+Leer en orden: CLAUDE.md → AUDIT-LAST.md → decisions/ADR-009 → roadmap/deuda-tecnica.md
 </file>
 
-<file path=".claude/roadmap/sprints.md">
-# Sprints — ecosistema-ms
+<file path="analytics-backend/prisma/schema.prisma">
+// schema.prisma — analytics-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
 
-**Última actualización:** 2026-09-02
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
 
-## Estado de fases
+datasource db {
+  provider = "postgresql"
+}
 
-| Fase | Descripción | Estado |
-|------|-------------|--------|
-| FASE 0 | Estructura base .claude/ | ✅ COMPLETO |
-| FASE 1 | Carpetas bloqueantes/dinámicas | ✅ COMPLETO |
-| FASE 2 | ADR-001: DTOs → Zod | ✅ COMPLETO — 0 class-validator residuales |
-| FASE 3 | Contratos gRPC documentados | ✅ COMPLETO |
-| FASE 4 | Domain/Repository MOLDE VIVO | ✅ COMPLETO |
-| FASE 5 | Multi-tenant — auditoría queries | ✅ COMPLETO |
-| FASE 6 | Build limpio + tests baseline | 🔴 PRÓXIMA |
+/// Evento operacional raw — append-only, nunca se actualiza
 
----
+          model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  eventType      String
+  payload        Json
+  occurredAt     DateTime
+  processedAt    DateTime @default(now())
 
-## Logros totales
+  @@index([organizationId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, ecosystemId, eventType, occurredAt])
+  @@index([organizationId, ecosystemId, occurredAt])
+}
 
-- ✅ 0 imports de class-validator residuales
-- ✅ 0 carpetas dto/ huérfanas
-- ✅ 0 imports de DTOs legacy rotos
-- ✅ AllExceptionsFilter en todos los main.ts
-- ✅ ConversationsService + PaymentsService migrados a Domain/Repository
-- ✅ DT-006: tenantId en reconciliation (bug de seguridad cerrado)
-- ✅ ecosystemId en analytics, notificaciones y preferences
-- ✅ Timeouts gRPC en los 5 módulos cliente
-- ✅ ZodValidationPipe en todos los controllers
-- ✅ OrgContext con tenantId
-- ✅ projects.service + contacts.service usando schemas.ts
+/// Proyeccion materializada — recalculada cada hora por ProjectionsService
+model DailyConversationSummary {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  date           DateTime @db.Date
+  channel        String
+  total          Int      @default(0)
+  resolved       Int      @default(0)
+  escalated      Int      @default(0)
+  avgResponseMin Float    @default(0)
+  calculatedAt   DateTime @default(now())
 
----
-
-## PRÓXIMA SESIÓN — FASE 6
-
-### Paso 1 — Build limpio (prioridad máxima)
-
-```bash
-pnpm -r build
-```
-
-Errores más probables si aparecen:
-- Algún controller que llame a `getPreferences()` sin pasar `ecosystemId` (nuevo parámetro)
-- Algún controller de `projects` que siga usando `CreateProjectDto` importado
-- `OrgContext` — verificar que los guards de pasarelapagos ya lo poblan con `tenantId`
-
-### Paso 2 — Tests baseline
-
-Ver: `.claude/checklists/testing-desde-cero.md`
-
-Orden sugerido:
-1. Unit tests de domain entities (`payment.entity`, `conversation.entity`)
-2. Integration tests de los repository adapters (Prisma)
-3. E2E del contrato HTTP de cada servicio (Supertest)
-4. Test de cross-tenant: request con ecosystemId A no retorna datos de ecosystemId B
-
-### Paso 3 — DT-015 (cuando haya 2+ ecosistemas en prod)
-
-```bash
-pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation
-```
-
-### Paso 4 — Observabilidad
-
-Ver: `.claude/checklists/observabilidad.md`
-- OpenTelemetry traces activos
-- Prometheus métricas expuestas en /metrics
-- Grafana dashboards por servicio
-
----
-
-## Sprint — x.sh ejecutado el 2026-09-12T19:09:25Z
-
-### Bloque 1 (docs) completado ✓
-- ADR-008 escrito — plan hacia 10/10
-- lifecycle/02-fase-estabilizacion.md actualizado
-- Deudas DT-019..DT-026 registradas
-- Checklists CI/CD y observabilidad creados
-
-### Bloque 2 (code) completado ✓
-- packages/logger creado (@ecosistema-ms/logger con pino)
-- packages/metrics creado (@ecosistema-ms/metrics con Prometheus)
-- RequestIdMiddleware creado en cada servicio
-- jest.config.ts con coverageThreshold (85%) en cada servicio
-- GitHub Actions CI workflow por cada servicio
-- multitenant.spec.ts template en cada servicio
-- Parche DT-023 documentado en .claude/patches/
-
-### Pendiente manual post-ejecución
-- [ ] Importar createLoggerModule() en app.module.ts de cada servicio
-- [ ] Importar createMetricsModule() en app.module.ts de cada servicio
-- [ ] Importar RequestIdMiddleware en app.module.ts de cada servicio
-- [ ] Agregar packages/logger y packages/metrics a pnpm-workspace.yaml
-- [ ] Agregar pino, nestjs-pino, @willsoto/nestjs-prometheus al catalog raíz
-- [ ] Aplicar parche DT-023 en analytics-backend manualmente
-- [ ] Configurar branch protection en GitHub
-- [ ] Completar suite multitenant.spec.ts con tests reales
-
-### Proyección de puntaje post-implementación completa
-| Dimensión      | Antes | Después (proyectado) |
-|----------------|-------|----------------------|
-| Arquitectura   | 7.2   | 8.5                  |
-| Tests          | 3.5   | 9.0                  |
-| Observabilidad | 2.5   | 8.5                  |
-| CI/CD          | 6.0   | 9.0                  |
-| **Promedio**   | **5.8** | **8.8**            |
-
----
-
-## Sprint — x.sh v3 (hacia 9.5/10) — 2026-09-12T19:29:30Z
-**Servicios presentes:** chatia-backend pasarelapagos-backend notificaciones-backend analytics-backend workers-backend
-**Filtro activo:** all
-
-### Entregables
-
-| Archivo | Cambio |
-|---------|--------|
-| `packages/auth-server/src/filters/zod-exception.filter.ts` | ZodExceptionFilter global ✅ |
-| `analytics-backend/src/analytics/analytics.service.ts` | getAgentMetrics → SQL GROUP BY ✅ |
-| `analytics-backend/prisma/schema.prisma` | índices compuestos JSON ✅ |
-| `*/src/main.ts` | ZodExceptionFilter + pino Logger ✅ |
-| `*/src/app.module.ts` | LoggerModule + PrometheusModule + RequestId ✅ |
-| `*/src/common/middleware/request-id.middleware.ts` | X-Request-Id ✅ |
-| `*/jest.config.ts` | coverageThreshold 85% ✅ |
-| `.github/workflows/ci-*.yml` | CI lint+type+test+build ✅ |
-| `*/src/test/multitenant.spec.ts` | template cross-tenant ✅ |
-
-### Deudas cerradas
-~~DT-019~~ ~~DT-020~~ ~~DT-021~~ ~~DT-022~~ ~~DT-023~~ ~~DT-026~~ ~~DT-027~~ ~~DT-028~~ ~~DT-029~~
-
-### Pendientes manuales
-- DT-024: CircuitBreakerService → Redis (cuando escale a 3+ pods)
-- DT-025: completar it.todo() en multitenant.spec.ts
-- DT-015: Conversation sin ecosystemId directo → migración pre multi-ecosistema
-
-### Proyección puntaje (sin tests/obs/deploy)
-| Dimensión | v8.0 | v9.5 |
-|-----------|------|------|
-| Arquitectura/Capas | 8.5 | 9.0 |
-| Calidad de código | 7.5 | 9.0 |
-| Base de datos | 6.5 | 9.0 |
-| Config/Twelve-Factor | 9.0 | 9.5 |
-| **Promedio** | **8.0** | **9.1** |
-
----
-
-## Auditoría real de código — 2026-09-12T19:49:34Z
-
-**Método:** lectura directa del código fuente (ecosistema-ms.xml)
-**Resultado:** puntaje real 7.6/10 vs 8.3-9.1 proyectado en sesiones anteriores
-
-### Desincronización detectada: +1.5 puntos sobre la realidad
-
-La proyección de 8.3-9.1 asumía que el x.sh (ADR-009) corrió sobre los 5
-servicios. En realidad solo corrió sobre chatia-backend y pasarelapagos-backend.
-El resto del sistema no recibió los cambios.
-
-### Puntaje auditado por dimensión
-
-| Dimensión | Real |
-|-----------|------|
-| Arquitectura/Capas | 7.5 |
-| Contratos/Tipado | 7.5 |
-| Multi-tenancy | 9.0 |
-| Comunicación gRPC | 7.5 |
-| Calidad de código | 7.0 |
-| Base de datos | 6.5 |
-| Seguridad/RBAC | 7.5 |
-| Config/Twelve-Factor | 8.5 |
-| Documentación .claude | 9.5 |
-| **Promedio** | **7.6** |
-
-### Nuevas deudas documentadas: DT-030..036
-
-### Para llegar al 9.0 real (no proyectado)
-
-1. x.sh con los 5 servicios en el checkout → +0.7
-2. Parche DT-023 analytics-backend manualmente → +0.8
-3. Refactor handleIncomingMessage → IConversationsRepository → +0.3
-4. Health controller pasarela con SELECT 1 → +0.2
+  @@unique([organizationId, date, channel])
+  @@index([organizationId, date])
+}
 </file>
 
 <file path="analytics-backend/src/grpc/analytics-grpc.controller.ts">
@@ -16333,6 +15868,61 @@ export class AnalyticsGrpcController {
     return { pong: 'analytics-backend', timestamp_unix: Date.now() };
   }
 }
+</file>
+
+<file path="analytics-backend/src/main.ts">
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'analytics',
+      protoPath:  join(process.cwd(), 'proto', 'analytics.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5004'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
+  });
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('analytics-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3003';
+  await app.listen(port);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5004`,
+    'analytics-backend',
+  );
+}
+void bootstrap();
 </file>
 
 <file path="chatia-backend/src/agents/agents.controller.ts">
@@ -16998,110 +16588,199 @@ export class WidgetController {
 }
 </file>
 
-<file path="chatia-backend/package.json">
-{
-  "name": "chatia-backend",
-  "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "scripts": {
-    "build": "prisma generate && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "start:migrate": "prisma migrate deploy",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/event-emitter": "catalog:",
-    "@nestjs/mapped-types": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@nestjs/throttler": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bcryptjs": "catalog:",
-    "bullmq": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "pg": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "socket.io": "^4.8.1",
-    "swagger-ui-express": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "catalog:",
-    "@eslint/js": "catalog:",
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/bcryptjs": "catalog:",
-    "@types/express": "catalog:",
-    "@types/jest": "catalog:",
-    "@types/multer": "^1.4.12",
-    "@types/node": "catalog:",
-    "@types/supertest": "catalog:",
-    "@types/uuid": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "globals": "catalog:",
-    "jest": "catalog:",
-    "prettier": "catalog:",
-    "prisma": "catalog:",
-    "source-map-support": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+<file path="chatia-backend/src/app.module.ts">
+// chatia-backend/src/app.module.ts
+import { Module }           from '@nestjs/common';
+import { ConfigModule }     from '@nestjs/config';
+import { BullModule }       from '@nestjs/bullmq';
+// Analytics events — ADR-003 A-1.4
+import { AnalyticsEventsModule } from './analytics-events/analytics-events.module.js';
+// Analytics proxy deprecated (eliminar en semana 6 cuando welver migre)
+import { AnalyticsModule }       from './analytics/analytics.module.js';
+// Core modules
+import { PrismaModule }         from './prisma/prisma.module.js';
+import { HealthModule }         from './health/health.module.js';
+import { CommonModule }         from './common/common.module.js';
+import { FirebaseModule }       from './firebase/firebase.module.js';
+import { GroqModule }           from './groq/groq.module.js';
+import { EventsModule }         from './events/events.module.js';
+// Business modules
+import { EcosystemModule }      from './ecosystem/ecosystem.module.js';
+import { OrganizationsModule }  from './organizations/organizations.module.js';
+import { AgentsModule }         from './agents/agents.module.js';
+import { ContactsModule }       from './contacts/contacts.module.js';
+import { ConversationsModule }  from './conversations/conversations.module.js';
+import { MessagesModule }       from './messages/messages.module.js';
+import { ChannelsModule }        from './channels/channel.module.js';
+import { ChannelAccountsModule } from './channel-accounts/channel-accounts.module.js';
+import { AssistantModule }      from './assistant/assistant.module.js';
+import { FaqModule }            from './faq/faq.module.js';
+import { WebhooksModule }       from './webhooks/webhooks.module.js';
+import { NotificationsModule }  from './notifications/notifications.module.js';
+import { WidgetModule }         from './widget/widget.module.js';
+import { InternalModule }       from './internal/internal.module.js';
+import { QueueModule }          from './queue/queue.module.js';
+import { AiConfigModule }       from './ai-config/ai-config.module.js';
+@Module({
+  imports: [
+    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
+    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
+    ConfigModule.forRoot({ isGlobal: true }),
+    BullModule.forRootAsync({
+      useFactory: () => ({
+        connection: {
+          host:     process.env['REDIS_HOST']     ?? 'localhost',
+          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
+          password: process.env['REDIS_PASSWORD'],
+        },
+      }),
+    }),
+    // Infraestructura
+    PrismaModule,
+    FirebaseModule,
+    CommonModule,
+    GroqModule,
+    EventsModule,
+    QueueModule,
+    // Analytics — ADR-003
+    AnalyticsEventsModule,   // producer de eventos hacia analytics-backend
+    AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
+    // Negocio
+    HealthModule,
+    EcosystemModule,
+    OrganizationsModule,
+    AgentsModule,
+    ContactsModule,
+    ConversationsModule,
+    MessagesModule,
+    ChannelsModule,
+    ChannelAccountsModule,
+    AssistantModule,
+    FaqModule,
+    WebhooksModule,
+    NotificationsModule,
+    WidgetModule,
+    InternalModule,
+    AiConfigModule,
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: "*", method: RequestMethod.ALL });
   }
 }
+</file>
+
+<file path="chatia-backend/src/main.ts">
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'chatia',
+      protoPath:  join(process.cwd(), 'proto', 'chatia.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5001'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
+  });
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('chatia-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3000';
+  await app.listen(port);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5001`,
+    'chatia-backend',
+  );
+}
+void bootstrap();
+</file>
+
+<file path="notificaciones-backend/src/main.ts">
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'notificaciones',
+      protoPath:  join(process.cwd(), 'proto', 'notificaciones.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5003'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
+  });
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('notificaciones-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3002';
+  await app.listen(port);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5003`,
+    'notificaciones-backend',
+  );
+}
+void bootstrap();
 </file>
 
 <file path="packages/grpc-client/src/analytics/analytics-grpc.module.ts">
@@ -17142,127 +16821,6 @@ export const ANALYTICS_CLIENT_TOKEN = 'ANALYTICS_GRPC_CLIENT';
   exports: [ClientsModule],
 })
 export class AnalyticsGrpcModule {}
-</file>
-
-<file path="pasarelapagos-backend/package.json">
-{
-  "name": "pasarelapagos-backend",
-  "version": "0.0.1",
-  "private": true,
-  "license": "UNLICENSED",
-  "scripts": {
-    "build": "prisma generate && nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
-    "start:migrate": "prisma migrate deploy",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/event-emitter": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@nestjs/throttler": "catalog:",
-    "@opentelemetry/auto-instrumentations-node": "catalog:",
-    "@opentelemetry/exporter-prometheus": "catalog:",
-    "@opentelemetry/sdk-node": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "@types/compression": "^1.7.5",
-    "@types/cookie-parser": "^1.4.8",
-    "axios": "catalog:",
-    "bcryptjs": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "compression": "^1.7.5",
-    "cookie-parser": "^1.4.7",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "mercadopago": "catalog:",
-    "nanoid": "^5.1.5",
-    "nestjs-pino": "catalog:",
-    "opossum": "^8.1.4",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "stripe": "catalog:",
-    "swagger-ui-express": "catalog:",
-    "uuid": "catalog:",
-    "zod": "catalog:"
-  },
-  "devDependencies": {
-    "@eslint/eslintrc": "catalog:",
-    "@eslint/js": "catalog:",
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/bcryptjs": "catalog:",
-    "@types/express": "catalog:",
-    "@types/jest": "catalog:",
-    "@types/node": "catalog:",
-    "@types/supertest": "catalog:",
-    "@types/uuid": "catalog:",
-    "eslint": "catalog:",
-    "eslint-config-prettier": "catalog:",
-    "eslint-plugin-prettier": "catalog:",
-    "globals": "catalog:",
-    "jest": "catalog:",
-    "prettier": "catalog:",
-    "prisma": "catalog:",
-    "source-map-support": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-loader": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
-  }
-}
 </file>
 
 <file path="workers-backend/prisma/schema.prisma">
@@ -17660,6 +17218,710 @@ export class DlqService {
 }
 </file>
 
+<file path="workers-backend/package.json">
+{
+  "name": "workers-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path=".claude/roadmap/deuda-tecnica.md">
+# Deuda técnica — ecosistema-ms
+
+**Última actualización:** 2026-09-02
+
+## ✅ RESUELTOS — todo cerrado
+
+| ID | Deuda | Cómo quedó |
+|----|-------|------------|
+| ~~DT-001~~ | dto/ huérfanas (17 carpetas) | Eliminadas |
+| ~~DT-002~~ | class-validator inline (9 archivos) | Migrado a Zod — 0 imports residuales |
+| ~~DT-003~~ | AllExceptionsFilter no registrado | Registrado en chatia + workers main.ts |
+| ~~DT-004~~ | ConversationsService → PrismaService directo | Migrado a IConversationsRepository |
+| ~~DT-005~~ | PaymentsService → PrismaService directo | PrismaService + IPaymentsRepository coexisten (ver nota) |
+| ~~DT-006~~ | reconciliation.service sin tenantId en where | ConfigService + tenantId dentro del where |
+| ~~DT-007~~ | contacts/ sin Domain/Repository | — (decidido: no aplicar, scope suficiente con organizationId) |
+| ~~DT-008~~ | projects/ sin Domain/Repository | — (ídem, imports dto corregidos a schemas.ts) |
+| ~~DT-009~~ | campaigns/ sin Domain/Repository | — (ídem) |
+| ~~DT-011~~ | notifications.service getStats() sin ecosystemId | ecosystemId en StatsQuery + where |
+| ~~DT-012~~ | analytics getConversationsByDay() sin ecosystemId | ecosystemId en firma + controller |
+| ~~DT-013~~ | Timeouts gRPC no definidos | channelOptions/keepalive en 5 módulos grpc-client |
+| ~~DT-014~~ | preferences.service getPreferences() sin ecosystemId | ecosystemId en where |
+| ~~DT-016~~ | contacts.service import roto class-validator | Reescrito usando schemas.ts |
+| ~~DT-017~~ | OrgContext sin tenantId | tenantId agregado a la interface |
+| ~~DT-018~~ | projects.service imports dto legacy rotos | Migrado a schemas.ts (CreateProjectInput/UpdateProjectInput) |
+| ~~DT-A~~ | Sin ZodValidationPipe ni filtros de excepción | Resuelto |
+| ~~DT-B~~ | Controllers con class-validator | Resuelto |
+| ~~DT-C~~ | class-validator en package.json | Resuelto |
+| ~~DT-D~~ | conversations/ sin domain+repository | Resuelto |
+| ~~DT-E~~ | payments/ sin domain+repository | Resuelto |
+| ~~DT-F~~ | Sin contratos gRPC documentados | Resuelto |
+| ~~DT-G~~ | Sin auditoría multi-tenant | Resuelto |
+
+### Nota de arquitectura — DT-005
+
+`PaymentsService` inyecta tanto `PrismaService` como `IPaymentsRepository`:
+- `IPaymentsRepository` → lecturas simples: `findById`, `findByIdempotencyKey`, `list`
+- `PrismaService` directamente → operaciones que requieren `$transaction` multi-tabla
+
+---
+
+## 🟡 PENDIENTE — decisión de arquitectura (no urgente)
+
+| ID | Deuda | Archivo | Acción |
+|----|-------|---------|--------|
+| DT-015 | Modelo `Conversation` sin `ecosystemId` directo en schema | `chatia-backend/prisma/schema.prisma` | Evaluar migración antes de múltiples ecosistemas en prod |
+| DT-010 | CircuitBreakerService en memoria | chatia + pasarelapagos | Migrar a Redis cuando se escale a múltiples instancias |
+
+### DT-015 — cuándo hacerlo
+
+El modelo `Conversation` llega a `ecosystemId` via join `Contact → Organization`.
+Funciona correctamente con un ecosistema. Antes de tener 2+ ecosistemas con datos
+reales en la misma DB, agregar:
+
+```prisma
+model Conversation {
+  ecosystemId    String
+  organizationId String
+  @@index([ecosystemId, organizationId])
+}
+```
+
+Luego: `pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation`
+
+---
+
+## 🔴 NUEVAS — ADR-008 (hacia 10/10)
+
+| ID | Deuda | Servicio | Acción | Prioridad |
+|----|-------|----------|--------|-----------|
+| ~~DT-019~~ | Sin CI/CD pipeline por servicio | todos | `.github/workflows/ci-{servicio}.yml` | P0 |
+| ~~DT-020~~ | Sin logs estructurados JSON en producción | todos | `pino` logger en `main.ts` | P0 |
+| ~~DT-021~~ | Sin endpoint `/metrics` Prometheus | todos | `@willsoto/nestjs-prometheus` | P1 |
+| ~~DT-022~~ | Sin propagación de `X-Request-Id` en gRPC | todos | metadata gRPC en grpc-client | P1 |
+| ~~DT-023~~ | `getAgentMetrics` carga 100K rows en memoria | analytics | SQL aggregation con GROUP BY | P1 |
+| DT-024 | `CircuitBreakerService` en memoria (multi-pod) | chatia · pagos | migrar a Redis (DT-010) | P2 |
+| DT-025 | Sin tests de aislamiento multi-tenant | todos | `multitenant.spec.ts` por servicio | P1 |
+| ~~DT-026~~ | `coverageThreshold` no configurado en jest | todos | `jest.config.ts` con 85% threshold | P0 |
+
+---
+
+## ADR-009 (hacia 9.5/10) — resueltas por x.sh
+
+| ID | Deuda | Servicio | Estado |
+|----|-------|----------|--------|
+| ~~DT-027~~ | `main.ts` sin ZodExceptionFilter — ZodError sale como HTTP 500 | todos | ✅ x.sh |
+| ~~DT-028~~ | packages/logger y metrics no importados en app.module.ts | todos | ✅ x.sh |
+| ~~DT-029~~ | ConversationsService accede a `this.prisma` directo (viola ADR-002) | chatia | ✅ x.sh |
+| ~~DT-023~~ | getAgentMetrics carga 100K rows en Node.js | analytics | ✅ x.sh |
+
+---
+
+## Auditoría 2026-09-12 — Brechas descubiertas (no estaban documentadas)
+
+| ID | Deuda | Servicio | Severidad | Evidencia |
+|----|-------|----------|-----------|-----------|
+| DT-030 | ConversationsService.handleIncomingMessage usa this.prisma directo pese a IConversationsRepository inyectado | chatia | 🔴 | Viola ADR-002. Línea this.prisma.channelAccount.findUnique en el servicio |
+| DT-031 | Health controller pasarela retorna status ok hardcodeado sin SELECT 1 | pasarela | 🔴 | Railway no detecta caída de DB. health.controller.ts línea 8519 |
+| DT-032 | EmbeddingService genera embeddings via Groq chat prompt — no es un modelo de embeddings real | chatia | 🟡 | Sprint 4 pendiente. DIMENSIONS=384 es inventado |
+| DT-033 | FaqIngestProcessor es stub explícito (TODO Sprint W-2) | workers | 🟡 | No procesa documentos reales. Solo loguea |
+| DT-034 | status as any en campaigns.service.ts — enum cast sin tipo | workers | 🟡 | Línea 17070 — @ecosistema-ms/jsonb-cast comment ausente |
+| DT-035 | app.module.ts de los 5 servicios sin LoggerModule ni PrometheusModule | todos | 🟡 | packages creados en ADR-008 pero nunca conectados |
+| DT-036 | ZodExceptionFilter ausente en notificaciones, analytics y workers | 3 svcs | 🔴 | ZodError sale como HTTP 500 en esos servicios |
+</file>
+
+<file path=".claude/roadmap/sprints.md">
+# Sprints — ecosistema-ms
+
+**Última actualización:** 2026-09-02
+
+## Estado de fases
+
+| Fase | Descripción | Estado |
+|------|-------------|--------|
+| FASE 0 | Estructura base .claude/ | ✅ COMPLETO |
+| FASE 1 | Carpetas bloqueantes/dinámicas | ✅ COMPLETO |
+| FASE 2 | ADR-001: DTOs → Zod | ✅ COMPLETO — 0 class-validator residuales |
+| FASE 3 | Contratos gRPC documentados | ✅ COMPLETO |
+| FASE 4 | Domain/Repository MOLDE VIVO | ✅ COMPLETO |
+| FASE 5 | Multi-tenant — auditoría queries | ✅ COMPLETO |
+| FASE 6 | Build limpio + tests baseline | 🔴 PRÓXIMA |
+
+---
+
+## Logros totales
+
+- ✅ 0 imports de class-validator residuales
+- ✅ 0 carpetas dto/ huérfanas
+- ✅ 0 imports de DTOs legacy rotos
+- ✅ AllExceptionsFilter en todos los main.ts
+- ✅ ConversationsService + PaymentsService migrados a Domain/Repository
+- ✅ DT-006: tenantId en reconciliation (bug de seguridad cerrado)
+- ✅ ecosystemId en analytics, notificaciones y preferences
+- ✅ Timeouts gRPC en los 5 módulos cliente
+- ✅ ZodValidationPipe en todos los controllers
+- ✅ OrgContext con tenantId
+- ✅ projects.service + contacts.service usando schemas.ts
+
+---
+
+## PRÓXIMA SESIÓN — FASE 6
+
+### Paso 1 — Build limpio (prioridad máxima)
+
+```bash
+pnpm -r build
+```
+
+Errores más probables si aparecen:
+- Algún controller que llame a `getPreferences()` sin pasar `ecosystemId` (nuevo parámetro)
+- Algún controller de `projects` que siga usando `CreateProjectDto` importado
+- `OrgContext` — verificar que los guards de pasarelapagos ya lo poblan con `tenantId`
+
+### Paso 2 — Tests baseline
+
+Ver: `.claude/checklists/testing-desde-cero.md`
+
+Orden sugerido:
+1. Unit tests de domain entities (`payment.entity`, `conversation.entity`)
+2. Integration tests de los repository adapters (Prisma)
+3. E2E del contrato HTTP de cada servicio (Supertest)
+4. Test de cross-tenant: request con ecosystemId A no retorna datos de ecosystemId B
+
+### Paso 3 — DT-015 (cuando haya 2+ ecosistemas en prod)
+
+```bash
+pnpm --filter chatia-backend prisma migrate dev --name add-ecosystemId-conversation
+```
+
+### Paso 4 — Observabilidad
+
+Ver: `.claude/checklists/observabilidad.md`
+- OpenTelemetry traces activos
+- Prometheus métricas expuestas en /metrics
+- Grafana dashboards por servicio
+
+---
+
+## Sprint — x.sh ejecutado el 2026-09-12T19:09:25Z
+
+### Bloque 1 (docs) completado ✓
+- ADR-008 escrito — plan hacia 10/10
+- lifecycle/02-fase-estabilizacion.md actualizado
+- Deudas DT-019..DT-026 registradas
+- Checklists CI/CD y observabilidad creados
+
+### Bloque 2 (code) completado ✓
+- packages/logger creado (@ecosistema-ms/logger con pino)
+- packages/metrics creado (@ecosistema-ms/metrics con Prometheus)
+- RequestIdMiddleware creado en cada servicio
+- jest.config.ts con coverageThreshold (85%) en cada servicio
+- GitHub Actions CI workflow por cada servicio
+- multitenant.spec.ts template en cada servicio
+- Parche DT-023 documentado en .claude/patches/
+
+### Pendiente manual post-ejecución
+- [ ] Importar createLoggerModule() en app.module.ts de cada servicio
+- [ ] Importar createMetricsModule() en app.module.ts de cada servicio
+- [ ] Importar RequestIdMiddleware en app.module.ts de cada servicio
+- [ ] Agregar packages/logger y packages/metrics a pnpm-workspace.yaml
+- [ ] Agregar pino, nestjs-pino, @willsoto/nestjs-prometheus al catalog raíz
+- [ ] Aplicar parche DT-023 en analytics-backend manualmente
+- [ ] Configurar branch protection en GitHub
+- [ ] Completar suite multitenant.spec.ts con tests reales
+
+### Proyección de puntaje post-implementación completa
+| Dimensión      | Antes | Después (proyectado) |
+|----------------|-------|----------------------|
+| Arquitectura   | 7.2   | 8.5                  |
+| Tests          | 3.5   | 9.0                  |
+| Observabilidad | 2.5   | 8.5                  |
+| CI/CD          | 6.0   | 9.0                  |
+| **Promedio**   | **5.8** | **8.8**            |
+
+---
+
+## Sprint — x.sh v3 (hacia 9.5/10) — 2026-09-12T19:29:30Z
+**Servicios presentes:** chatia-backend pasarelapagos-backend notificaciones-backend analytics-backend workers-backend
+**Filtro activo:** all
+
+### Entregables
+
+| Archivo | Cambio |
+|---------|--------|
+| `packages/auth-server/src/filters/zod-exception.filter.ts` | ZodExceptionFilter global ✅ |
+| `analytics-backend/src/analytics/analytics.service.ts` | getAgentMetrics → SQL GROUP BY ✅ |
+| `analytics-backend/prisma/schema.prisma` | índices compuestos JSON ✅ |
+| `*/src/main.ts` | ZodExceptionFilter + pino Logger ✅ |
+| `*/src/app.module.ts` | LoggerModule + PrometheusModule + RequestId ✅ |
+| `*/src/common/middleware/request-id.middleware.ts` | X-Request-Id ✅ |
+| `*/jest.config.ts` | coverageThreshold 85% ✅ |
+| `.github/workflows/ci-*.yml` | CI lint+type+test+build ✅ |
+| `*/src/test/multitenant.spec.ts` | template cross-tenant ✅ |
+
+### Deudas cerradas
+~~DT-019~~ ~~DT-020~~ ~~DT-021~~ ~~DT-022~~ ~~DT-023~~ ~~DT-026~~ ~~DT-027~~ ~~DT-028~~ ~~DT-029~~
+
+### Pendientes manuales
+- DT-024: CircuitBreakerService → Redis (cuando escale a 3+ pods)
+- DT-025: completar it.todo() en multitenant.spec.ts
+- DT-015: Conversation sin ecosystemId directo → migración pre multi-ecosistema
+
+### Proyección puntaje (sin tests/obs/deploy)
+| Dimensión | v8.0 | v9.5 |
+|-----------|------|------|
+| Arquitectura/Capas | 8.5 | 9.0 |
+| Calidad de código | 7.5 | 9.0 |
+| Base de datos | 6.5 | 9.0 |
+| Config/Twelve-Factor | 9.0 | 9.5 |
+| **Promedio** | **8.0** | **9.1** |
+
+---
+
+## Auditoría real de código — 2026-09-12T19:49:34Z
+
+**Método:** lectura directa del código fuente (ecosistema-ms.xml)
+**Resultado:** puntaje real 7.6/10 vs 8.3-9.1 proyectado en sesiones anteriores
+
+### Desincronización detectada: +1.5 puntos sobre la realidad
+
+La proyección de 8.3-9.1 asumía que el x.sh (ADR-009) corrió sobre los 5
+servicios. En realidad solo corrió sobre chatia-backend y pasarelapagos-backend.
+El resto del sistema no recibió los cambios.
+
+### Puntaje auditado por dimensión
+
+| Dimensión | Real |
+|-----------|------|
+| Arquitectura/Capas | 7.5 |
+| Contratos/Tipado | 7.5 |
+| Multi-tenancy | 9.0 |
+| Comunicación gRPC | 7.5 |
+| Calidad de código | 7.0 |
+| Base de datos | 6.5 |
+| Seguridad/RBAC | 7.5 |
+| Config/Twelve-Factor | 8.5 |
+| Documentación .claude | 9.5 |
+| **Promedio** | **7.6** |
+
+### Nuevas deudas documentadas: DT-030..036
+
+### Para llegar al 9.0 real (no proyectado)
+
+1. x.sh con los 5 servicios en el checkout → +0.7
+2. Parche DT-023 analytics-backend manualmente → +0.8
+3. Refactor handleIncomingMessage → IConversationsRepository → +0.3
+4. Health controller pasarela con SELECT 1 → +0.2
+</file>
+
+<file path="analytics-backend/src/health/health.controller.ts">
+import { Controller, Get }                          from '@nestjs/common';
+import { SetMetadata }                              from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+const Public = () => SetMetadata('isPublic', true);
+@Controller('api/v1/health')
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly memory: MemoryHealthIndicator,
+    private readonly prisma: PrismaService,
+  ) {}
+  @Get()
+  @Public()
+  @HealthCheck()
+  check(): Promise<HealthCheckResult> {
+    return this.health.check([
+      async () => {
+        try {
+          await this.prisma.$queryRaw`SELECT 1`;
+          return { database: { status: 'up' as const } };
+        } catch (e: unknown) {
+          return { database: { status: 'down' as const, error: String(e) } };
+        }
+      },
+      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
+    ]);
+  }
+}
+</file>
+
+<file path="chatia-backend/package.json">
+{
+  "name": "chatia-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/mapped-types": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "pg": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "socket.io": "^4.8.1",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/multer": "^1.4.12",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="notificaciones-backend/src/health/health.controller.ts">
+import { Controller, Get }                          from '@nestjs/common';
+import { SetMetadata }                              from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+const Public = () => SetMetadata('isPublic', true);
+@Controller('api/v1/health')
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly memory: MemoryHealthIndicator,
+    private readonly prisma: PrismaService,
+  ) {}
+  @Get()
+  @Public()
+  @HealthCheck()
+  check(): Promise<HealthCheckResult> {
+    return this.health.check([
+      async () => {
+        try {
+          await this.prisma.$queryRaw`SELECT 1`;
+          return { database: { status: 'up' as const } };
+        } catch (e: unknown) {
+          return { database: { status: 'down' as const, error: String(e) } };
+        }
+      },
+      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
+    ]);
+  }
+}
+</file>
+
+<file path="pasarelapagos-backend/package.json">
+{
+  "name": "pasarelapagos-backend",
+  "version": "0.0.1",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "prisma generate && nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:debug": "nest start --debug --watch",
+    "start:prod": "node dist/main",
+    "start:migrate": "prisma migrate deploy",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/event-emitter": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@nestjs/throttler": "catalog:",
+    "@opentelemetry/auto-instrumentations-node": "catalog:",
+    "@opentelemetry/exporter-prometheus": "catalog:",
+    "@opentelemetry/sdk-node": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "@types/compression": "^1.7.5",
+    "@types/cookie-parser": "^1.4.8",
+    "axios": "catalog:",
+    "bcryptjs": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "compression": "^1.7.5",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "mercadopago": "catalog:",
+    "nanoid": "^5.1.5",
+    "nestjs-pino": "catalog:",
+    "opossum": "^8.1.4",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "stripe": "catalog:",
+    "swagger-ui-express": "catalog:",
+    "uuid": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "catalog:",
+    "@eslint/js": "catalog:",
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/bcryptjs": "catalog:",
+    "@types/express": "catalog:",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "catalog:",
+    "@types/uuid": "catalog:",
+    "eslint": "catalog:",
+    "eslint-config-prettier": "catalog:",
+    "eslint-plugin-prettier": "catalog:",
+    "globals": "catalog:",
+    "jest": "catalog:",
+    "prettier": "catalog:",
+    "prisma": "catalog:",
+    "source-map-support": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-loader": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:",
+    "typescript-eslint": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="workers-backend/src/health/health.controller.ts">
+import { Controller, Get }                          from '@nestjs/common';
+import { SetMetadata }                              from '@nestjs/common';
+import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
+import { PrismaService }  from '../prisma/prisma.service.js';
+const Public = () => SetMetadata('isPublic', true);
+@Controller('api/v1/health')
+export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly memory: MemoryHealthIndicator,
+    private readonly prisma: PrismaService,
+  ) {}
+  @Get()
+  @Public()
+  @HealthCheck()
+  check(): Promise<HealthCheckResult> {
+    return this.health.check([
+      async () => {
+        try {
+          await this.prisma.$queryRaw`SELECT 1`;
+          return { database: { status: 'up' as const } };
+        } catch (e: unknown) {
+          return { database: { status: 'down' as const, error: String(e) } };
+        }
+      },
+      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
+    ]);
+  }
+}
+</file>
+
 <file path="pnpm-workspace.yaml">
 packages:
   - "chatia-backend"
@@ -17753,157 +18015,6 @@ catalog:
   ts-loader: "^9.5.2"
   tsconfig-paths: "^4.2.0"
   source-map-support: "^0.5.21"
-</file>
-
-<file path="analytics-backend/src/health/health.controller.ts">
-import { Controller, Get }                          from '@nestjs/common';
-import { SetMetadata }                              from '@nestjs/common';
-import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService }  from '../prisma/prisma.service.js';
-const Public = () => SetMetadata('isPublic', true);
-@Controller('api/v1/health')
-export class HealthController {
-  constructor(
-    private readonly health: HealthCheckService,
-    private readonly memory: MemoryHealthIndicator,
-    private readonly prisma: PrismaService,
-  ) {}
-  @Get()
-  @Public()
-  @HealthCheck()
-  check(): Promise<HealthCheckResult> {
-    return this.health.check([
-      async () => {
-        try {
-          await this.prisma.$queryRaw`SELECT 1`;
-          return { database: { status: 'up' as const } };
-        } catch (e: unknown) {
-          return { database: { status: 'down' as const, error: String(e) } };
-        }
-      },
-      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
-    ]);
-  }
-}
-</file>
-
-<file path="notificaciones-backend/src/health/health.controller.ts">
-import { Controller, Get }                          from '@nestjs/common';
-import { SetMetadata }                              from '@nestjs/common';
-import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService }  from '../prisma/prisma.service.js';
-const Public = () => SetMetadata('isPublic', true);
-@Controller('api/v1/health')
-export class HealthController {
-  constructor(
-    private readonly health: HealthCheckService,
-    private readonly memory: MemoryHealthIndicator,
-    private readonly prisma: PrismaService,
-  ) {}
-  @Get()
-  @Public()
-  @HealthCheck()
-  check(): Promise<HealthCheckResult> {
-    return this.health.check([
-      async () => {
-        try {
-          await this.prisma.$queryRaw`SELECT 1`;
-          return { database: { status: 'up' as const } };
-        } catch (e: unknown) {
-          return { database: { status: 'down' as const, error: String(e) } };
-        }
-      },
-      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
-    ]);
-  }
-}
-</file>
-
-<file path="workers-backend/src/health/health.controller.ts">
-import { Controller, Get }                          from '@nestjs/common';
-import { SetMetadata }                              from '@nestjs/common';
-import { HealthCheck, HealthCheckService, HealthCheckResult, MemoryHealthIndicator } from '@nestjs/terminus';
-import { PrismaService }  from '../prisma/prisma.service.js';
-const Public = () => SetMetadata('isPublic', true);
-@Controller('api/v1/health')
-export class HealthController {
-  constructor(
-    private readonly health: HealthCheckService,
-    private readonly memory: MemoryHealthIndicator,
-    private readonly prisma: PrismaService,
-  ) {}
-  @Get()
-  @Public()
-  @HealthCheck()
-  check(): Promise<HealthCheckResult> {
-    return this.health.check([
-      async () => {
-        try {
-          await this.prisma.$queryRaw`SELECT 1`;
-          return { database: { status: 'up' as const } };
-        } catch (e: unknown) {
-          return { database: { status: 'down' as const, error: String(e) } };
-        }
-      },
-      () => this.memory.checkHeap('memory_heap', 512 * 1024 * 1024),
-    ]);
-  }
-}
-</file>
-
-<file path="workers-backend/src/main.ts">
-import 'reflect-metadata';
-import { NestFactory }         from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { ValidationPipe }      from '@nestjs/common';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { Logger }              from 'nestjs-pino';
-import { join }                from 'path';
-import { AppModule }           from './app.module.js';
-import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
-async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
-  // ── Pino structured logger ─────────────────────────────────────────────
-  app.useLogger(app.get(Logger));
-  // ── gRPC microservice ──────────────────────────────────────────────────
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package:   'workers',
-      protoPath:  join(process.cwd(), 'proto', 'workers.proto'),
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5005'}`,
-      channelOptions: {
-        'grpc.keepalive_time_ms':             10_000,
-        'grpc.keepalive_timeout_ms':           5_000,
-        'grpc.keepalive_permit_without_calls':     1,
-        'grpc.http2.max_pings_without_data':       0,
-      },
-    },
-  });
-  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
-  app.useGlobalFilters(new ZodExceptionFilter());
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist:            true,
-    forbidNonWhitelisted: true,
-    transform:            true,
-  }));
-  // ── Swagger ────────────────────────────────────────────────────────────
-  const swaggerCfg = new DocumentBuilder()
-    .setTitle('workers-backend')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
-  // ── Arranque ───────────────────────────────────────────────────────────
-  await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3004';
-  await app.listen(port);
-  app.get(Logger).log(
-    `HTTP:${port}  gRPC:5005`,
-    'workers-backend',
-  );
-}
-void bootstrap();
 </file>
 
 <file path="chatia-backend/src/conversations/conversations.service.ts">
@@ -18199,6 +18310,61 @@ export const NOTIF_PACKAGE     = 'notificaciones';
 export const ANALYTICS_PACKAGE = 'analytics';
 export const WORKERS_PACKAGE   = 'workers';
 export const PAGOS_PACKAGE     = 'pagos';
+</file>
+
+<file path="workers-backend/src/main.ts">
+import 'reflect-metadata';
+import { NestFactory }         from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+import { ValidationPipe }      from '@nestjs/common';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { Logger }              from 'nestjs-pino';
+import { join }                from 'path';
+import { AppModule }           from './app.module.js';
+import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'workers',
+      protoPath:  join(process.cwd(), 'proto', 'workers.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5005'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
+  });
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('workers-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3004';
+  await app.listen(port);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5005`,
+    'workers-backend',
+  );
+}
+void bootstrap();
 </file>
 
 <file path="workers-backend/src/app.module.ts">
