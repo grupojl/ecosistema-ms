@@ -55,6 +55,11 @@ The content is organized as follows:
     02-grpc-inter-servicio.md
     03-reglas-duras.md
     04-degradacion-elegante.md
+    05-dockerfile-backend.md
+    06-dockerfile-frontend.md
+    07-railway-deploy.md
+    08-testing-norte.md
+    09-observabilidad-norte.md
   checklists/
     cambio-proto.md
     ci-cd-github-actions.md
@@ -534,167 +539,6 @@ tsconfig.base.json
 <files>
 This section contains the contents of the repository's files.
 
-<file path=".claude/checklists/ms-capa-2-zod-migracion.md">
-# Checklist — Migración class-validator → Zod (ADR-011 Sprint 1)
-
-## Para cada controller migrado, verificar:
-
-- [ ] Schema Zod definido inline en el mismo archivo del controller
-- [ ] `z.infer<typeof Schema>` como tipo del parámetro (no una clase DTO)
-- [ ] `ZodValidationPipe` en cada endpoint que recibe body
-- [ ] `class-validator` eliminado de los imports del archivo
-- [ ] El schema incluye `.optional()` solo donde el campo realmente es opcional
-- [ ] `z.coerce.number()` para query params numéricos (vienen como string en HTTP)
-- [ ] El schema tiene `.min()` / `.max()` en strings — nunca validación implícita
-
-## Verificación final del servicio
-
-```bash
-# Cero class-validator fuera de schemas/ (si los hay)
-grep -r "@IsString\|@IsEnum\|@IsOptional\|class-validator" \
-  <servicio>/src --include="*.ts" | grep -v "schemas\|.spec." | wc -l
-# → 0
-
-# ZodValidationPipe presente en todos los endpoints con body
-grep -rn "ZodValidationPipe" <servicio>/src --include="*.controller.ts" | wc -l
-# → igual al número de endpoints con @Body()
-
-# class-validator eliminado de package.json
-grep "class-validator" <servicio>/package.json
-# → no debe aparecer
-```
-
-## Servicios por migrar (ADR-011)
-
-| Servicio | Estado | Done cuando |
-|---------|--------|-------------|
-| pasarelapagos-backend | ✅ Completado (Sprint 1) | grep class-validator → 0 ✅ |
-| workers-backend | ✅ Completado (Sprint 1) | grep class-validator → 0 ✅ |
-| notificaciones-backend | ✅ Ya migrado | — |
-| chatia-backend | ✅ Ya migrado | — |
-| analytics-backend | ✅ Sin DTOs con class-validator | — |
-</file>
-
-<file path=".claude/decisions/ADR-011-plan-10-10-codigo-estructura.md">
-# ADR-011 — Plan estructural para score 10/10 (sin observabilidad, testing ni deploy)
-
-**Fecha:** 2026-09-10
-**Estado:** Aceptado — en ejecución
-**Repo:** grupojl/ecosistema-ms
-
-## Gaps a cerrar (4)
-
-- G1: class-validator en pasarela/workers + getAgentMetrics 100K rows en memoria
-- G2: Domain/Repository incompleto (contacts, agents, campaigns, notifications)
-- G3: CircuitBreaker sin capturar CircuitOpenError en AssistantChatService
-- G4: toOutput() definido pero no conectado en services de negocio
-
-## Sprints
-
-### Sprint 1 — Zod completo + getAgentMetrics
-- Migrar pasarelapagos-backend a Zod (CreatePaymentSchema, ListPaymentsSchema, RefundSchema)
-- Migrar workers-backend a Zod (campaigns/dto, jobs/dto)
-- Corregir getAgentMetrics: groupBy en DB, no cargar 100K rows
-
-### Sprint 2 — Domain/Repository completo
-- chatia-backend/contacts/ → domain/ + repository/
-- chatia-backend/agents/ → domain/ + repository/
-- workers-backend/campaigns/ → domain/ + repository/
-- notificaciones-backend/notifications/ → domain/ + repository/
-
-### Sprint 3 — Circuit Breaker en path crítico
-- AssistantChatService: capturar CircuitOpenError → fallback + escalar humano
-- OutgoingMessageProcessor: CB por channelType
-- HealthExtendedController: incluir estado del CB por servicio
-
-### Sprint 4 — toOutput() conectado
-- conversations.service.ts: toOutput() en todos los métodos public
-- contacts.service.ts: toOutput() en todos los métodos public
-- Tipo de retorno declarado en payments.service.ts serialize()
-
-## Verificación completa
-
-```bash
-./x.sh --check
-```
-
-## Reglas permanentes
-
-- Un service public que devuelve tipo Prisma directo es bug de capa → PR bloqueado
-- Un controller con class-validator es bug de arquitectura → PR bloqueado
-- CircuitOpenError sin captura en paths de proveedores externos → PR bloqueado
-- findMany sin ecosystemId en where → PR bloqueado
-</file>
-
-<file path=".claude/lifecycle/tasks.md">
-# tasks.md — Checklist ejecutable ecosistema-ms
-
-**Última actualización:** 2026-09-10
-
----
-
-## S4 — En curso (bloqueante)
-
-### Testing (P0)
-- [ ] **S4-T01** Crear `ADR-011-testing-strategy-ms.md`
-  - Criterio: define scope por ms, cómo mockear gRPC client, cobertura mínima 85%
-- [ ] **S4-T02** Unit test: invariante multi-tenant `analytics.service.ts`
-  - Criterio: test que llama `getConversationsByDay` sin `ecosystemId` y verifica que el where lo incluye
-  - Criterio: test que verifica que datos de ecosistema A no aparecen en consulta de ecosistema B
-  - Archivo: `analytics-backend/src/analytics/analytics.service.spec.ts`
-- [ ] **S4-T03** Unit test: idempotencia BullMQ en workers-backend
-  - Criterio: job ya procesado no se reprocesa
-  - Archivo: `workers-backend/src/jobs/jobs.processor.spec.ts`
-- [ ] **S4-T04** Integration test: `AnalyticsController`
-  - Criterio: GET /analytics/overview con organizationId + ecosystemId → 200
-  - Criterio: GET sin ecosystemId → 400 (si hay validación) o resultado scoped
-  - Archivo: `analytics-backend/src/analytics/analytics.controller.spec.ts`
-- [ ] **S4-T05** Fix tipo: `AgentMetric` interface
-  - Criterio: `getAgentMetrics` retorna `{ agents: AgentMetric[]; total: number }` tipado
-  - Archivo: `analytics-backend/src/analytics/analytics.service.ts`
-
-### CI (P0)
-- [ ] **S4-T06** `.github/workflows/ci.yml`
-  - Criterio: `pnpm typecheck` + `pnpm test` por cada ms en cada PR
-  - Criterio: matrix strategy: chatia | pasarela | notificaciones | analytics | workers
-
-### OpenTelemetry (P2)
-- [ ] **S4-T07** SDK básico en analytics-backend (primera referencia)
-- [ ] **S4-T08** Correlación trace-id entre chatia → analytics
-
----
-
-## Completado
-
-- ✅ chatia-backend: conversaciones, agentes, canales, FAQ/RAG, asignación, AI config
-- ✅ pasarelapagos-backend: pagos, providers, webhooks, retry
-- ✅ notificaciones-backend: adaptadores email/push/SMS
-- ✅ analytics-backend: eventos, proyecciones, SSE, gRPC
-- ✅ workers-backend: BullMQ, DLQ, scheduler, circuit breaker
-- ✅ packages/proto + grpc-client
-- ✅ ADR-010: bug ecosystemId corregido
-</file>
-
-<file path="chatia-backend/src/contacts/repository/contacts.repository.interface.ts">
-// chatia-backend/src/contacts/repository/contacts.repository.interface.ts
-// ADR-011 Sprint 2 — Puerto del repositorio de contactos
-import type { Contact } from '../domain/contact.entity.js';
-export const CONTACTS_REPOSITORY = Symbol('CONTACTS_REPOSITORY');
-export interface IContactsRepository {
-  findById(id: string, organizationId: string, ecosystemId: string): Promise<Contact | null>;
-  findByPhone(phone: string, organizationId: string, ecosystemId: string): Promise<Contact | null>;
-  list(params: {
-    organizationId: string;
-    ecosystemId:    string;
-    page?:          number;
-    limit?:         number;
-    search?:        string;
-  }): Promise<{ data: Contact[]; total: number }>;
-  create(input: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>): Promise<Contact>;
-  update(id: string, organizationId: string, data: Partial<Pick<Contact, 'name' | 'email' | 'metadata'>>): Promise<Contact>;
-}
-</file>
-
 <file path=".claude/architecture/01-backend-capas.md">
 # Backend — 5 microservicios
 
@@ -967,6 +811,203 @@ Ver checklist circuit-breaker-adapters.md.
 pasarelapagos-backend/src/modules/redis/redis.module.ts tiene RedisNoopClient.
 Cuando REDIS_ENABLED=false -> mock sin conexion de red.
 Replicar en los demas MS para facilitar desarrollo local.
+</file>
+
+<file path=".claude/architecture/08-testing-norte.md">
+# 08 — Norte de testing: qué testear y por qué
+
+> Referentes: **Stripe** (tests sobre efectos de dinero), **Google** (Beyoncé Rule),
+> **Vercel** (E2E pragmático — paths críticos, no cobertura decorativa).
+
+---
+
+## El principio
+
+**Stripe:** el test que importa es el que verifica qué pasa cuando el provider falla.
+**Google:** toda invariante tiene un test que la rompe deliberadamente.
+**Vercel:** E2E solo en los paths que, si se rompen, el negocio para.
+
+---
+
+## Regla 1 — Services: invariantes de negocio, no implementación
+
+```ts
+// ❌ prueba implementación — inútil si refactorizás
+expect(prisma.payment.create).toHaveBeenCalled();
+
+// ✅ invariante de tenant isolation
+it('nunca retorna datos de otro tenant', async () => {
+  await seedPayment({ organizationId: 'org-A' });
+  const result = await service.listPayments({ organizationId: 'org-B' });
+  expect(result.data).toHaveLength(0);
+});
+
+// ✅ audit trail antes de ejecutar
+it('crea AdminAction antes de suspender', async () => {
+  const auditSpy   = jest.spyOn(auditService, 'create');
+  const suspendSpy = jest.spyOn(orgClient, 'suspend');
+  suspendSpy.mockRejectedValueOnce(new Error('timeout'));
+  await expect(service.suspendOrg(input)).rejects.toThrow();
+  expect(auditSpy).toHaveBeenCalledBefore(suspendSpy);
+});
+```
+
+---
+
+## Regla 2 — Guards: cobertura 100%
+
+```ts
+// ✅ UID no autorizado → 403
+it('rechaza UID fuera de allowlist con 403', async () => {
+  const ctx = mockContext({ uid: 'uid-no-autorizado' });
+  await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+});
+
+// ✅ token expirado → 401
+it('rechaza token expirado con 401', async () => {
+  firebaseAdmin.verifyIdToken.mockRejectedValueOnce(new Error('token has expired'));
+  await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
+});
+```
+
+---
+
+## Regla 3 — E2E: solo paths que paran el negocio
+
+```
+superadmin:
+  1. Login Firebase → redirige a /dashboard
+  2. Dashboard 0 alertas → EmptyState "Todo operativo"
+  3. Suspender org → ConfirmDialog → AdminAction creado
+```
+
+---
+
+## Cobertura mínima
+
+| Capa | Cobertura |
+|------|-----------|
+| Guards | 100% |
+| Domain services | 85% |
+| Integration clients | 80% |
+| Controllers HTTP | 70% |
+| Frontend hooks | 70% |
+| E2E | 3-5 flows críticos |
+
+---
+
+## Señal de test bien escrito
+
+1. El nombre describe qué invariante protege, no qué función llama
+2. Si lo borrás y el código se rompe en prod, el test lo hubiera detectado
+3. Si refactorizás sin cambiar comportamiento, el test sigue pasando
+</file>
+
+<file path=".claude/architecture/09-observabilidad-norte.md">
+# 09 — Norte de observabilidad: qué instrumentar y por qué
+
+> Referentes: **Honeycomb** (entender cualquier estado en prod sin deployar código),
+> **Datadog** (qué ve el operador), **Shopify** (trazabilidad de BullMQ jobs).
+
+---
+
+## El principio de Honeycomb
+
+> "Dado cualquier estado en producción, ¿podés entender qué pasó
+> sin deployar código nuevo?"
+
+---
+
+## Qué genera un span
+
+```
+Request HTTP entrante     → automático via instrumentation-http
+Query Prisma              → automático via instrumentation-prisma
+Llamada gRPC saliente     → manual en GrpcClient
+Job BullMQ encolado       → manual en el service que encola
+Job BullMQ procesado      → manual en el Processor
+Llamada a provider externo → manual en el Adapter
+CB estado                 → evento en el span del Adapter (no span propio)
+Cache hit/miss            → atributo en el span del caller (no span propio)
+Health check polling      → excluir del sampler
+```
+
+---
+
+## Atributos obligatorios en spans de negocio
+
+```ts
+span.setAttributes({
+  'tenant.ecosystem_id':    ecosystemId,
+  'tenant.organization_id': organizationId,
+  'service.name':           'superadmin-backend',
+  'request.id':             correlationId,
+});
+```
+
+---
+
+## Qué activa una alerta vs. qué es contexto
+
+### Alerta (acción en < 15 min)
+```
+CB OPEN en provider de pagos    → CRÍTICA
+DLQ depth > 100 jobs            → CRÍTICA
+Health check DOWN               → CRÍTICA
+Error rate > 5% en 5 min        → WARNING
+Latencia P95 > 2s en pagos      → WARNING
+CB OPEN en Groq/LLM             → WARNING
+```
+
+### Contexto (dashboard, no alerta)
+```
+Cache hit/miss rate
+Latencia P50 Prisma
+Jobs procesados por hora
+Requests por tenant
+```
+
+**Regla Datadog:** si no cambia una decisión operativa en los próximos 15 min,
+no es una alerta.
+
+---
+
+## Health check extendido — formato canónico
+
+```json
+{
+  "status": "ok" | "degraded" | "down",
+  "db":    { "status": "up", "latencyMs": 4 },
+  "redis": { "status": "up", "latencyMs": 1 },
+  "circuit_breakers": { "mercadopago": "closed", "groq-llm": "open" },
+  "queues": { "payments": { "waiting": 0, "dlq": 0 } },
+  "uptime": 3600,
+  "version": "1.2.3"
+}
+```
+
+---
+
+## Correlation ID
+
+```ts
+app.use((req, res, next) => {
+  const id = req.headers['x-correlation-id'] as string ?? crypto.randomUUID();
+  req.headers['x-correlation-id'] = id;
+  res.setHeader('x-correlation-id', id);
+  trace.getActiveSpan()?.setAttribute('request.id', id);
+  next();
+});
+```
+
+---
+
+## Señal de observabilidad bien implementada
+
+1. Pago fallido → span del provider en < 2 min sin grep en logs
+2. Job en DLQ → trazable al request HTTP que lo originó
+3. CB abierto → visible en superadmin en < 15 segundos
+4. Podés filtrar spans de una org por `tenant.organization_id`
 </file>
 
 <file path=".claude/checklists/cambio-proto.md">
@@ -1268,6 +1309,47 @@ Se bloquea en code review — no se mergea con ticket de deuda.
 Un DTO nuevo definido dentro de un service es un bug de organizacion.
 Los DTOs viven en `dto/` — siempre. Un type de retorno `Promise<any>` en
 un service que expone datos al controller es un bug de Capa 2.
+</file>
+
+<file path=".claude/checklists/ms-capa-2-zod-migracion.md">
+# Checklist — Migración class-validator → Zod (ADR-011 Sprint 1)
+
+## Para cada controller migrado, verificar:
+
+- [ ] Schema Zod definido inline en el mismo archivo del controller
+- [ ] `z.infer<typeof Schema>` como tipo del parámetro (no una clase DTO)
+- [ ] `ZodValidationPipe` en cada endpoint que recibe body
+- [ ] `class-validator` eliminado de los imports del archivo
+- [ ] El schema incluye `.optional()` solo donde el campo realmente es opcional
+- [ ] `z.coerce.number()` para query params numéricos (vienen como string en HTTP)
+- [ ] El schema tiene `.min()` / `.max()` en strings — nunca validación implícita
+
+## Verificación final del servicio
+
+```bash
+# Cero class-validator fuera de schemas/ (si los hay)
+grep -r "@IsString\|@IsEnum\|@IsOptional\|class-validator" \
+  <servicio>/src --include="*.ts" | grep -v "schemas\|.spec." | wc -l
+# → 0
+
+# ZodValidationPipe presente en todos los endpoints con body
+grep -rn "ZodValidationPipe" <servicio>/src --include="*.controller.ts" | wc -l
+# → igual al número de endpoints con @Body()
+
+# class-validator eliminado de package.json
+grep "class-validator" <servicio>/package.json
+# → no debe aparecer
+```
+
+## Servicios por migrar (ADR-011)
+
+| Servicio | Estado | Done cuando |
+|---------|--------|-------------|
+| pasarelapagos-backend | ✅ Completado (Sprint 1) | grep class-validator → 0 ✅ |
+| workers-backend | ✅ Completado (Sprint 1) | grep class-validator → 0 ✅ |
+| notificaciones-backend | ✅ Ya migrado | — |
+| chatia-backend | ✅ Ya migrado | — |
+| analytics-backend | ✅ Sin DTOs con class-validator | — |
 </file>
 
 <file path=".claude/checklists/ms-capa-3-domain-service.md">
@@ -2465,6 +2547,57 @@ Todo el acceso a DB va por `IConversationsRepository`. Cierra ADR-002.
 | Herencia de AppModule base | NestJS no tiene herencia limpia de módulos |
 </file>
 
+<file path=".claude/decisions/ADR-011-plan-10-10-codigo-estructura.md">
+# ADR-011 — Plan estructural para score 10/10 (sin observabilidad, testing ni deploy)
+
+**Fecha:** 2026-09-10
+**Estado:** Aceptado — en ejecución
+**Repo:** grupojl/ecosistema-ms
+
+## Gaps a cerrar (4)
+
+- G1: class-validator en pasarela/workers + getAgentMetrics 100K rows en memoria
+- G2: Domain/Repository incompleto (contacts, agents, campaigns, notifications)
+- G3: CircuitBreaker sin capturar CircuitOpenError en AssistantChatService
+- G4: toOutput() definido pero no conectado en services de negocio
+
+## Sprints
+
+### Sprint 1 — Zod completo + getAgentMetrics
+- Migrar pasarelapagos-backend a Zod (CreatePaymentSchema, ListPaymentsSchema, RefundSchema)
+- Migrar workers-backend a Zod (campaigns/dto, jobs/dto)
+- Corregir getAgentMetrics: groupBy en DB, no cargar 100K rows
+
+### Sprint 2 — Domain/Repository completo
+- chatia-backend/contacts/ → domain/ + repository/
+- chatia-backend/agents/ → domain/ + repository/
+- workers-backend/campaigns/ → domain/ + repository/
+- notificaciones-backend/notifications/ → domain/ + repository/
+
+### Sprint 3 — Circuit Breaker en path crítico
+- AssistantChatService: capturar CircuitOpenError → fallback + escalar humano
+- OutgoingMessageProcessor: CB por channelType
+- HealthExtendedController: incluir estado del CB por servicio
+
+### Sprint 4 — toOutput() conectado
+- conversations.service.ts: toOutput() en todos los métodos public
+- contacts.service.ts: toOutput() en todos los métodos public
+- Tipo de retorno declarado en payments.service.ts serialize()
+
+## Verificación completa
+
+```bash
+./x.sh --check
+```
+
+## Reglas permanentes
+
+- Un service public que devuelve tipo Prisma directo es bug de capa → PR bloqueado
+- Un controller con class-validator es bug de arquitectura → PR bloqueado
+- CircuitOpenError sin captura en paths de proveedores externos → PR bloqueado
+- findMany sin ecosystemId en where → PR bloqueado
+</file>
+
 <file path=".claude/lifecycle/01-fase-desarrollo.md">
 # Fase 1 — Desarrollo
 ## Escalones 1, 2, 4 — La base que hace cosmético todo lo demás
@@ -3157,6 +3290,55 @@ y cómo saber que está hecho. En orden de ejecución dentro de cada fase.
 | **Total** | **63** | **0** | **0%** |
 
 Actualizar este resumen en cada sprint.
+</file>
+
+<file path=".claude/lifecycle/tasks.md">
+# tasks.md — Checklist ejecutable ecosistema-ms
+
+**Última actualización:** 2026-09-10
+
+---
+
+## S4 — En curso (bloqueante)
+
+### Testing (P0)
+- [ ] **S4-T01** Crear `ADR-011-testing-strategy-ms.md`
+  - Criterio: define scope por ms, cómo mockear gRPC client, cobertura mínima 85%
+- [ ] **S4-T02** Unit test: invariante multi-tenant `analytics.service.ts`
+  - Criterio: test que llama `getConversationsByDay` sin `ecosystemId` y verifica que el where lo incluye
+  - Criterio: test que verifica que datos de ecosistema A no aparecen en consulta de ecosistema B
+  - Archivo: `analytics-backend/src/analytics/analytics.service.spec.ts`
+- [ ] **S4-T03** Unit test: idempotencia BullMQ en workers-backend
+  - Criterio: job ya procesado no se reprocesa
+  - Archivo: `workers-backend/src/jobs/jobs.processor.spec.ts`
+- [ ] **S4-T04** Integration test: `AnalyticsController`
+  - Criterio: GET /analytics/overview con organizationId + ecosystemId → 200
+  - Criterio: GET sin ecosystemId → 400 (si hay validación) o resultado scoped
+  - Archivo: `analytics-backend/src/analytics/analytics.controller.spec.ts`
+- [ ] **S4-T05** Fix tipo: `AgentMetric` interface
+  - Criterio: `getAgentMetrics` retorna `{ agents: AgentMetric[]; total: number }` tipado
+  - Archivo: `analytics-backend/src/analytics/analytics.service.ts`
+
+### CI (P0)
+- [ ] **S4-T06** `.github/workflows/ci.yml`
+  - Criterio: `pnpm typecheck` + `pnpm test` por cada ms en cada PR
+  - Criterio: matrix strategy: chatia | pasarela | notificaciones | analytics | workers
+
+### OpenTelemetry (P2)
+- [ ] **S4-T07** SDK básico en analytics-backend (primera referencia)
+- [ ] **S4-T08** Correlación trace-id entre chatia → analytics
+
+---
+
+## Completado
+
+- ✅ chatia-backend: conversaciones, agentes, canales, FAQ/RAG, asignación, AI config
+- ✅ pasarelapagos-backend: pagos, providers, webhooks, retry
+- ✅ notificaciones-backend: adaptadores email/push/SMS
+- ✅ analytics-backend: eventos, proyecciones, SSE, gRPC
+- ✅ workers-backend: BullMQ, DLQ, scheduler, circuit breaker
+- ✅ packages/proto + grpc-client
+- ✅ ADR-010: bug ecosystemId corregido
 </file>
 
 <file path=".claude/modules/chatia-backend/agents.md">
@@ -5261,6 +5443,26 @@ import { GroqModule }       from '../groq/groq.module';
   exports:   [EmbeddingService, CacheService, EcosystemModule],
 })
 export class CommonModule {}
+</file>
+
+<file path="chatia-backend/src/contacts/repository/contacts.repository.interface.ts">
+// chatia-backend/src/contacts/repository/contacts.repository.interface.ts
+// ADR-011 Sprint 2 — Puerto del repositorio de contactos
+import type { Contact } from '../domain/contact.entity.js';
+export const CONTACTS_REPOSITORY = Symbol('CONTACTS_REPOSITORY');
+export interface IContactsRepository {
+  findById(id: string, organizationId: string, ecosystemId: string): Promise<Contact | null>;
+  findByPhone(phone: string, organizationId: string, ecosystemId: string): Promise<Contact | null>;
+  list(params: {
+    organizationId: string;
+    ecosystemId:    string;
+    page?:          number;
+    limit?:         number;
+    search?:        string;
+  }): Promise<{ data: Contact[]; total: number }>;
+  create(input: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>): Promise<Contact>;
+  update(id: string, organizationId: string, data: Partial<Pick<Contact, 'name' | 'email' | 'metadata'>>): Promise<Contact>;
+}
 </file>
 
 <file path="chatia-backend/src/contacts/types/contact.types.ts">
@@ -10719,6 +10921,334 @@ Cada decisión de degradación debe estar documentada aquí antes de llegar a pr
 2. ¿Este dato lo necesito "ya generado por otro servicio"? → Llega por gRPC, no por import.
 3. ¿Si Railway escala este servicio a 3 réplicas, esto se rompe? → Si depende de memoria
    compartida entre réplicas, va a Redis.
+</file>
+
+<file path=".claude/architecture/05-dockerfile-backend.md">
+# 05 — Dockerfile canónico: Backend NestJS + Prisma + pnpm workspace
+
+> Patrón de referencia permanente para todo backend NestJS del ecosistema GrupoJL.
+> Aplica a: `superadmin-backend`, `realsass-sass-back`, `realsass-ecommerce-back`,
+> `chatia-backend`, `pasarelapagos-backend`, `notificaciones-backend`,
+> `analytics-backend`, `workers-backend`.
+
+---
+
+## Por qué este patrón y no otro
+
+### Imagen base: `node:22-alpine` — no distroless
+
+Prisma genera binarios nativos del query engine en tiempo de build.
+Alpine usa `musl libc`; Distroless usa `glibc` (Debian).
+Si el stage de build es Alpine y el runtime es Distroless, el Prisma Query Engine
+**no corre** — falla silenciosamente con error de ELF incompatible.
+
+Decisión: `node:22-alpine` en todos los stages del backend.
+
+### pnpm versión única: `ARG PNPM_VERSION`
+
+Un solo ARG es la fuente de verdad. Si se actualiza el digest de la imagen base
+pero no la versión de pnpm, el build rompe con error críptico de corepack.
+
+### `prisma generate` en build, no en runtime
+
+Correrlo en runtime agrega 3-8s al cold start. En build es determinístico y trazable.
+El schema `prisma/schema.prisma` va en la imagen final. Las migrations NO van.
+
+### Cache mounts de BuildKit: comportamiento en Railway
+
+Los cache mounts NO persisten entre builds en Railway (runner efímero).
+El beneficio real viene de la **estructura de layers**. Los mounts sí ayudan en local
+y en GitHub Actions. Se mantienen en el Dockerfile.
+
+### Usuario no-root: obligatorio
+
+CIS Benchmarks / SOC2 / PCI. Usuario `nestjs` con UID fijo (1001).
+
+---
+
+## Template canónico
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+# Build context: raíz del monorepo
+# Reemplazar SERVICE_DIR con el nombre del servicio
+
+ARG NODE_VERSION=22
+ARG PNPM_VERSION=10.11.1
+
+FROM node:${NODE_VERSION}-alpine AS deps
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+# COPY packages/auth-server/package.json ./packages/auth-server/
+COPY <SERVICE_DIR>/package.json ./<SERVICE_DIR>/
+RUN echo "shamefully-hoist=true" >> .npmrc
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+FROM node:${NODE_VERSION}-alpine AS build
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY tsconfig.base.json ./
+# COPY packages/auth-server/ ./packages/auth-server/
+COPY <SERVICE_DIR>/ ./<SERVICE_DIR>/
+WORKDIR /app/<SERVICE_DIR>
+RUN pnpm prisma generate
+RUN pnpm build
+
+FROM node:${NODE_VERSION}-alpine AS runtime
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nestjs
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=3000
+COPY --from=build --chown=nestjs:nodejs /app/node_modules               ./node_modules
+COPY --from=build --chown=nestjs:nodejs /app/<SERVICE_DIR>/dist          ./<SERVICE_DIR>/dist
+COPY --from=build --chown=nestjs:nodejs /app/<SERVICE_DIR>/prisma        ./<SERVICE_DIR>/prisma
+COPY --from=build --chown=nestjs:nodejs /app/<SERVICE_DIR>/package.json  ./<SERVICE_DIR>/package.json
+USER nestjs
+EXPOSE ${PORT}
+WORKDIR /app/<SERVICE_DIR>
+CMD ["node", "dist/main.js"]
+```
+
+---
+
+## Reglas permanentes
+
+1. `ARG PNPM_VERSION` al inicio — una sola fuente de verdad
+2. `pnpm install --frozen-lockfile` siempre
+3. `prisma generate` en stage `build`, antes de `pnpm build`
+4. Solo `prisma/schema.prisma` en runtime — migrations NO van en la imagen
+5. `shamefully-hoist=true` — no es opcional en este stack
+6. Build context siempre la raíz del monorepo — ver `07-railway-deploy.md`
+7. Nunca `npm install` ni `yarn`
+
+---
+
+## Checklist
+
+- [ ] `ARG PNPM_VERSION` definido al inicio
+- [ ] Solo `package.json` copiados en stage `deps` (no el source)
+- [ ] `pnpm install --frozen-lockfile` con cache mount
+- [ ] `prisma generate` antes de `pnpm build`
+- [ ] Runtime copia solo `dist/`, `node_modules`, `prisma/schema.prisma`, `package.json`
+- [ ] Usuario `nestjs` activado antes del CMD
+- [ ] `CMD ["node", "dist/main.js"]`
+</file>
+
+<file path=".claude/architecture/06-dockerfile-frontend.md">
+# 06 — Dockerfile canónico: Frontend Next.js + pnpm workspace
+
+> Patrón de referencia permanente para todo frontend Next.js del ecosistema GrupoJL.
+> Aplica a: `superadmin-frontend`, `realsass-sass-front`,
+> `realsass-dashboard-front`, `real-ecommerce-front`.
+
+---
+
+## Por qué este patrón y no otro
+
+### `output: standalone` — obligatorio
+
+Genera en `.next/standalone/` un servidor Node.js autocontenido (~50-80 MB).
+Sin él, la imagen necesita cientos de MB de `node_modules`.
+Sin él, el CMD no funciona en el contexto del monorepo.
+
+Verificar en `next.config.mjs`:
+```js
+const nextConfig = { output: 'standalone' };
+```
+
+### `NEXT_PUBLIC_*` como build args — no hay otra forma
+
+Son **inlineadas por el compilador en build time**.
+Si no se pasan como `ARG` + `ENV` en el stage de build, quedan como `undefined`.
+Ningún `ENV` en runtime puede corregirlas.
+
+### Copiar `static` y `public` separado
+
+`output: standalone` NO incluye `.next/static/` ni `public/`.
+Sin ellos la app arranca sin CSS, imágenes ni fuentes.
+
+### `HOSTNAME=0.0.0.0` — obligatorio en Railway
+
+Next.js standalone bindea a `127.0.0.1` por default.
+Sin este ENV el health check falla y Railway revierte el deploy.
+
+---
+
+## Template canónico
+
+```dockerfile
+# syntax=docker/dockerfile:1.7
+# Build context: raíz del monorepo
+# Reemplazar SERVICE_DIR con el nombre del servicio
+
+ARG NODE_VERSION=22
+ARG PNPM_VERSION=10.11.1
+
+FROM node:${NODE_VERSION}-alpine AS deps
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /app
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+# COPY packages/auth-client/package.json ./packages/auth-client/
+COPY <SERVICE_DIR>/package.json ./<SERVICE_DIR>/
+RUN echo "shamefully-hoist=true" >> .npmrc
+RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+FROM node:${NODE_VERSION}-alpine AS build
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /app
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+ARG NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ARG NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+ARG NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+ARG NEXT_PUBLIC_FIREBASE_APP_ID
+# ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_FIREBASE_API_KEY=$NEXT_PUBLIC_FIREBASE_API_KEY
+ENV NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+ENV NEXT_PUBLIC_FIREBASE_PROJECT_ID=$NEXT_PUBLIC_FIREBASE_PROJECT_ID
+ENV NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=$NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+ENV NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=$NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+ENV NEXT_PUBLIC_FIREBASE_APP_ID=$NEXT_PUBLIC_FIREBASE_APP_ID
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY --from=deps /app/node_modules ./node_modules
+COPY tsconfig.base.json ./
+COPY package.json pnpm-workspace.yaml ./
+# COPY packages/auth-client/ ./packages/auth-client/
+COPY <SERVICE_DIR>/ ./<SERVICE_DIR>/
+WORKDIR /app/<SERVICE_DIR>
+RUN /app/node_modules/.bin/next build
+
+FROM node:${NODE_VERSION}-alpine AS runtime
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 nextjs
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+COPY --from=build --chown=nextjs:nodejs /app/<SERVICE_DIR>/.next/standalone ./
+COPY --from=build --chown=nextjs:nodejs /app/<SERVICE_DIR>/.next/static ./<SERVICE_DIR>/.next/static
+COPY --from=build --chown=nextjs:nodejs /app/<SERVICE_DIR>/public ./<SERVICE_DIR>/public
+USER nextjs
+EXPOSE 3000
+WORKDIR /app/<SERVICE_DIR>
+CMD ["node", "server.js"]
+```
+
+---
+
+## Reglas permanentes
+
+1. `output: 'standalone'` en `next.config.mjs` — prerequisito
+2. Toda `NEXT_PUBLIC_*` como `ARG` + `ENV` en stage `build`
+3. Copiar `.next/static` y `public/` siempre
+4. `HOSTNAME=0.0.0.0` en runtime — obligatorio en Railway
+5. `NEXT_TELEMETRY_DISABLED=1` en build y runtime
+6. `CMD ["node", "server.js"]` — no `dist/main.js`
+
+---
+
+## Checklist
+
+- [ ] `output: 'standalone'` en `next.config.mjs`
+- [ ] Todos los `NEXT_PUBLIC_*` como `ARG` + `ENV` en stage `build`
+- [ ] `.next/static` copiado al runtime
+- [ ] `public/` copiado al runtime
+- [ ] `HOSTNAME=0.0.0.0` en runtime
+- [ ] `CMD ["node", "server.js"]`
+- [ ] Usuario `nextjs` activado
+</file>
+
+<file path=".claude/architecture/07-railway-deploy.md">
+# 07 — Reglas de deploy en Railway para monorepos pnpm
+
+> Reglas específicas de Railway que contradicen guías genéricas de Docker.
+> Aplica a los tres monorepos: `superadmin`, `ecosistema`, `ecosistema-ms`.
+
+---
+
+## Configuración en Railway — reglas fijas
+
+```
+Root Directory: /                         ← raíz del monorepo, siempre
+Dockerfile Path: <servicio>/Dockerfile    ← relativo a la raíz
+Build Command: (vacío)
+Start Command: (vacío)
+```
+
+**No usar Root Directory por servicio** — `pnpm install` no puede resolver los
+packages locales del workspace sin la raíz.
+
+---
+
+## Cache mounts en Railway
+
+**No persisten entre builds** — Railway usa runners efímeros.
+El beneficio viene de la estructura de layers, no de los mounts.
+Se mantienen en el Dockerfile porque sí ayudan en local y GitHub Actions.
+
+| Entorno | Cache mount persiste |
+|---------|---------------------|
+| Docker Desktop local | ✅ sí |
+| GitHub Actions | ✅ sí (con `actions/cache`) |
+| Railway | ❌ no |
+
+---
+
+## Variables de entorno
+
+**Backend** — variables de runtime, configuradas en Railway como variables del servicio.
+
+**Frontend** — `NEXT_PUBLIC_*` deben estar en Railway como **build variables** además
+de runtime. Si solo se configuran como runtime, el bundle tendrá `undefined`.
+
+---
+
+## Health checks
+
+- Todo backend: `GET /health` → `200` en < 200ms
+- Railway apunta a `/health`, no a `/`
+- `HOSTNAME=0.0.0.0` obligatorio en frontends Next.js standalone
+
+---
+
+## Redeploy sin cambios de código
+
+```bash
+make git-empty
+# o:
+git commit --allow-empty -m "chore: force redeploy [$(date +%Y-%m-%d)]"
+git push
+```
+
+---
+
+## Package compartido modificado
+
+Railway no detecta que un servicio necesita rebuild cuando cambia un package del workspace.
+
+```bash
+git push
+git commit --allow-empty -m "chore: rebuild after shared package update"
+git push
+```
+
+---
+
+## Resumen vs. guías genéricas
+
+| Guía genérica | En Railway |
+|---------------|------------|
+| Cache mounts aceleran CI | No persisten — layers importan |
+| Root Directory al subdirectorio | Siempre `/` |
+| `NEXT_PUBLIC_*` opcionales en build | Obligatorias en build |
+| Health check a `/` | Siempre a `/health` |
+| HOSTNAME no necesario | `HOSTNAME=0.0.0.0` obligatorio |
 </file>
 
 <file path=".claude/checklists/observabilidad.md">
