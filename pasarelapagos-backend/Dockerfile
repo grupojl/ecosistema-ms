@@ -13,8 +13,9 @@ ARG NODE_VERSION=22
 ARG PNPM_VERSION=10.30.3
 
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS deps
+FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS deps
 
+RUN apk add --no-cache dumb-init
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 WORKDIR /app
@@ -31,7 +32,7 @@ RUN --mount=type=cache,id=pnpm-pasarela,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
 
 # ─── Stage 2: build ───────────────────────────────────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS build
+FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS build
 
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
@@ -50,15 +51,15 @@ RUN pnpm prisma generate
 RUN pnpm build
 
 # ─── Stage 3: runtime ─────────────────────────────────────────────────────────
-FROM node:${NODE_VERSION}-alpine AS runtime
+FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS runtime
 
+RUN apk add --no-cache dumb-init
 RUN addgroup --system --gid 1001 nodejs \
  && adduser  --system --uid 1001 nestjs
 
 WORKDIR /app
 
 ENV NODE_ENV=production
-# Puerto distinto al resto — evita conflicto si se levantan varios MS en el mismo host
 ENV PORT=3001
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                          ./node_modules
@@ -66,10 +67,10 @@ COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/dist         
 COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/prisma          ./pasarelapagos-backend/prisma
 COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/package.json    ./pasarelapagos-backend/package.json
 COPY --from=build --chown=nestjs:nodejs /app/packages/proto/                       ./packages/proto/
+COPY --chown=nestjs:nodejs pasarelapagos-backend/entrypoint.sh                     ./pasarelapagos-backend/entrypoint.sh
 
 USER nestjs
 
-# HTTP (público — webhooks de MercadoPago/Stripe llegan aquí) + gRPC (privado)
 EXPOSE 3001
 EXPOSE 5002
 
@@ -78,4 +79,4 @@ WORKDIR /app/pasarelapagos-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
-CMD ["node", "dist/main.js"]
+CMD ["dumb-init", "/app/pasarelapagos-backend/entrypoint.sh"]

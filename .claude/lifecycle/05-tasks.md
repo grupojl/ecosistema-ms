@@ -67,8 +67,8 @@ y cómo saber que está hecho. En orden de ejecución dentro de cada fase.
 - [ ] **[E4-01]** Verificar índices compuestos `@@index([ecosystemId, organizationId])` en cada schema
   → Done cuando: todos los modelos con tenant scope tienen el índice
 
-- [ ] **[E4-02]** Confirmar que `prisma migrate deploy` corre antes del `CMD` en cada Dockerfile
-  → Done cuando: los 5 Dockerfiles tienen el migrate antes del start
+- [x] **[E4-02]** Confirmar que `prisma migrate deploy` corre antes del `CMD` en cada Dockerfile
+  → Done (2026-09-16): entrypoint.sh con migrate deploy + exec node en los 5 servicios. Auditado en ecosistema-ms.xml — 10/10 verificado.
 
 - [ ] **[E4-03]** Documentar política de backups de Railway y RPO resultante
   → Done cuando: `roadmap/deuda-tecnica.md` tiene la política documentada

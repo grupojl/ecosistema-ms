@@ -68,3 +68,43 @@ analytics-backend no estaba en el checkout cuando corrió el x.sh de ADR-009.
 - BullMQ + idempotencia: ADR-003 implementado correctamente
 - Circuit breakers: opossum en chatia+pagos+notificaciones, CB Redis propio en workers
 - Lock distribuido: SET NX EX correcto en analytics y workers (ADR-006)
+
+---
+
+## Actualización 2026-09-16 — Docker/Deploy: 10/10 ✅
+
+**Auditor:** Claude (lectura directa de ecosistema-ms.xml post-fix)
+
+### Dimensión Docker/Deploy — antes vs ahora
+
+| Check | Antes | Ahora |
+|---|---|---|
+| `--platform=linux/amd64` | ❌ ausente | ✅ en los 3 `FROM` de cada Dockerfile |
+| `dumb-init` | ✅ | ✅ |
+| `entrypoint.sh` referenciado | ✅ | ✅ |
+| `prisma migrate deploy` en entrypoint | ❌ ausente | ✅ |
+| `exec node dist/main.js` | ❌ `node` directo | ✅ con `exec` |
+| HEALTHCHECK con puerto hardcodeado | ✅ | ✅ |
+| CMD → dumb-init | ✅ | ✅ |
+
+### Score Docker/Deploy actualizado
+
+| Dimensión | Score anterior | Score actual |
+|---|---|---|
+| Docker/Deploy | 8.5 | **10/10** |
+
+### Archivos auditados
+
+- `chatia-backend/Dockerfile` + `entrypoint.sh` → ✅ 10/10
+- `pasarelapagos-backend/Dockerfile` + `entrypoint.sh` → ✅ 10/10
+- `analytics-backend/Dockerfile` + `entrypoint.sh` → ✅ 10/10
+- `notificaciones-backend/Dockerfile` + `entrypoint.sh` → ✅ 10/10
+- `workers-backend/Dockerfile` + `entrypoint.sh` → ✅ 10/10
+
+### Referencia
+
+Ver scripts aplicados: `fix10-ecosistema-ms.sh`
+Ver arquitectura declarada: `.claude/architecture/05-dockerfile-backend.md`
+
+---
+

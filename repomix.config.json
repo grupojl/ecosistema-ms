@@ -27,6 +27,8 @@
     "packages/grpc-client/src/**/*.module.ts",
     "packages/grpc-client/package.json",
 
+    "chatia-backend/Dockerfile",
+    "chatia-backend/.dockerignore",
     "chatia-backend/package.json",
     "chatia-backend/prisma/schema.prisma",
     "chatia-backend/src/main.ts",
@@ -39,6 +41,8 @@
     "chatia-backend/src/**/*.types.ts",
     "chatia-backend/src/**/*.dto.ts",
 
+    "pasarelapagos-backend/Dockerfile",
+    "pasarelapagos-backend/.dockerignore",
     "pasarelapagos-backend/package.json",
     "pasarelapagos-backend/prisma/schema.prisma",
     "pasarelapagos-backend/src/main.ts",
@@ -51,6 +55,8 @@
     "pasarelapagos-backend/src/**/*.types.ts",
     "pasarelapagos-backend/src/**/*.dto.ts",
 
+    "notificaciones-backend/Dockerfile",
+    "notificaciones-backend/.dockerignore",
     "notificaciones-backend/package.json",
     "notificaciones-backend/prisma/schema.prisma",
     "notificaciones-backend/src/main.ts",
@@ -64,6 +70,8 @@
     "notificaciones-backend/src/**/*.interface.ts",
     "notificaciones-backend/src/**/*.dto.ts",
 
+    "analytics-backend/Dockerfile",
+    "analytics-backend/.dockerignore",
     "analytics-backend/package.json",
     "analytics-backend/prisma/schema.prisma",
     "analytics-backend/src/main.ts",
@@ -75,6 +83,8 @@
     "analytics-backend/src/**/*.interface.ts",
     "analytics-backend/src/**/*.dto.ts",
 
+    "workers-backend/Dockerfile",
+    "workers-backend/.dockerignore",
     "workers-backend/package.json",
     "workers-backend/prisma/schema.prisma",
     "workers-backend/src/main.ts",
@@ -86,7 +96,13 @@
     "workers-backend/src/**/*.helper.ts",
     "workers-backend/src/**/*.constants.ts",
     "workers-backend/src/**/*.interface.ts",
-    "workers-backend/src/**/*.dto.ts"
+    "workers-backend/src/**/*.dto.ts",
+
+    "chatia-backend/entrypoint.sh",
+    "pasarelapagos-backend/entrypoint.sh",
+    "notificaciones-backend/entrypoint.sh",
+    "analytics-backend/entrypoint.sh",
+    "workers-backend/entrypoint.sh"
   ],
   "ignore": {
     "useGitignore": true,
