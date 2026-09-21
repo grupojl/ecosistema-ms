@@ -54,3 +54,16 @@ export interface IConversationsRepository {
     isAiActive:     boolean,
   ): Promise<Conversation>;
 }
+
+// ── DT-030: método para handleIncomingMessage ─────────────────────────────
+// Agrega findChannelAccountById al contrato del repository para que
+// ConversationsService no importe PrismaService directamente.
+export interface ChannelAccountRecord {
+  id:             string;
+  organizationId: string;
+  ecosystemId:    string;
+  channelType:    string;
+  externalId:     string;
+  accessToken:    string;
+  extraConfig:    Record<string, unknown>;
+}

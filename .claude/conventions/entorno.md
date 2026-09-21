@@ -39,3 +39,40 @@ Si ves `catalog:algo` en cualquier `package.json` → es un bug, normalizar a `c
 | `notificaciones-backend` | 3002 | 5003 |
 | `analytics-backend` | 3003 | 5004 |
 | `workers-backend` | 3004 | 5005 |
+| `marketing-backend` | 3005 | 5006 |
+
+## Variables de entorno — marketing-backend
+
+```bash
+# ── Plataformas Ad ────────────────────────────────────────────────────────────
+META_APP_ID=                   # Meta for Developers → App ID
+META_APP_SECRET=               # Meta for Developers → App Secret
+GOOGLE_ADS_CLIENT_ID=          # Google Cloud → OAuth 2.0 Client ID
+GOOGLE_ADS_CLIENT_SECRET=      # Google Cloud → OAuth 2.0 Client Secret
+GOOGLE_ADS_DEVELOPER_TOKEN=    # Google Ads API Center → Developer Token
+TIKTOK_APP_ID=                 # TikTok for Business → App ID
+TIKTOK_APP_SECRET=             # TikTok for Business → App Secret
+
+# ── Sync config ───────────────────────────────────────────────────────────────
+MARKETING_SYNC_INTERVAL_MINUTES=15   # frecuencia de sync de métricas por org
+MARKETING_AUTOMATION_INTERVAL_HOURS=1 # frecuencia de evaluación de reglas
+
+# ── Interno (mismo valor que todos los MS) ────────────────────────────────────
+INTERNAL_API_KEY=              # igual en todos los servicios + superadmin
+MARKETING_GRPC_PORT=5006
+
+# ── Infra ─────────────────────────────────────────────────────────────────────
+DATABASE_URL=                  # PostgreSQL dedicado para marketing-backend
+REDIS_URL=                     # mismo Redis compartido del ecosistema
+NODE_ENV=production
+PORT=3005
+```
+
+## Paquetes externos específicos de marketing-backend
+
+| Paquete | Propósito |
+|---------|-----------|
+| `facebook-nodejs-business-sdk` | Meta Ads API |
+| `google-ads-api` | Google Ads API v17+ |
+| `axios` | TikTok Ads API (sin SDK oficial estable) |
+| `opossum` | Circuit breaker (igual que chatia/pagos/notificaciones) |

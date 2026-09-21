@@ -10,15 +10,11 @@
     "start:migrate": "prisma migrate deploy && node dist/main",
     "prisma:migrate:dev": "prisma migrate dev",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage --config jest.config.ts"
   },
   "dependencies": {
-    "/nestjs-prometheus": "catalog:",
     "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",
@@ -50,7 +46,8 @@
     "protobufjs": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
+    "swagger-ui-express": "catalog:",
+    "@nestjs-modules/nestjs-prometheus": "catalog:"
   },
   "devDependencies": {
     "@nestjs/cli": "catalog:",

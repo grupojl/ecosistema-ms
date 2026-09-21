@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { QUEUES, JOBS } from '../queue.constants';
 import { ConversationsService } from '../../conversations/conversations.service';
+import { MultimodalService } from '../../channels/multimodal.service.js';
 import { ChannelType } from '@prisma/client';
 import { IncomingMessage } from '../../channels/channel.interface';
 
@@ -17,7 +18,10 @@ export interface IncomingMessageJobData {
 export class IncomingMessageProcessor extends WorkerHost {
   private readonly logger = new Logger(IncomingMessageProcessor.name);
 
-  constructor(private readonly conversations: ConversationsService) {
+  constructor(
+    private readonly conversations: ConversationsService,
+    private readonly multimodal:    MultimodalService,
+  ) {
     super();
   }
 
@@ -28,7 +32,12 @@ export class IncomingMessageProcessor extends WorkerHost {
       `[job:${job.id}] Procesando mensaje ${msg.externalId} — canal: ${channelType}`,
     );
 
-    await this.conversations.handleIncomingMessage(channelAccountId, channelType, msg);
+    // Normalizar el mensaje a texto antes de enviarlo al LLM
+    // El LLM siempre recibe texto — MultimodalService garantiza esto
+    // Ref: .claude/modules/chatia-backend/multimodal-adapters.md
+    const normalized = await this.multimodal.normalize(msg, '');
+    const normalizedMsg = { ...msg, content: normalized.text };
+    await this.conversations.handleIncomingMessage(channelAccountId, channelType, normalizedMsg);
   }
 
   @OnWorkerEvent('failed')

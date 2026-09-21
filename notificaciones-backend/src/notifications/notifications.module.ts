@@ -42,3 +42,9 @@ import { DlqModule }                 from './dlq/dlq.module.js';
   exports: [NotificationsService],
 })
 export class NotificationsModule {}
+
+// ── ECO-03: MANUAL — agregar al array providers del @Module:
+//   import { PrismaNotificationsRepository } from './repository/prisma-notifications.repository.js';
+//   import { NOTIFICATIONS_REPOSITORY }      from './repository/notifications.repository.interface.js';
+//   providers: [..., PrismaNotificationsRepository, { provide: NOTIFICATIONS_REPOSITORY, useClass: PrismaNotificationsRepository }]
+//   exports:   [..., NOTIFICATIONS_REPOSITORY]

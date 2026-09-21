@@ -33,14 +33,11 @@ export class ConversationsService {
     channelType: ChannelType,
     msg: IncomingMessage,
   ): Promise<void> {
-    const account = await this.prisma.channelAccount.findUnique({
-      where:   { id: channelAccountId },
-      include: { organization: true },
-    });
+    const account = await this.conversationsRepository.findChannelAccountById(channelAccountId);
     if (!account) throw new NotFoundException(`ChannelAccount ${channelAccountId} no encontrada`);
 
     const organizationId = account.organizationId;
-    const ecosystemId    = account.organization.ecosystemId;
+    const ecosystemId    = account.ecosystemId;
 
     // Upsert contacto
     const contact = await this.prisma.contact.upsert({

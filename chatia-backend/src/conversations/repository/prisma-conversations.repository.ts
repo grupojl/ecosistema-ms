@@ -166,3 +166,23 @@ export class PrismaConversationsRepository implements IConversationsRepository {
     return this.toEntity({ ...row, organizationId });
   }
 }
+
+  // ── DT-030: elimina this.prisma.channelAccount en ConversationsService ──
+  async findChannelAccountById(
+    channelAccountId: string,
+  ): Promise<import('./conversations.repository.interface.js').ChannelAccountRecord | null> {
+    const account = await this.prisma.channelAccount.findUnique({
+      where:   { id: channelAccountId },
+      include: { organization: { select: { ecosystemId: true } } },
+    });
+    if (!account) return null;
+    return {
+      id:             account.id,
+      organizationId: account.organizationId,
+      ecosystemId:    (account as any).organization?.ecosystemId ?? '',
+      channelType:    account.channelType as string,
+      externalId:     account.externalId,
+      accessToken:    account.accessToken,
+      extraConfig:    (account.extraConfig ?? {}) as Record<string, unknown>,
+    };
+  }

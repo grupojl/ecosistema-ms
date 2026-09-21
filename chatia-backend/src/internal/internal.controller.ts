@@ -1,56 +1,119 @@
 // chatia-backend/src/internal/internal.controller.ts
-// Migrado de class-validator → Zod inline (ADR-001)
-// Protegido por InternalApiKeyGuard — sin Firebase, sin TenantGuard.
+//
+// Endpoints REST consumidos por grupojl-control (superadmin).
+// Protegidos por InternalApiKeyGuard — sin Firebase ni TenantGuard.
+//
+// GET /internal/conversations/escalated
+//   → conversaciones abiertas sin respuesta > N minutos (norte Intercom Admin)
+//   → superadmin ve cuáles orgs tienen escalaciones pendientes
+//
+// GET /internal/conversations/stats
+//   → totales por ecosistema para el dashboard de superadmin
 import {
-  Body, Controller, Delete, Get,
-  HttpCode, HttpStatus, Param, Post, UseGuards,
+  Controller, Get, Query, UseGuards,
 } from '@nestjs/common';
-import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { InternalApiKeyGuard }  from './internal-api-key.guard';
-import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
-import { ProjectsService }      from '../projects/projects.service';
-import { ZodValidationPipe }    from '../common/pipes/zod-validation.pipe';
-import { InternalChatSchema, InternalProjectSchema } from './schemas';
-import type { InternalChatInput, InternalProjectInput } from './schemas';
+import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
+import { InternalApiKeyGuard }              from './internal-api-key.guard.js';
+import { PrismaService }                    from '../prisma/prisma.service.js';
+import { ZodValidationPipe }               from '../common/pipes/zod-validation.pipe.js';
+import { z }                               from 'zod';
+
+// ── Schemas Zod ──────────────────────────────────────────────────────────────
+
+const EscalatedConvsSchema = z.object({
+  ecosystemId:             z.string().optional(),
+  minutesWithoutResponse:  z.coerce.number().int().positive().default(60),
+  limit:                   z.coerce.number().int().min(1).max(200).default(50),
+});
+type EscalatedConvsDto = z.infer<typeof EscalatedConvsSchema>;
+
+const ConvsStatsSchema = z.object({
+  ecosystemId: z.string(),
+  from:        z.string().datetime().optional(),
+  to:          z.string().datetime().optional(),
+});
+type ConvsStatsDto = z.infer<typeof ConvsStatsSchema>;
+
+// ── Controller ───────────────────────────────────────────────────────────────
 
 @ApiTags('internal')
-@ApiHeader({ name: 'x-api-key', required: true })
+@ApiHeader({ name: 'x-internal-api-key', required: true })
 @UseGuards(InternalApiKeyGuard)
 @Controller('internal')
 export class InternalController {
-  constructor(
-    private readonly chatService:     AssistantChatService,
-    private readonly projectsService: ProjectsService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  @Post('chat')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Enviar mensaje al asistente IA (uso interno)' })
-  chat(@Body(new ZodValidationPipe(InternalChatSchema)) dto: InternalChatInput) {
-    return this.chatService.chat(dto);
-  }
-
-  @Get(':organizationId/projects')
-  listProjects(@Param('organizationId') organizationId: string) {
-    return this.projectsService.findAll(organizationId);
-  }
-
-  @Post('projects')
-  @HttpCode(HttpStatus.CREATED)
-  createProject(
-    @Body(new ZodValidationPipe(InternalProjectSchema)) dto: InternalProjectInput,
+  // ── GET /internal/conversations/escalated ─────────────────────────────────
+  @Get('conversations/escalated')
+  @ApiOperation({ summary: 'Conversaciones escaladas sin respuesta > N minutos' })
+  async escalated(
+    @Query(new ZodValidationPipe(EscalatedConvsSchema)) dto: EscalatedConvsDto,
   ) {
-    return this.projectsService.create(dto.organizationId, dto);
+    const cutoff = new Date(Date.now() - dto.minutesWithoutResponse * 60 * 1000);
+
+    // Buscar conversaciones abiertas (OPEN status) con lastMessageAt antes del cutoff
+    // La "escalada" en este contexto = abierta y sin respuesta del agente por > N min
+    const convs = await this.prisma.conversation.findMany({
+      where: {
+        ...(dto.ecosystemId ? { ecosystemId: dto.ecosystemId } : {}),
+        status:        'OPEN',
+        updatedAt:     { lt: cutoff },
+        assignedAgent: null,          // sin agente asignado = sin atención
+      },
+      select: {
+        id:             true,
+        ecosystemId:    true,
+        organizationId: true,
+        channelType:    true,
+        updatedAt:      true,
+        contact: {
+          select: { name: true },
+        },
+      },
+      orderBy: { updatedAt: 'asc' }, // más antigua primero
+      take:    dto.limit,
+    });
+
+    return convs.map((c) => ({
+      id:             c.id,
+      ecosystemId:    c.ecosystemId,
+      organizationId: c.organizationId,
+      channel:        c.channelType,
+      contactName:    c.contact?.name ?? 'Sin nombre',
+      agentName:      null,
+      lastMessageAt:  c.updatedAt.toISOString(),
+      minutesWaiting: Math.floor((Date.now() - c.updatedAt.getTime()) / 60_000),
+    }));
   }
 
-  @Delete(':organizationId/projects/:slug')
-  deleteProject(
-    @Param('organizationId') organizationId: string,
-    @Param('slug') slug: string,
+  // ── GET /internal/conversations/stats ─────────────────────────────────────
+  @Get('conversations/stats')
+  @ApiOperation({ summary: 'Stats de conversaciones por ecosistema' })
+  async stats(
+    @Query(new ZodValidationPipe(ConvsStatsSchema)) dto: ConvsStatsDto,
   ) {
-    return this.projectsService.removeBySlug(slug, organizationId);
-  }
+    const where = {
+      ecosystemId: dto.ecosystemId,
+      ...(dto.from || dto.to ? {
+        createdAt: {
+          ...(dto.from ? { gte: new Date(dto.from) } : {}),
+          ...(dto.to   ? { lte: new Date(dto.to)   } : {}),
+        },
+      } : {}),
+    };
 
-  @Get('ping')
-  ping() { return { status: 'ok', service: 'chatia-backend' }; }
+    const [total, resolved, escalated] = await Promise.all([
+      this.prisma.conversation.count({ where }),
+      this.prisma.conversation.count({ where: { ...where, status: 'RESOLVED' } }),
+      this.prisma.conversation.count({
+        where: {
+          ...where,
+          status:        'OPEN',
+          assignedAgent: null,
+        },
+      }),
+    ]);
+
+    return { total, resolved, escalated, avgResponseMinutes: 0 };
+  }
 }

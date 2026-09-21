@@ -9,6 +9,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { envSchema } from './config/env.validation';
 
 // Core
+import { InternalModule } from './internal/internal.module.js';
 import { PrismaModule }   from './modules/prisma/prisma.module';
 import { FirebaseModule }    from './modules/firebase/firebase.module';
 import { SharedGuardsModule } from './common/shared-guards.module';
@@ -70,6 +71,7 @@ import { TenantThrottlerGuard } from './common/guards/tenant-throttler.guard';
     EventEmitterModule.forRoot(),
 
     // Core
+    InternalModule,
     PrismaModule,
     FirebaseModule,
     SharedGuardsModule,

@@ -30,6 +30,7 @@ Proyectos, Contactos, Conversaciones, Mensajes.
 | Carpeta | Regla |
 |---------|-------|
 | `src/channels/` (implementaciones) | Nuevos canales siguen `channel.interface.ts`. No se modifica la interface sin ADR. |
+| `src/channels/adapters/` | Nuevos adapters multimodales siguen `IMultimodalAdapter`. Un adapter por tipo de media. CB obligatorio si toca proveedor externo. Fallback explícito siempre. |
 | `src/modules/` (manzana/mexus/welver) | Nuevos ecosistemas siguen el mismo molde (enrich-context). La interface `ProjectStrategy` es BLOQUEANTE. |
 | `src/faq/` (subcarpetas de documento/ingestion/rag) | La arquitectura de RAG es el molde. Nuevas funciones de FAQ siguen la misma estructura. |
 
@@ -50,3 +51,36 @@ Proyectos, Contactos, Conversaciones, Mensajes.
 
 `src/conversations/` — será el molde una vez migrado a Domain + Repository.
 Ver `modules/chatia-backend/conversations.md`.
+
+---
+
+## Adapters multimodales — implementados (sesión 2026-09-19)
+
+chatia-backend normaliza TODOS los tipos de mensaje de WhatsApp a texto
+antes de enviarlo al LLM. El canal ya soportaba todos los tipos en
+`channel.interface.ts` — los adapters son el puente.
+
+```
+IncomingMessage.type    →   Adapter                →  texto para LLM
+─────────────────────────────────────────────────────────────────────
+text                    →   (directo)               →  msg.content
+audio                   →   SpeechToTextAdapter     →  Groq Whisper
+image                   →   ImageToTextAdapter      →  Claude Vision
+document                →   DocumentToTextAdapter   →  extracción PDF
+location                →   LocationToTextAdapter   →  OSM Nominatim
+video                   →   VideoToTextAdapter      →  stub Fase 2
+sticker                 →   (directo)               →  '[sticker]'
+```
+
+**Invariante:** `MultimodalService.normalize()` siempre retorna texto.
+El LLM nunca recibe un `mediaUrl` de WhatsApp CDN.
+
+**Punto de inserción:** `IncomingMessageProcessor.process()` — antes de
+`ConversationsService.handleIncomingMessage()`.
+
+**Variables de entorno nuevas:**
+- `ANTHROPIC_API_KEY` — Claude Vision
+- `CARTESIA_API_KEY` — Cartesia TTS
+- `GROQ_API_KEY` — ya existía (Groq Whisper STT)
+
+**Referencia:** `.claude/modules/chatia-backend/multimodal-adapters.md`

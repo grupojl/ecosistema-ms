@@ -16,7 +16,7 @@
 - NestJS 11 · Prisma 7 · PostgreSQL · Redis · BullMQ · Firebase Admin
 - gRPC inter-servicio (@nestjs/microservices + @grpc/grpc-js)
 - pnpm 10 workspaces con catalog único
-- Deploy: Railway — 5 servicios separados, mismo repo
+- Deploy: Railway — 6 servicios separados, mismo repo (marketing-backend listo para Railway)
 
 ## Microservicios
 
@@ -27,6 +27,7 @@
 | notificaciones-backend | 3002 | 5003 | Sin ZodFilter ⚠️ |
 | analytics-backend | 3003 | 5004 | Sin ZodFilter + DT-023 pendiente ⚠️ |
 | workers-backend | 3004 | 5005 | Sin ZodFilter ⚠️ |
+| marketing-backend | 3005 | 5006 | ZodFilter + pino ✅ implementado |
 
 ## Lo más sólido
 
@@ -46,10 +47,74 @@
 
 ## Próximas tareas (en orden de impacto)
 
-1. Correr x.sh con los 5 servicios presentes en el checkout
-2. Aplicar parche DT-023 (ver .claude/patches/DT-023-analytics-agent-metrics.md)
-3. Refactorizar handleIncomingMessage en ConversationsService
+1. `make typecheck-chatia` → 0 errores post-multimodal
+2. Agregar `ANTHROPIC_API_KEY` y `CARTESIA_API_KEY` en Railway (chatia-backend)
+3. `make typecheck-pagos` → 0 errores post-fire-forget marketing
+4. Deploy marketing-backend en Railway
+5. Correr x.sh sobre notificaciones, analytics, workers (ZodFilter pendiente)
 
+## Sesión actual — multimodal chatia-backend
+
+### Adapters multimodales implementados en chatia-backend
+
+| Adapter | Proveedor | Estado |
+|---|---|---|
+| SpeechToTextAdapter | Groq Whisper | ✅ |
+| DocumentToTextAdapter | extracción PDF interna | ✅ |
+| ImageToTextAdapter | Claude Vision | ✅ |
+| LocationToTextAdapter | OSM Nominatim (gratuito) | ✅ |
+| TextToSpeechAdapter | Cartesia | ✅ |
+| VideoToTextAdapter | stub Fase 2 | ⏳ |
+
+### Punto de inserción
+
+`IncomingMessageProcessor` llama `MultimodalService.normalize()` antes de
+`ConversationsService.handleIncomingMessage()`. El LLM siempre recibe texto.
+
+### Variables de entorno nuevas en chatia-backend
+```bash
+ANTHROPIC_API_KEY=   # Claude Vision (ImageToTextAdapter)
+CARTESIA_API_KEY=    # TTS (TextToSpeechAdapter)
+# GROQ_API_KEY ya existe (SpeechToTextAdapter)
+```
+## Sesión actual — 2026-09-19
+
+- marketing-backend implementado completo (36 archivos)
+- pasarelapagos-backend: fire-forget en WebhookProcessor cuando CAPTURED
+- monorepo: pnpm-workspace, package.json raíz, Makefile actualizados
 ## Regla antes de nueva sesión
 
 Leer en orden: CLAUDE.md → AUDIT-LAST.md → decisions/ADR-009 → roadmap/deuda-tecnica.md
+
+---
+
+## Markets — contexto global en microservicios (ADR-014)
+
+### Principio en este repo
+
+Los MS de ecosistema-ms son **consumidores del contexto de Market**, no dueños del modelo.
+El modelo Market vive en welver/realsass-sass-back.
+
+### Cómo llega el contexto
+
+```
+X-Market-Country: CO    →  header HTTP desde el caller
+X-Market-ID: <uuid>     →  header HTTP desde el caller (resuelto upstream)
+```
+
+Nunca se resuelve ni valida aquí. Si llega → se usa. Si no → comportamiento actual.
+
+### Impacto por MS
+
+| MS | Campo nuevo | Uso |
+|----|------------|-----|
+| chatia-backend | `marketCountry` en Conversation | System prompt contextualizado |
+| pasarelapagos-backend | `marketCountry` en Transaction | Auditoría y reconciliación |
+| analytics-backend | `marketCountry` en AnalyticsEvent | Dimensión de segmentación |
+| notificaciones-backend | `marketCountry` en contexto | Templates localizados |
+| workers-backend | `marketCountry` en job payload | Contexto de fulfillment |
+
+### Cambio en packages/auth-server (TenantContext)
+
+`marketCountry?: string` — campo opcional, backward compatible.
+Ver `.claude/modules/packages/markets-tenant-context.md`

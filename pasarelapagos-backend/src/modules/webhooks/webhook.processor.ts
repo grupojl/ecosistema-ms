@@ -1,9 +1,11 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
+import { InjectQueue }                          from '@nestjs/bullmq';
+import { Queue }                               from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
 import { assertValidTransition } from '../payments/payment-state.machine';
-import { QUEUE_WEBHOOKS } from '../../common/constants/queues';
+import { QUEUE_WEBHOOKS, QUEUE_MARKETING_ATTRIBUTION, JOB_ATTRIBUTE_CONVERSION } from '../../common/constants/queues';
 import { WebhookEvent } from '../providers/provider.interface';
 import { PaymentStatus } from '@prisma/client';
 import { MetricsService } from '../metrics/metrics.service';
@@ -33,6 +35,8 @@ export class WebhookProcessor extends WorkerHost {
   constructor(
     private readonly prisma:   PrismaService,
     private readonly metrics:  MetricsService,
+    @InjectQueue(QUEUE_MARKETING_ATTRIBUTION)
+    private readonly marketingAttributionQueue: Queue,
   ) {
     super();
   }
@@ -66,6 +70,33 @@ export class WebhookProcessor extends WorkerHost {
       this.logger.debug(`Estado ya es ${newStatus}, skip idempotente.`);
       await this.markProcessed(webhookInboundId);
       this.metrics.recordWebhook({ provider: event.providerId, status: 'processed', lagMs });
+
+    // ── Fire-forget: atribución de marketing ─────────────────────────────
+    // Norte Triple Whale: revenue real de pasarelapagos, no el de la plataforma
+    // Ref: .claude/contracts/marketing-integration.md
+    if (newStatus === PaymentStatus.CAPTURED) {
+      this.marketingAttributionQueue
+        .add(
+          JOB_ATTRIBUTE_CONVERSION,
+          {
+            paymentId:      payment.id,
+            ecosystemId:    payment.tenantId,
+            organizationId: payment.organizationId,
+            revenue:        payment.amountMinor.toString(),
+            currency:       payment.currency,
+            occurredAt:     new Date().toISOString(),
+          },
+          {
+            jobId:    `attribution:${payment.id}`,
+            attempts: 3,
+            backoff:  { type: 'exponential' as const, delay: 5_000 },
+          },
+        )
+        .catch((err: Error) =>
+          this.logger.warn(`[marketing-attribution] fire-forget failed: ${err.message}`)
+        );
+      // NO await — el pago esta confirmado, la atribucion es best-effort
+    }
       return;
     }
 
@@ -87,6 +118,7 @@ export class WebhookProcessor extends WorkerHost {
 
     await this.markProcessed(webhookInboundId);
     this.metrics.recordWebhook({ provider: event.providerId, status: 'processed', lagMs });
+
 
     this.logger.log(`Payment ${payment.id}: ${payment.status} → ${newStatus}`);
   }

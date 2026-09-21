@@ -1,9 +1,19 @@
-import { Module } from '@nestjs/common';
-import { TerminusModule } from '@nestjs/terminus';
-import { HealthController } from './health.controller';
+// pasarelapagos-backend/src/modules/health/health.module.ts
+import { Module }          from '@nestjs/common';
+import { BullModule }      from '@nestjs/bullmq';
+import { HealthController } from './health.controller.js';
+import { ProvidersModule } from '../providers/providers.module.js';
+import { QUEUE_WEBHOOKS, QUEUE_RECONCILE, QUEUE_DLQ } from '../../common/constants/queues.js';
 
 @Module({
-  imports: [TerminusModule],
+  imports: [
+    ProvidersModule,
+    BullModule.registerQueue(
+      { name: QUEUE_WEBHOOKS },
+      { name: QUEUE_RECONCILE },
+      { name: QUEUE_DLQ },
+    ),
+  ],
   controllers: [HealthController],
 })
 export class HealthModule {}

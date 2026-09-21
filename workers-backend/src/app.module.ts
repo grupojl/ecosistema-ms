@@ -6,6 +6,7 @@ import { BullModule }   from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
+import { InternalModule }  from './internal/internal.module.js';
 import { PrismaModule }    from './prisma/prisma.module.js';
 import { HealthModule }    from './health/health.module.js';
 import { MetricsModule }   from './metrics/metrics.module.js';
@@ -63,6 +64,7 @@ const PROTO_DIR = join(process.cwd(), 'proto');
       },
     ]),
 
+    InternalModule,
     PrismaModule,
     MetricsModule,
     HealthModule,

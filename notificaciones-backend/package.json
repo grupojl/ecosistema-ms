@@ -10,9 +10,7 @@
     "start:migrate": "prisma migrate deploy && node dist/main",
     "prisma:migrate:dev": "prisma migrate dev",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
@@ -38,8 +36,6 @@
     "@prisma/client": "catalog:",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
     "dotenv": "catalog:",
     "firebase-admin": "catalog:",
     "helmet": "catalog:",

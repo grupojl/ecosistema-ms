@@ -1,0 +1,168 @@
+// schema.prisma — marketing-backend
+// Norte: Triple Whale (ROAS honesto) + Motion (automatización simple) + Northbeam (atribución honesta)
+// Invariante: ecosystemId + organizationId en TODOS los modelos de negocio
+// Ref: .claude/services/marketing-backend.md
+// Ref: .claude/architecture/norte-marketing.md
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AdPlatform {
+  META
+  GOOGLE
+  TIKTOK
+}
+
+enum AdAccountStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+enum CampaignStatus {
+  ACTIVE
+  PAUSED
+  DELETED
+}
+
+enum AutomationActionType {
+  PAUSE
+  SCALE_BUDGET
+  NOTIFY
+}
+
+enum AttributionModel {
+  LAST_CLICK
+}
+
+// Cuenta publicitaria — accessToken CIFRADO, nunca en responses REST
+model AdAccount {
+  id             String          @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  platform       AdPlatform
+  externalId     String
+  name           String
+  status         AdAccountStatus @default(ACTIVE)
+  accessToken    String          // cifrado — TODO(pii): PII service Fase 2
+  refreshToken   String?
+  tokenExpiresAt DateTime?
+  lastSyncAt     DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  campaigns Campaign[]
+
+  @@unique([platform, externalId, organizationId])
+  @@index([ecosystemId, organizationId])
+  @@index([status])
+}
+
+// Espejo de campaña en la plataforma — sync cada 15 min
+model Campaign {
+  id             String         @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  adAccountId    String
+  externalId     String
+  name           String
+  platform       AdPlatform
+  status         CampaignStatus @default(ACTIVE)
+  dailyBudget    Decimal?       @db.Decimal(12, 2)
+  totalBudget    Decimal?       @db.Decimal(12, 2)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  adAccount       AdAccount        @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  dailyMetrics    DailyMetric[]
+  automationRules AutomationRule[]
+
+  @@unique([externalId, adAccountId])
+  @@index([ecosystemId, organizationId])
+  @@index([status])
+  @@index([adAccountId])
+}
+
+// Métricas diarias — roas calculado al insertar (no on-the-fly)
+// revenue viene de pasarelapagos (honesto), NO del reporte de Meta (inflado)
+model DailyMetric {
+  id          String   @id @default(cuid())
+  campaignId  String
+  date        DateTime @db.Date
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  spend       Decimal  @default(0) @db.Decimal(12, 2)
+  conversions Int      @default(0)
+  revenue     Decimal  @default(0) @db.Decimal(12, 2)
+  roas        Decimal? @db.Decimal(8, 4)
+  reach       Int?
+  frequency   Decimal? @db.Decimal(6, 2)
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, date])
+  @@index([campaignId])
+  @@index([date])
+}
+
+// Reglas de automatización — condition + action en lenguaje humano (norte Motion)
+// condition: { metric, operator, value, windowDays }
+// action: { type: pause|scale_budget|notify, factor? }
+model AutomationRule {
+  id         String   @id @default(cuid())
+  campaignId String
+  name       String
+  isActive   Boolean  @default(true)
+  condition  Json
+  action     Json
+  lastRunAt  DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId, isActive])
+}
+
+// Atribución de conversiones — campaignId nullable (honestidad Northbeam)
+// paymentId @unique: jobId determinista en BullMQ previene doble atribución
+model AttributionEvent {
+  id               String           @id @default(cuid())
+  ecosystemId      String
+  organizationId   String
+  paymentId        String           @unique
+  campaignId       String?
+  platform         AdPlatform?
+  revenue          Decimal          @db.Decimal(12, 2)
+  currency         String           @default("ARS")
+  attributionModel AttributionModel @default(LAST_CLICK)
+  attributedAt     DateTime         @default(now())
+
+  @@index([ecosystemId, organizationId])
+  @@index([campaignId])
+  @@index([attributedAt])
+}
+
+// Log de acciones automáticas — visible en el frontend (norte Motion)
+model AutomationActionLog {
+  id               String               @id @default(cuid())
+  automationRuleId String
+  campaignId       String
+  organizationId   String
+  actionType       AutomationActionType
+  triggerSnapshot  Json
+  success          Boolean
+  errorMessage     String?
+  executedAt       DateTime             @default(now())
+
+  @@index([campaignId])
+  @@index([organizationId])
+  @@index([executedAt])
+}

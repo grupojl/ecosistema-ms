@@ -42,3 +42,23 @@ La estrategia se configura por organizacion.
 OK — funcional en produccion.
 Sin state machine formal para transiciones invalidas.
 Sin tests unitarios de AssignmentService.
+
+---
+
+## Integración con superadmin (2026-09-19)
+
+chatia-backend ya tiene `src/internal/` con `InternalApiKeyGuard`.
+Hay que agregar los endpoints de conversaciones escaladas al `InternalController`.
+
+### Query de conversaciones escaladas
+
+```ts
+// Conversaciones abiertas sin respuesta del agente por > N minutos
+// OPEN status + lastMessageAt < now - minutesWithoutResponse
+// Ordenadas por lastMessageAt ASC (más antigua primero)
+```
+
+### Task ejecutable: [ECO-I-01]
+
+Verificar primero qué endpoints ya existen en `internal.controller.ts`.
+Si ya hay algo para superadmin, extenderlo. Si no, agregar.

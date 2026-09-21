@@ -738,7 +738,8 @@ TIMESTAMP := $(shell date +"%Y-%m-%d %H:%M:%S")
         generate-notificaciones generate-analytics generate-workers \
         railway-chatia railway-pagos \
         railway-notificaciones railway-analytics railway-workers railway-all-new \
-        seed-chatia setup queue-stats help
+        seed-chatia setup queue-stats help \
+        dev-marketing migrate-marketing generate-marketing railway-marketing
 
 help:
 	@echo "================================================="
@@ -1050,6 +1051,24 @@ setup: install docker-up migrate-all
 	@echo "  3. make seed-chatia"
 	@echo "  4. make dev"
 	@echo ""
+# ─────────────────────────────────────────────────────────────────────────────
+# MARKETING-BACKEND
+# ─────────────────────────────────────────────────────────────────────────────
+dev-marketing:
+	pnpm --filter marketing-backend start:dev
+
+migrate-marketing:
+	cd marketing-backend && pnpm exec prisma migrate dev
+
+migrate-deploy-marketing:
+	cd marketing-backend && pnpm exec prisma migrate deploy
+
+generate-marketing:
+	cd marketing-backend && pnpm exec prisma generate
+
+railway-marketing:
+	docker build -f marketing-backend/Dockerfile -t ecosistema-ms/marketing-backend:local .
+	@echo "[✓] ecosistema-ms/marketing-backend:local"
 </file>
 
 <file path="package.json">
@@ -1060,8 +1079,8 @@ setup: install docker-up migrate-all
   "description": "Ecosistema de microservicios — grupojl/ecosistema-ms",
   "scripts": {
     "build:packages": "pnpm --filter \"./packages/*\" build",
-    "build": "pnpm build:packages && pnpm --recursive --filter \"./chatia-backend\" --filter \"./pasarelapagos-backend\" --filter \"./notificaciones-backend\" --filter \"./analytics-backend\" --filter \"./workers-backend\" build",
-    "dev": "pnpm --parallel --filter chatia-backend --filter pasarelapagos-backend --filter notificaciones-backend --filter analytics-backend --filter workers-backend start:dev",
+    "build": "pnpm build:packages && pnpm --recursive --filter \"./chatia-backend\" --filter \"./pasarelapagos-backend\" --filter \"./notificaciones-backend\" --filter \"./analytics-backend\" --filter \"./workers-backend\" --filter \"./marketing-backend\" build",
+    "dev": "pnpm --parallel --filter chatia-backend --filter pasarelapagos-backend --filter notificaciones-backend --filter analytics-backend --filter workers-backend --filter marketing-backend start:dev",
     "lint": "pnpm --recursive lint",
     "typecheck": "pnpm --recursive typecheck",
     "test": "pnpm --recursive test"
@@ -1798,9 +1817,7 @@ model ContactPreference {
     "start:migrate": "prisma migrate deploy && node dist/main",
     "prisma:migrate:dev": "prisma migrate dev",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
     "test:cov": "jest --coverage"
   },
   "dependencies": {
@@ -1826,8 +1843,6 @@ model ContactPreference {
     "@prisma/client": "catalog:",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
     "dotenv": "catalog:",
     "firebase-admin": "catalog:",
     "helmet": "catalog:",
@@ -2134,15 +2149,11 @@ model CampaignRecipient {
     "start:migrate": "prisma migrate deploy && node dist/main",
     "prisma:migrate:dev": "prisma migrate dev",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
     "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage --config jest.config.ts"
   },
   "dependencies": {
-    "/nestjs-prometheus": "catalog:",
     "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",
@@ -2174,7 +2185,8 @@ model CampaignRecipient {
     "protobufjs": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
+    "swagger-ui-express": "catalog:",
+    "@nestjs-modules/nestjs-prometheus": "catalog:"
   },
   "devDependencies": {
     "@nestjs/cli": "catalog:",
@@ -2447,6 +2459,7 @@ packages:
   - "workers-backend"
   - "analytics-backend"
   - "notificaciones-backend"
+  - "marketing-backend"
   - "packages/*"
 catalog:
   # ── Core ──────────────────────────────────────────────

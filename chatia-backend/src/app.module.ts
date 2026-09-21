@@ -25,6 +25,7 @@ import { ContactsModule }       from './contacts/contacts.module.js';
 import { ConversationsModule }  from './conversations/conversations.module.js';
 import { MessagesModule }       from './messages/messages.module.js';
 import { ChannelsModule }        from './channels/channel.module.js';
+import { MultimodalModule }      from './channels/multimodal.module.js';
 import { ChannelAccountsModule } from './channel-accounts/channel-accounts.module.js';
 import { AssistantModule }      from './assistant/assistant.module.js';
 import { FaqModule }            from './faq/faq.module.js';
@@ -72,6 +73,7 @@ import { AiConfigModule }       from './ai-config/ai-config.module.js';
     ConversationsModule,
     MessagesModule,
     ChannelsModule,
+    MultimodalModule,
     ChannelAccountsModule,
     AssistantModule,
     FaqModule,

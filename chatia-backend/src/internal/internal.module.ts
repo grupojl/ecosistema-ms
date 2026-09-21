@@ -1,14 +1,12 @@
-// src/internal/internal.module.ts
+// chatia-backend/src/internal/internal.module.ts
 import { Module }             from '@nestjs/common';
-import { InternalController } from './internal.controller';
-import { AssistantModule }    from '../assistant/assistant.module';
-import { ProjectsModule }     from '../projects/projects.module';
+import { InternalApiKeyGuard } from './internal-api-key.guard.js';
+import { InternalController }  from './internal.controller.js';
+import { PrismaModule }        from '../prisma/prisma.module.js';
 
 @Module({
-  imports: [
-    AssistantModule,
-    ProjectsModule,
-  ],
+  imports:     [PrismaModule],
   controllers: [InternalController],
+  providers:   [InternalApiKeyGuard],
 })
 export class InternalModule {}

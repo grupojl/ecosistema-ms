@@ -64,3 +64,69 @@
 - Implementa la interface del dominio, no la del proveedor
 - Circuit breaker obligatorio si el proveedor es crítico
 - Nunca exponer tipos del SDK del proveedor fuera del adapter
+
+## marketing-backend — estructura de dominio
+
+```
+marketing-backend/
+  src/
+    ad-accounts/
+      adapters/
+        meta-ads.adapter.ts         # Circuit breaker obligatorio
+        google-ads.adapter.ts       # Circuit breaker obligatorio
+        tiktok-ads.adapter.ts       # Circuit breaker obligatorio
+      interfaces/
+        ad-platform.interface.ts    # Contrato que todos los adapters implementan
+      ad-accounts.controller.ts
+      ad-accounts.service.ts
+      ad-accounts.module.ts
+    campaigns/
+      domain/
+        campaign.entity.ts
+        automation-rule.entity.ts   # { metric, operator, value, windowDays } → acción
+        campaign.errors.ts
+      repository/
+        campaigns.repository.interface.ts
+        prisma-campaigns.repository.ts
+      processors/
+        automation-check.processor.ts   # Queue: campaign-automation
+        sync-metrics.processor.ts       # Queue: campaign-sync
+      campaigns.controller.ts
+      campaigns.service.ts
+      campaigns.module.ts
+    attribution/
+      processors/
+        attribute-conversion.processor.ts  # Queue: marketing-attribution
+      attribution.service.ts
+      attribution.module.ts
+    internal/
+      internal-api-key.guard.ts     # mismo molde que chatia/pagos/workers
+      internal.controller.ts        # /internal/campaigns, /internal/metrics/summary
+      internal.module.ts
+    grpc/
+      marketing-grpc.controller.ts
+    health/
+    metrics/
+    prisma/
+    app.module.ts
+    main.ts
+  prisma/
+    schema.prisma
+  Dockerfile
+  railway.json
+  package.json
+  tsconfig.json
+```
+
+### Adapters — regla de circuit breaker
+
+Todos los adapters de plataformas (Meta, Google, TikTok) tienen circuit breaker
+obligatorio con `opossum`. Si el CB está abierto:
+- `SyncMetricsProcessor` → loguea + emite alerta a notificaciones-backend (fire-forget)
+- `AutomationCheckProcessor` → postpone la revisión 15 min (BullMQ delay)
+- Nunca lanza excepción que bloquee el job principal
+
+### Invariante multi-tenant en marketing-backend
+
+Todo query Prisma lleva `ecosystemId` + `organizationId`.
+`attribution` también: un payment de org-A jamás se atribuye a org-B.

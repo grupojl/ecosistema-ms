@@ -20,3 +20,19 @@ Define el patrón Strategy para canales de comunicación (WhatsApp, Email, etc.)
 ## Canales implementados
 
 Verificar en `src/channels/` — documentar aquí cuando se conozcan.
+
+---
+
+## Tipos de mensaje soportados por la interface
+
+La `IncomingMessage.type` ya soporta todos los tipos de WhatsApp:
+
+```typescript
+type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'sticker' | 'location'
+```
+
+El procesamiento de cada tipo no-texto lo resuelve `MultimodalService`
+via adapters especializados. Ver `.claude/modules/chatia-backend/multimodal-adapters.md`.
+
+**Regla:** ningún controller o service de conversación procesa media directamente.
+Todo pasa por `MultimodalService.normalize()` → texto → LLM.

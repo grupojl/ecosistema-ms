@@ -21,7 +21,8 @@ TIMESTAMP := $(shell date +"%Y-%m-%d %H:%M:%S")
         generate-notificaciones generate-analytics generate-workers \
         railway-chatia railway-pagos \
         railway-notificaciones railway-analytics railway-workers railway-all-new \
-        seed-chatia setup queue-stats help
+        seed-chatia setup queue-stats help \
+        dev-marketing migrate-marketing generate-marketing railway-marketing
 
 help:
 	@echo "================================================="
@@ -333,3 +334,21 @@ setup: install docker-up migrate-all
 	@echo "  3. make seed-chatia"
 	@echo "  4. make dev"
 	@echo ""
+# ─────────────────────────────────────────────────────────────────────────────
+# MARKETING-BACKEND
+# ─────────────────────────────────────────────────────────────────────────────
+dev-marketing:
+	pnpm --filter marketing-backend start:dev
+
+migrate-marketing:
+	cd marketing-backend && pnpm exec prisma migrate dev
+
+migrate-deploy-marketing:
+	cd marketing-backend && pnpm exec prisma migrate deploy
+
+generate-marketing:
+	cd marketing-backend && pnpm exec prisma generate
+
+railway-marketing:
+	docker build -f marketing-backend/Dockerfile -t ecosistema-ms/marketing-backend:local .
+	@echo "[✓] ecosistema-ms/marketing-backend:local"

@@ -1,7 +1,7 @@
 import { BullModule }     from '@nestjs/bullmq';
 import { Global, Module } from '@nestjs/common';
 import { ConfigService }  from '@nestjs/config';
-import { QUEUE_WEBHOOKS, QUEUE_RECONCILE, QUEUE_DLQ } from '../../common/constants/queues';
+import { QUEUE_WEBHOOKS, QUEUE_RECONCILE, QUEUE_DLQ, QUEUE_MARKETING_ATTRIBUTION } from '../../common/constants/queues';
 
 const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
 
@@ -24,6 +24,7 @@ const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
       { name: QUEUE_WEBHOOKS },
       { name: QUEUE_RECONCILE },
       { name: QUEUE_DLQ },
+      { name: QUEUE_MARKETING_ATTRIBUTION },
     ),
   ] : [],
   exports: REDIS_ENABLED ? [BullModule] : [],

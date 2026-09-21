@@ -10,3 +10,9 @@ export const QUEUE_DLQ       = 'payments-dlq';
 
 export const JOB_PROCESS_WEBHOOK   = 'process-webhook';
 export const JOB_RECONCILE_PAYMENT = 'reconcile-payment';
+
+// ── Cross-service: producida por pasarelapagos, consumida por marketing-backend
+// Ref: .claude/contracts/marketing-integration.md
+// CRITICO: mismo REDIS_URL que marketing-backend
+export const QUEUE_MARKETING_ATTRIBUTION = 'marketing-attribution';
+export const JOB_ATTRIBUTE_CONVERSION    = 'attribute-conversion';

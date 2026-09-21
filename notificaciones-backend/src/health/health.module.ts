@@ -1,10 +1,12 @@
+// notificaciones-backend/src/health/health.module.ts
 import { Module }           from '@nestjs/common';
-import { TerminusModule }   from '@nestjs/terminus';
 import { HealthController } from './health.controller.js';
 import { PrismaModule }     from '../prisma/prisma.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
+import { DlqModule }        from '../notifications/dlq/dlq.module.js';
 
 @Module({
-  imports:     [TerminusModule, PrismaModule],
+  imports:     [PrismaModule, NotificationsModule, DlqModule],
   controllers: [HealthController],
 })
 export class HealthModule {}

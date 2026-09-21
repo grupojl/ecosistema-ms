@@ -1,88 +1,70 @@
 // chatia-backend/src/contacts/contacts.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
-import type { UpdateContactInput, ListContactsInput } from './schemas';
-import { ContactStatus } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+// FIX-02: refactorizado para usar IContactsRepository via @Inject.
+// PrismaService eliminado — toda la persistencia va por el repository.
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
+import {
+  CONTACTS_REPOSITORY,
+  type IContactsRepository,
+} from './repository/contacts.repository.interface.js';
+import { assertNoDuplicateTags, ContactNotFoundError } from './domain/contact.errors.js';
+import type { UpdateContactDto }   from './dto/update-contact.dto.js';
+import type { ListContactsFilter } from './repository/contacts.repository.interface.js';
 
 @Injectable()
 export class ContactsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(CONTACTS_REPOSITORY)
+    private readonly contactsRepository: IContactsRepository,
+  ) {}
 
-  async list(organizationId: string, filters?: ListContactsInput) {
-    const where: Record<string, unknown> = { organizationId };
-    if (filters?.status)  where['status'] = filters.status;
-    if (filters?.search) {
-      where['OR'] = [
-        { name:     { contains: filters.search, mode: 'insensitive' } },
-        { phone:    { contains: filters.search } },
-        { email:    { contains: filters.search, mode: 'insensitive' } },
-        { username: { contains: filters.search, mode: 'insensitive' } },
-      ];
-    }
-    const contacts = await this.prisma.contact.findMany({
-      where: where as any,
-      include: { _count: { select: { conversations: true } } },
-      orderBy: { lastSeenAt: 'desc' },
-    });
+  async list(organizationId: string, filters?: ListContactsFilter) {
+    const contacts = await this.contactsRepository.list(organizationId, filters);
     return { success: true, data: contacts };
   }
 
-  async findOne(contactId: string, organizationId: string) {
-    const contact = await this.prisma.contact.findFirst({
-      where: { id: contactId, organizationId },
-      include: {
-        conversations: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-          select: {
-            id: true, status: true, stage: true,
-            lastMessageAt: true, createdAt: true,
-          },
-        },
-      },
-    });
-    if (!contact) throw new NotFoundException('Contacto no encontrado');
+  async getOne(contactId: string, organizationId: string) {
+    const contact = await this.contactsRepository.findOne(contactId, organizationId);
+    if (!contact) {
+      throw new NotFoundException(
+        new ContactNotFoundError(contactId, organizationId).message,
+      );
+    }
     return { success: true, data: contact };
   }
 
-  async update(contactId: string, organizationId: string, dto: UpdateContactInput) {
-    const contact = await this.prisma.contact.findFirst({
-      where: { id: contactId, organizationId },
-    });
-    if (!contact) throw new NotFoundException('Contacto no encontrado');
-    const updated = await this.prisma.contact.update({
-      where: { id: contactId },
-      data: {
-        ...(dto.name     !== undefined && { name:     dto.name }),
-        ...(dto.email    !== undefined && { email:    dto.email }),
-        ...(dto.status   !== undefined && { status:   dto.status }),
-        ...(dto.tags     !== undefined && { tags:     dto.tags }),
-        ...(dto.optedOut !== undefined && { optedOut: dto.optedOut }),
-      },
+  async update(
+    contactId:      string,
+    organizationId: string,
+    dto: UpdateContactDto,
+  ) {
+    // Validar invariante de dominio: tags sin duplicados
+    if (dto.tags) {
+      try {
+        assertNoDuplicateTags(dto.tags);
+      } catch (err) {
+        throw new UnprocessableEntityException(
+          err instanceof Error ? err.message : 'Tags inválidos',
+        );
+      }
+    }
+
+    const updated = await this.contactsRepository.update(contactId, organizationId, {
+      ...(dto.name     !== undefined && { name:     dto.name }),
+      ...(dto.email    !== undefined && { email:    dto.email }),
+      ...(dto.status   !== undefined && { status:   dto.status }),
+      ...(dto.tags     !== undefined && { tags:     dto.tags }),
+      ...(dto.optedOut !== undefined && { optedOut: dto.optedOut }),
     });
     return { success: true, data: updated };
   }
 
   async getStats(organizationId: string) {
-    const [total, byStatus, optedOut] = await Promise.all([
-      this.prisma.contact.count({ where: { organizationId } }),
-      this.prisma.contact.groupBy({
-        by: ['status'],
-        where: { organizationId },
-        _count: true,
-      }),
-      this.prisma.contact.count({ where: { organizationId, optedOut: true } }),
-    ]);
-    return {
-      success: true,
-      data: {
-        total,
-        optedOut,
-        byStatus: byStatus.reduce(
-          (acc, row) => ({ ...acc, [row.status]: row._count }),
-          {} as Record<string, number>,
-        ),
-      },
-    };
+    const stats = await this.contactsRepository.getStats(organizationId);
+    return { success: true, data: stats };
   }
 }
