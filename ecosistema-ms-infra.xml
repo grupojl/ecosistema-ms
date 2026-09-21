@@ -332,248 +332,6 @@ This section contains the contents of the repository's files.
 }
 </file>
 
-<file path="pasarelapagos-backend/prisma/schema.prisma">
-// =============================================================================
-// prisma/schema.prisma — Sprint 8: organizationId SSO
-// =============================================================================
-// PASOS:
-//   1. Reemplazar este archivo en tu repo
-//   2. pnpm prisma migrate dev --name sprint8_organization_id
-//   3. pnpm prisma generate
-// =============================================================================
-
-generator client {
-  provider = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-// ============================================================================
-// TENANCY — se mantiene para compatibilidad B2B (x-api-key)
-// En el ecosistema SSO: id de Tenant === organizationId del owner-dashboard
-// ============================================================================
-
-model Tenant {
-  id         String   @id @default(cuid())
-  name       String
-  apiKeyHash String   @unique  // legacy sprint 1 — mantener para compatibilidad B2B
-  active     Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  payments  Payment[]
-  customers Customer[]
-  apiKeys   TenantApiKey[]
-
-  // NOTA: El modelo User fue eliminado — el owner-dashboard gestiona los usuarios.
-  // Los sprints 7 (User local) quedan deprecados.
-
-  @@index([active])
-}
-
-// ============================================================================
-// API KEYS POR TENANT (Sprint 6) — se mantienen para flows B2B
-// ============================================================================
-
-model TenantApiKey {
-  id         String    @id @default(cuid())
-  tenantId   String
-  label      String
-  keyHash    String    // bcrypt — nunca la key cruda
-  prefix     String    // primeros 8 chars para búsqueda rápida
-  active     Boolean   @default(true)
-  expiresAt  DateTime?
-  revokedAt  DateTime?
-  lastUsedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@index([prefix, active])
-  @@index([tenantId])
-}
-
-// ============================================================================
-// CUSTOMERS — ahora con organizationId para filtrado SSO
-// ============================================================================
-
-model Customer {
-  id             String   @id @default(cuid())
-  tenantId       String   // FK legacy → Tenant (mantenida para compatibilidad)
-  organizationId String   // UUID del org en owner-dashboard = tenantId en esta pasarela
-  externalId     String
-  email          String?  // cifrado at-rest (PII)
-  country        String?
-  createdAt      DateTime @default(now())
-
-  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  payments Payment[]
-
-  @@unique([tenantId, externalId])
-  @@index([email])
-  @@index([organizationId])
-}
-
-// ============================================================================
-// ENUMS
-// ============================================================================
-
-enum PaymentStatus {
-  PENDING
-  AUTHORIZED
-  CAPTURED
-  FAILED
-  CANCELLED
-  REFUNDED
-  PARTIALLY_REFUNDED
-}
-
-enum PaymentMethodKind {
-  CARD
-  WALLET
-  BANK_TRANSFER
-  CASH_VOUCHER
-  PIX
-  QR
-}
-
-// ============================================================================
-// PAYMENTS — ahora con organizationId para filtrado SSO
-// ============================================================================
-
-model Payment {
-  id             String            @id @default(cuid())
-  tenantId       String            // FK legacy → Tenant
-  organizationId String            // UUID del org en owner-dashboard
-  customerId     String?
-  idempotencyKey String
-  amountMinor    BigInt
-  currency       String
-  country        String
-  method         PaymentMethodKind
-  status         PaymentStatus     @default(PENDING)
-  providerId     String
-  externalId     String?
-  description    String?
-  metadata       Json?
-  failureCode    String?
-  failureMessage String?
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-
-  tenant   Tenant         @relation(fields: [tenantId], references: [id])
-  customer Customer?      @relation(fields: [customerId], references: [id])
-  events   PaymentEvent[]
-  refunds  Refund[]
-  @@unique([tenantId, idempotencyKey])
-  @@index([tenantId, status, createdAt])
-  @@index([organizationId, status, createdAt])  // SSO: filtro principal
-  @@index([providerId, externalId])
-}
-
-// ============================================================================
-// PAYMENT EVENTS (audit log append-only)
-// ============================================================================
-
-model PaymentEvent {
-  id        String   @id @default(cuid())
-  paymentId String
-  type      String
-  payload   Json
-  createdAt DateTime @default(now())
-
-  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
-
-  @@index([paymentId, createdAt])
-}
-
-// ============================================================================
-// REFUNDS
-// ============================================================================
-
-model Refund {
-  id               String   @id @default(cuid())
-  paymentId        String
-  amountMinor      BigInt
-  reason           String?
-  externalRefundId String?
-  status           String
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  payment Payment @relation(fields: [paymentId], references: [id])
-
-  @@index([paymentId])
-}
-
-// ============================================================================
-// WEBHOOK INBOUND
-// Los webhooks llegan del provider (cross-tenant por naturaleza)
-// organizationId se resuelve al procesar, no al recibir
-// ============================================================================
-
-model WebhookInbound {
-  id          String    @id @default(cuid())
-  providerId  String
-  externalId  String
-  signature   String?
-  headers     Json
-  body        Json
-  processedAt DateTime?
-  status      String    @default("received")
-  attempts    Int       @default(0)
-  lastError   String?
-  createdAt   DateTime  @default(now())
-
-  @@unique([providerId, externalId])
-  @@index([status, createdAt])
-}
-
-// ============================================================================
-// PROVIDER ROUTES
-// ============================================================================
-
-model ProviderRoute {
-  id         String            @id @default(cuid())
-  country    String
-  currency   String
-  method     PaymentMethodKind
-  providerId String
-  priority   Int               @default(0)
-  active     Boolean           @default(true)
-
-  @@unique([country, currency, method, providerId])
-  @@index([country, currency, method, active, priority])
-}
-
-// ============================================================================
-// AUDIT LOG INMUTABLE (append-only) — ahora con organizationId
-// ============================================================================
-
-model AuditLog {
-  id             String   @id @default(cuid())
-  tenantId       String   // FK legacy
-  organizationId String?  // UUID del org en owner-dashboard
-  actorId        String?  // firebaseUid del usuario o 'api-key'
-  action         String
-  resourceId     String
-  resourceType   String
-  before         Json?
-  after          Json?
-  metadata       Json?
-  ip             String?
-  createdAt      DateTime @default(now())
-
-  @@index([tenantId, createdAt])
-  @@index([organizationId, createdAt])  // SSO: filtro principal
-  @@index([resourceId])
-}
-</file>
-
 <file path="pasarelapagos-backend/nest-cli.json">
 {
   "$schema": "https://json.schemastore.org/nest-cli",
@@ -712,6 +470,496 @@ volumes:
   postgres_chatia_data:
   postgres_pagos_data:
   redis_ms_data:
+</file>
+
+<file path="analytics-backend/package.json">
+{
+  "name": "analytics-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts",
+    "test:cov": "jest --coverage"
+  },
+  "dependencies": {
+    "/nestjs-prometheus": "catalog:",
+    "prom-client": "catalog:",
+    "-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "class-transformer": "catalog:",
+    "class-validator": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
+<file path="analytics-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="notificaciones-backend/prisma/schema.prisma">
+// schema.prisma — notificaciones-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  EMAIL
+  PUSH
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
+model Notification {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  templateKey    String
+  payload        Json
+  idempotencyKey String              @unique
+  status         NotificationStatus  @default(PENDING)
+  attempts       Int                 @default(0)
+  sentAt         DateTime?
+  failureReason  String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId, contactId])
+  @@index([organizationId, status])
+  @@index([createdAt])
+}
+
+/// Preferencias de canal por contacto — se chequea antes de cada envio
+model ContactPreference {
+  id             String              @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  contactId      String
+  channel        NotificationChannel
+  optedOut       Boolean             @default(false)
+  optedOutAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, contactId, channel])
+  @@index([organizationId, contactId])
+}
+</file>
+
+<file path="notificaciones-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="pasarelapagos-backend/prisma/schema.prisma">
+// =============================================================================
+// prisma/schema.prisma — Sprint 8: organizationId SSO
+// =============================================================================
+// PASOS:
+//   1. Reemplazar este archivo en tu repo
+//   2. pnpm prisma migrate dev --name sprint8_organization_id
+//   3. pnpm prisma generate
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// TENANCY — se mantiene para compatibilidad B2B (x-api-key)
+// En el ecosistema SSO: id de Tenant === organizationId del owner-dashboard
+// ============================================================================
+
+model Tenant {
+  id         String   @id @default(cuid())
+  name       String
+  apiKeyHash String   @unique  // legacy sprint 1 — mantener para compatibilidad B2B
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  payments  Payment[]
+  customers Customer[]
+  apiKeys   TenantApiKey[]
+
+  // NOTA: El modelo User fue eliminado — el owner-dashboard gestiona los usuarios.
+  // Los sprints 7 (User local) quedan deprecados.
+
+  @@index([active])
+}
+
+// ============================================================================
+// API KEYS POR TENANT (Sprint 6) — se mantienen para flows B2B
+// ============================================================================
+
+model TenantApiKey {
+  id         String    @id @default(cuid())
+  tenantId   String
+  label      String
+  keyHash    String    // bcrypt — nunca la key cruda
+  prefix     String    // primeros 8 chars para búsqueda rápida
+  active     Boolean   @default(true)
+  expiresAt  DateTime?
+  revokedAt  DateTime?
+  lastUsedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([prefix, active])
+  @@index([tenantId])
+}
+
+// ============================================================================
+// CUSTOMERS — ahora con organizationId para filtrado SSO
+// ============================================================================
+
+model Customer {
+  id             String   @id @default(cuid())
+  tenantId       String   // FK legacy → Tenant (mantenida para compatibilidad)
+  organizationId String   // UUID del org en owner-dashboard = tenantId en esta pasarela
+  externalId     String
+  email          String?  // cifrado at-rest (PII)
+  country        String?
+  createdAt      DateTime @default(now())
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@unique([tenantId, externalId])
+  @@index([email])
+  @@index([organizationId])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum PaymentStatus {
+  PENDING
+  AUTHORIZED
+  CAPTURED
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum PaymentMethodKind {
+  CARD
+  WALLET
+  BANK_TRANSFER
+  CASH_VOUCHER
+  PIX
+  QR
+}
+
+// ============================================================================
+// PAYMENTS — ahora con organizationId para filtrado SSO
+// ============================================================================
+
+model Payment {
+  id             String            @id @default(cuid())
+  tenantId       String            // FK legacy → Tenant
+  organizationId String            // UUID del org en owner-dashboard
+  customerId     String?
+  idempotencyKey String
+  amountMinor    BigInt
+  currency       String
+  country        String
+  method         PaymentMethodKind
+  status         PaymentStatus     @default(PENDING)
+  providerId     String
+  externalId     String?
+  description    String?
+  metadata       Json?
+  marketCountry  String?  @map("market_country")  // ADR-014 — Market resuelto upstream
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id])
+  customer Customer?      @relation(fields: [customerId], references: [id])
+  events   PaymentEvent[]
+  refunds  Refund[]
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, status, createdAt])
+  @@index([organizationId, status, createdAt])  // SSO: filtro principal
+  @@index([providerId, externalId])
+}
+
+// ============================================================================
+// PAYMENT EVENTS (audit log append-only)
+// ============================================================================
+
+model PaymentEvent {
+  id        String   @id @default(cuid())
+  paymentId String
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId, createdAt])
+}
+
+// ============================================================================
+// REFUNDS
+// ============================================================================
+
+model Refund {
+  id               String   @id @default(cuid())
+  paymentId        String
+  amountMinor      BigInt
+  reason           String?
+  externalRefundId String?
+  status           String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id])
+
+  @@index([paymentId])
+}
+
+// ============================================================================
+// WEBHOOK INBOUND
+// Los webhooks llegan del provider (cross-tenant por naturaleza)
+// organizationId se resuelve al procesar, no al recibir
+// ============================================================================
+
+model WebhookInbound {
+  id          String    @id @default(cuid())
+  providerId  String
+  externalId  String
+  signature   String?
+  headers     Json
+  body        Json
+  processedAt DateTime?
+  status      String    @default("received")
+  attempts    Int       @default(0)
+  lastError   String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([providerId, externalId])
+  @@index([status, createdAt])
+}
+
+// ============================================================================
+// PROVIDER ROUTES
+// ============================================================================
+
+model ProviderRoute {
+  id         String            @id @default(cuid())
+  country    String
+  currency   String
+  method     PaymentMethodKind
+  providerId String
+  priority   Int               @default(0)
+  active     Boolean           @default(true)
+
+  @@unique([country, currency, method, providerId])
+  @@index([country, currency, method, active, priority])
+}
+
+// ============================================================================
+// AUDIT LOG INMUTABLE (append-only) — ahora con organizationId
+// ============================================================================
+
+model AuditLog {
+  id             String   @id @default(cuid())
+  tenantId       String   // FK legacy
+  organizationId String?  // UUID del org en owner-dashboard
+  actorId        String?  // firebaseUid del usuario o 'api-key'
+  action         String
+  resourceId     String
+  resourceType   String
+  before         Json?
+  after          Json?
+  metadata       Json?
+  ip             String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+  @@index([organizationId, createdAt])  // SSO: filtro principal
+  @@index([resourceId])
+}
+</file>
+
+<file path="workers-backend/tsconfig.json">
+{
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "resolvePackageJsonExports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "removeComments": true,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "allowSyntheticDefaultImports": true,
+    "target": "ES2023",
+    "sourceMap": true,
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "incremental": true,
+    "skipLibCheck": true,
+    "strictNullChecks": true,
+    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": false,
+    "strictBindCallApply": false,
+    "noFallthroughCasesInSwitch": false
+  },
+  "extends": "../tsconfig.base.json"
+}
 </file>
 
 <file path="Makefile">
@@ -1095,101 +1343,7 @@ railway-marketing:
 }
 </file>
 
-<file path="analytics-backend/package.json">
-{
-  "name": "analytics-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "typecheck": "tsc --noEmit",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "typecheck": "tsc --noEmit",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts",
-    "test:cov": "jest --coverage"
-  },
-  "dependencies": {
-    "/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "class-transformer": "catalog:",
-    "class-validator": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
-  }
-}
-</file>
-
-<file path="analytics-backend/tsconfig.json">
+<file path="tsconfig.base.json">
 {
   "compilerOptions": {
     "module": "nodenext",
@@ -1496,6 +1650,7 @@ model Conversation {
   summary           String?
   tags              String[] @default([])
 
+  marketCountry  String?  @map("market_country")  // ADR-014 — ISO 3166-1 alpha-2
   lastMessageAt DateTime?
   resolvedAt    DateTime?
   deletedAt     DateTime?
@@ -1738,72 +1893,6 @@ model KbChunk {
 }
 </file>
 
-<file path="notificaciones-backend/prisma/schema.prisma">
-// schema.prisma — notificaciones-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-enum NotificationChannel {
-  WHATSAPP
-  EMAIL
-  PUSH
-}
-
-enum NotificationStatus {
-  PENDING
-  SENT
-  FAILED
-  SKIPPED
-}
-
-/// idempotencyKey = sha256(eventType+contactId+orgId+windowMin) — previene doble envio
-model Notification {
-  id             String              @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  contactId      String
-  channel        NotificationChannel
-  templateKey    String
-  payload        Json
-  idempotencyKey String              @unique
-  status         NotificationStatus  @default(PENDING)
-  attempts       Int                 @default(0)
-  sentAt         DateTime?
-  failureReason  String?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  @@index([organizationId, contactId])
-  @@index([organizationId, status])
-  @@index([createdAt])
-}
-
-/// Preferencias de canal por contacto — se chequea antes de cada envio
-model ContactPreference {
-  id             String              @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  contactId      String
-  channel        NotificationChannel
-  optedOut       Boolean             @default(false)
-  optedOutAt     DateTime?
-  createdAt      DateTime            @default(now())
-  updatedAt      DateTime            @updatedAt
-
-  @@unique([organizationId, contactId, channel])
-  @@index([organizationId, contactId])
-}
-</file>
-
 <file path="notificaciones-backend/package.json">
 {
   "name": "notificaciones-backend",
@@ -1891,143 +1980,6 @@ model ContactPreference {
     },
     "testEnvironment": "node"
   }
-}
-</file>
-
-<file path="notificaciones-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
-<file path="workers-backend/tsconfig.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
-<file path="tsconfig.base.json">
-{
-  "compilerOptions": {
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "resolvePackageJsonExports": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "declaration": true,
-    "removeComments": true,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "allowSyntheticDefaultImports": true,
-    "target": "ES2023",
-    "sourceMap": true,
-    "outDir": "./dist",
-    "baseUrl": "./",
-    "incremental": true,
-    "skipLibCheck": true,
-    "strictNullChecks": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
-    "noFallthroughCasesInSwitch": false
-  },
-  "extends": "../tsconfig.base.json"
-}
-</file>
-
-<file path="analytics-backend/prisma/schema.prisma">
-// schema.prisma — analytics-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
-
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-/// Evento operacional raw — append-only, nunca se actualiza
-
-          model AnalyticsEvent {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  eventType      String
-  payload        Json
-  occurredAt     DateTime
-  processedAt    DateTime @default(now())
-
-  @@index([organizationId, eventType, occurredAt])
-  @@index([occurredAt])
-  @@index([organizationId, occurredAt])
-  @@index([organizationId, ecosystemId, eventType, occurredAt])
-  @@index([organizationId, ecosystemId, occurredAt])
-}
-
-/// Proyeccion materializada — recalculada cada hora por ProjectionsService
-model DailyConversationSummary {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  date           DateTime @db.Date
-  channel        String
-  total          Int      @default(0)
-  resolved       Int      @default(0)
-  escalated      Int      @default(0)
-  avgResponseMin Float    @default(0)
-  calculatedAt   DateTime @default(now())
-
-  @@unique([organizationId, date, channel])
-  @@index([organizationId, date])
 }
 </file>
 
@@ -2136,92 +2088,55 @@ model CampaignRecipient {
 }
 </file>
 
-<file path="workers-backend/package.json">
-{
-  "name": "workers-backend",
-  "version": "0.0.1",
-  "private": true,
-  "scripts": {
-    "build": "nest build",
-    "typecheck": "tsc --noEmit",
-    "start": "node dist/main",
-    "start:dev": "nest start --watch",
-    "start:migrate": "prisma migrate deploy && node dist/main",
-    "prisma:migrate:dev": "prisma migrate dev",
-    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:cov": "jest --coverage --config jest.config.ts"
-  },
-  "dependencies": {
-    "prom-client": "catalog:",
-    "@ecosistema-ms/auth-server": "workspace:*",
-    "@ecosistema-ms/grpc-client": "workspace:*",
-    "@ecosistema-ms/proto": "workspace:*",
-    "@grpc/grpc-js": "catalog:",
-    "@grpc/proto-loader": "catalog:",
-    "@nestjs/bullmq": "catalog:",
-    "@nestjs/cache-manager": "catalog:",
-    "@nestjs/common": "catalog:",
-    "@nestjs/config": "catalog:",
-    "@nestjs/core": "catalog:",
-    "@nestjs/microservices": "catalog:",
-    "@nestjs/platform-express": "catalog:",
-    "@nestjs/schedule": "catalog:",
-    "@nestjs/swagger": "catalog:",
-    "@nestjs/terminus": "catalog:",
-    "@prisma/adapter-pg": "catalog:",
-    "@prisma/client": "catalog:",
-    "bullmq": "catalog:",
-    "cache-manager": "catalog:",
-    "dotenv": "catalog:",
-    "firebase-admin": "catalog:",
-    "helmet": "catalog:",
-    "ioredis": "catalog:",
-    "nestjs-pino": "catalog:",
-    "pg": "catalog:",
-    "pino": "catalog:",
-    "pino-http": "catalog:",
-    "prisma": "catalog:",
-    "protobufjs": "catalog:",
-    "reflect-metadata": "catalog:",
-    "rxjs": "catalog:",
-    "swagger-ui-express": "catalog:",
-    "@nestjs-modules/nestjs-prometheus": "catalog:"
-  },
-  "devDependencies": {
-    "@nestjs/cli": "catalog:",
-    "@nestjs/schematics": "catalog:",
-    "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
-    "jest": "catalog:",
-    "supertest": "catalog:",
-    "ts-jest": "catalog:",
-    "ts-node": "catalog:",
-    "tsconfig-paths": "catalog:",
-    "typescript": "catalog:"
-  },
-  "jest": {
-    "moduleFileExtensions": [
-      "js",
-      "json",
-      "ts"
-    ],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {
-      "^.+\\.(t|j)s$": "ts-jest"
-    },
-    "collectCoverageFrom": [
-      "**/*.(t|j)s"
-    ],
-    "coverageDirectory": "../coverage",
-    "coverageThreshold": {
-      "global": {
-        "lines": 85
-      }
-    },
-    "testEnvironment": "node"
-  }
+<file path="analytics-backend/prisma/schema.prisma">
+// schema.prisma — analytics-backend
+// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
+// CLI (migrate/generate): lee url del datasource + .env del directorio
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Evento operacional raw — append-only, nunca se actualiza
+
+          model AnalyticsEvent {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  eventType      String
+  payload        Json
+  occurredAt     DateTime
+  marketCountry  String?  @map("market_country")  // ADR-014 — dimensión de segmentación
+  processedAt    DateTime @default(now())
+
+  @@index([organizationId, eventType, occurredAt])
+  @@index([occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([organizationId, ecosystemId, eventType, occurredAt])
+  @@index([organizationId, ecosystemId, occurredAt])
+  @@index([organizationId, marketCountry, occurredAt])
+}
+
+/// Proyeccion materializada — recalculada cada hora por ProjectionsService
+model DailyConversationSummary {
+  id             String   @id @default(cuid())
+  ecosystemId    String
+  organizationId String
+  date           DateTime @db.Date
+  channel        String
+  total          Int      @default(0)
+  resolved       Int      @default(0)
+  escalated      Int      @default(0)
+  avgResponseMin Float    @default(0)
+  calculatedAt   DateTime @default(now())
+
+  @@unique([organizationId, date, channel])
+  @@index([organizationId, date])
 }
 </file>
 
@@ -2452,6 +2367,95 @@ model CampaignRecipient {
 }
 </file>
 
+<file path="workers-backend/package.json">
+{
+  "name": "workers-backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "build": "nest build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/main",
+    "start:dev": "nest start --watch",
+    "start:migrate": "prisma migrate deploy && node dist/main",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
+    "test": "jest",
+    "test:cov": "jest --coverage --config jest.config.ts"
+  },
+  "dependencies": {
+    "prom-client": "catalog:",
+    "@ecosistema-ms/auth-server": "workspace:*",
+    "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/proto": "workspace:*",
+    "@grpc/grpc-js": "catalog:",
+    "@grpc/proto-loader": "catalog:",
+    "@nestjs/bullmq": "catalog:",
+    "@nestjs/cache-manager": "catalog:",
+    "@nestjs/common": "catalog:",
+    "@nestjs/config": "catalog:",
+    "@nestjs/core": "catalog:",
+    "@nestjs/microservices": "catalog:",
+    "@nestjs/platform-express": "catalog:",
+    "@nestjs/schedule": "catalog:",
+    "@nestjs/swagger": "catalog:",
+    "@nestjs/terminus": "catalog:",
+    "@prisma/adapter-pg": "catalog:",
+    "@prisma/client": "catalog:",
+    "bullmq": "catalog:",
+    "cache-manager": "catalog:",
+    "dotenv": "catalog:",
+    "firebase-admin": "catalog:",
+    "helmet": "catalog:",
+    "ioredis": "catalog:",
+    "nestjs-pino": "catalog:",
+    "pg": "catalog:",
+    "pino": "catalog:",
+    "pino-http": "catalog:",
+    "prisma": "catalog:",
+    "protobufjs": "catalog:",
+    "reflect-metadata": "catalog:",
+    "rxjs": "catalog:",
+    "swagger-ui-express": "catalog:",
+    "@nestjs-modules/nestjs-prometheus": "catalog:"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "catalog:",
+    "@nestjs/schematics": "catalog:",
+    "@nestjs/testing": "catalog:",
+    "@types/node": "catalog:",
+    "jest": "catalog:",
+    "supertest": "catalog:",
+    "ts-jest": "catalog:",
+    "ts-node": "catalog:",
+    "tsconfig-paths": "catalog:",
+    "typescript": "catalog:"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
+    "coverageDirectory": "../coverage",
+    "coverageThreshold": {
+      "global": {
+        "lines": 85
+      }
+    },
+    "testEnvironment": "node"
+  }
+}
+</file>
+
 <file path="pnpm-workspace.yaml">
 packages:
   - "chatia-backend"
@@ -2516,6 +2520,7 @@ catalog:
   # ── Logging ───────────────────────────────────────────
   nestjs-pino: "^4.4.0"
   pino: "^9.7.0"
+  pino-pretty: "^13.0.0"
   pino-http: "^10.5.0"
   # ── gRPC ──────────────────────────────────────────────
   "@grpc/grpc-js": "^1.13.3"

@@ -1,380 +1,489 @@
 #!/usr/bin/env bash
 # =============================================================================
-# x-markets-ecosistema-ms.sh
-# Escribe la documentación de Markets en el monorepo ecosistema-ms/
-# Ejecutar desde la raíz de ecosistema-ms/
-# Git Bash (Windows): bash x-markets-ecosistema-ms.sh
+# x.sh — Instalar .claude/architecture/10-monorepo-estructura.md
+# Auto-detecta el monorepo, ajusta el contenido específico de cada uno
 # =============================================================================
-set -e
 
-echo "▶ [ecosistema-ms] Escribiendo documentación de Markets..."
+CYAN='\033[0;36m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
-# -----------------------------------------------------------------------------
-# 1. ADR-014 — Markets en ecosistema-ms
-# -----------------------------------------------------------------------------
-mkdir -p .claude/decisions
+log()  { echo -e "${CYAN}[monorepo-arch]${NC} $1"; }
+ok()   { echo -e "${GREEN}  ✓${NC} $1"; }
+warn() { echo -e "${YELLOW}  ⚠${NC} $1"; }
 
-cat > .claude/decisions/ADR-014-markets-context.md << 'EOF'
-# ADR-014 — Markets: contexto global en microservicios
+# Auto-detect
+REPO_MODE=""
+if [[ -f "pnpm-workspace.yaml" ]] && [[ -d "realsass-sass-back" ]]; then
+  REPO_MODE="welver"
+elif [[ -d "chatia-backend" ]]; then
+  REPO_MODE="ecosistema-ms"
+elif [[ -d "grupojl-control-backend" ]]; then
+  REPO_MODE="superadmin"
+fi
 
-**Fecha:** 2026-09-19
-**Estado:** Aceptado
-**Referencia:** welver/ADR-014-markets-global.md (fuente de verdad del modelo)
+[[ -n "$REPO_MODE" ]] || { echo "No se detectó monorepo"; exit 0; }
+log "Modo: $REPO_MODE"
 
----
+mkdir -p .claude/architecture
 
-## Contexto
+# =============================================================================
+# Contenido base común a los 3 monorepos
+# =============================================================================
+write_common_header() {
+  local TURBO_NOTE="$1"
+  cat << MD
+# 10 — Estructura de monorepo: hacia 10/10
 
-Los microservicios de ecosistema-ms operan en contexto multi-tenant.
-Cada tenant es una Organization de welver que tiene un `ecosystemId`.
-Con la introducción de Markets, cada request puede tener además un `marketId`
-que indica el contexto geográfico de la operación.
-
----
-
-## Decisión
-
-### Markets NO se modelan en ecosistema-ms
-
-El modelo `Market` vive en `welver/realsass-sass-back`.
-Los microservicios de este repo son **consumidores del contexto** — no dueños del modelo.
-
-### Cómo llega el contexto de Market a cada MS
-
-El contexto de Market se propaga como header HTTP desde el caller:
-
-```
-X-Tenant-ID:       <organizationId>     (ya existe — TenantGuard)
-X-Ecosystem-ID:    <ecosystemId>        (ya existe — TenantGuard)
-X-Market-Country:  CO                  (nuevo — ISO 3166-1 alpha-2)
-X-Market-ID:       <marketId>          (nuevo — resuelto por ecommerce-back)
-```
-
-### Microservicio por microservicio
-
-| MS | Uso de Market | Detalle |
-|----|--------------|---------|
-| `chatia-backend` | Contexto de respuesta | El agente responde con contexto del país del cliente |
-| `pasarelapagos-backend` | País de la transacción | Registro de país para auditoría y reconciliación |
-| `notificaciones-backend` | Localización de mensajes | Template de notificación según país |
-| `analytics-backend` | Dimensión de análisis | Métricas segmentadas por Market/país |
-| `workers-backend` | Contexto de jobs | Jobs de fulfillment con contexto del Market |
+> Referentes: **Vercel (Turborepo)** · **Nx/Nrwl** · **Google (Bazel)**
+>
+> Norte: dado cualquier cambio en el repo, el sistema sabe exactamente qué
+> buildear, qué testear y qué deployar — sin buildear nada de más.
 
 ---
 
-## Consecuencias
+## Por qué este monorepo ya tiene buena estructura
 
-- Cada MS lee `X-Market-Country` del header — nunca lo resuelve ni lo valida
-- La validación del Market ocurre upstream (ecommerce-back o sass-back)
-- Si el header no llega → los MS operan sin contexto de país (comportamiento actual)
-- Backward compatible — los MS existentes no rompen
-EOF
+Los 3 monorepos de GrupoJL tienen workspace organization correcta y
+dependency graph bien modelado. El gap con el 10/10 es de **orquestación
+y enforcement** — no de estructura.
 
-echo "  ✓ ADR-014-markets-context.md"
-
-# -----------------------------------------------------------------------------
-# 2. chatia-backend — cómo usa Market
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/chatia-backend
-
-cat > .claude/modules/chatia-backend/markets.md << 'EOF'
-# Markets en chatia-backend
-
-## Rol
-
-El agente de chat IA recibe el contexto de país del cliente para:
-- Adaptar las respuestas al contexto local (ej: "enviamos desde Bogotá" en CO)
-- Registrar el país en cada conversación para analytics
-- Seleccionar templates de respuesta localizados (si existen)
-
-## Cómo llega el contexto
-
-Header `X-Market-Country: CO` en cada request de conversación.
-Extraído en el TenantGuard extendido o en el ConversationController.
-
-## Cambios necesarios
-
-### En TenantContext (packages/auth-server)
-
-```typescript
-// types/tenant-context.ts — agregar campo opcional
-export interface TenantContext {
-  organizationId: string
-  ecosystemId:    string
-  userId:         string
-  role:           Role
-  marketCountry?: string   // NUEVO — ISO 3166-1 alpha-2, opcional
-}
-```
-
-### En ConversationService
-
-```typescript
-// Al crear/actualizar conversación
-await this.repo.saveConversation({
-  ...existingFields,
-  marketCountry: tenantContext.marketCountry ?? null,
-})
-```
-
-### En el agente IA
-
-Incluir `marketCountry` en el system prompt cuando esté disponible:
-
-```typescript
-const systemPrompt = marketCountry
-  ? `${basePrompt}\n\nContexto geográfico del cliente: ${marketCountry}.
-     Adapta las respuestas de logística y envíos a este país.`
-  : basePrompt
-```
-
-## Checklist
-
-- [ ] MKT-CH-01: Agregar `marketCountry?` a `TenantContext`
-- [ ] MKT-CH-02: Extraer `X-Market-Country` en el guard/middleware
-- [ ] MKT-CH-03: Guardar `marketCountry` en Conversation model (Prisma migration)
-- [ ] MKT-CH-04: Inyectar en system prompt del agente
-- [ ] MKT-CH-05: Dimensión `market_country` en eventos de analytics
-EOF
-
-echo "  ✓ modules/chatia-backend/markets.md"
-
-# -----------------------------------------------------------------------------
-# 3. pasarelapagos-backend — cómo usa Market
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/pasarelapagos-backend
-
-cat > .claude/modules/pasarelapagos-backend/markets.md << 'EOF'
-# Markets en pasarelapagos-backend
-
-## Rol
-
-Pagos ya usa Stripe que maneja multi-moneda y multi-país de forma nativa.
-El rol de Market aquí es de **auditoría y trazabilidad**, no de lógica de pago.
-
-## Lo que se registra
-
-En cada transacción se guarda el país del comprador para:
-- Reconciliación contable por mercado
-- Reportes de revenue por país en el superadmin
-- Cumplimiento fiscal (saber en qué país ocurrió la transacción)
-
-## Cambios en el modelo de Transaction
-
-```prisma
-model Transaction {
-  // ... campos existentes ...
-  marketCountry  String?  @map("market_country")  // NUEVO — ISO 3166-1 alpha-2
-  // Stripe ya registra country en el PaymentIntent — esto lo espeja en nuestra DB
-}
-```
-
-## Checklist
-
-- [ ] MKT-PP-01: Migración Prisma — `marketCountry` en Transaction
-- [ ] MKT-PP-02: Extraer de header `X-Market-Country` en PaymentController
-- [ ] MKT-PP-03: Pasar a TransactionService al registrar pago
-- [ ] MKT-PP-04: Incluir en listado interno de transacciones (para superadmin)
-EOF
-
-echo "  ✓ modules/pasarelapagos-backend/markets.md"
-
-# -----------------------------------------------------------------------------
-# 4. analytics-backend — Markets como dimensión de análisis
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/analytics-backend
-
-cat > .claude/modules/analytics-backend/markets.md << 'EOF'
-# Markets en analytics-backend
-
-## Rol
-
-`marketCountry` es una **dimensión de segmentación** en todos los eventos de analytics.
-Permite responder: "¿cuántas ventas tuve en CO este mes?" sin joins complejos.
-
-## Cambios en el schema de eventos
-
-```prisma
-model AnalyticsEvent {
-  // ... campos existentes ...
-  marketCountry  String?  @map("market_country")  // NUEVO — dimensión de análisis
-}
-```
-
-## Proyecciones afectadas
-
-Las proyecciones de `ProjectionsService` deben incluir `marketCountry`
-como dimensión de agrupación cuando esté disponible:
-
-```typescript
-// projections.service.ts — agregar agrupación por market
-async getRevenueByMarket(organizationId: string, from: Date, to: Date) {
-  return this.prisma.analyticsEvent.groupBy({
-    by: ['marketCountry'],
-    where: { organizationId, eventType: 'ORDER_COMPLETED', createdAt: { gte: from, lte: to } },
-    _sum: { amountCents: true },
-  })
-}
-```
-
-## Checklist
-
-- [ ] MKT-AN-01: Migración Prisma — `marketCountry` en AnalyticsEvent
-- [ ] MKT-AN-02: Extraer de payload o header en AnalyticsController
-- [ ] MKT-AN-03: `getRevenueByMarket()` en ProjectionsService
-- [ ] MKT-AN-04: Endpoint gRPC para que superadmin consulte revenue por Market
-EOF
-
-echo "  ✓ modules/analytics-backend/markets.md"
-
-# -----------------------------------------------------------------------------
-# 5. packages/auth-server — TenantContext extendido
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/packages
-
-cat > .claude/modules/packages/markets-tenant-context.md << 'EOF'
-# TenantContext extendido con Market
-
-## Cambio en @ecosistema-ms/auth-server
-
-El `TenantContext` es el contrato central que fluye por todos los microservicios.
-Agregar `marketCountry` como campo opcional mantiene backward compatibility total.
-
-```typescript
-// packages/auth-server/src/types/tenant-context.ts
-
-export interface TenantContext {
-  organizationId: string    // existente
-  ecosystemId:    string    // existente
-  userId:         string    // existente
-  role:           Role      // existente
-  marketCountry?: string    // NUEVO — ISO 3166-1 alpha-2, undefined si no aplica
-}
-```
-
-## Dónde se extrae
-
-En el `TenantGuard` o en un middleware previo al guard:
-
-```typescript
-// guards/tenant.guard.ts — agregar extracción de header
-const marketCountry = request.headers['x-market-country'] as string | undefined
-
-context.set<TenantContext>('tenant', {
-  ...existingFields,
-  marketCountry: marketCountry?.toUpperCase() ?? undefined,
-})
-```
-
-## Headers estándar
-
-```
-X-Tenant-ID:       <organizationId>   // existente
-X-Ecosystem-ID:    <ecosystemId>      // existente
-X-Market-Country:  CO                 // NUEVO — opcional
-X-Market-ID:       <marketId>         // NUEVO — opcional, UUID del Market resuelto
-```
-
-## Checklist
-
-- [ ] MKT-PKG-01: Agregar `marketCountry?` a TenantContext interface
-- [ ] MKT-PKG-02: Extraer `X-Market-Country` en TenantGuard
-- [ ] MKT-PKG-03: Bump de versión del package (minor — cambio backward compatible)
-- [ ] MKT-PKG-04: Actualizar tipos en todos los MS que importan TenantContext
-EOF
-
-echo "  ✓ modules/packages/markets-tenant-context.md"
-
-# -----------------------------------------------------------------------------
-# 6. Norte en CLAUDE.md
-# -----------------------------------------------------------------------------
-
-cat >> .claude/CLAUDE.md << 'EOF'
+$TURBO_NOTE
 
 ---
 
-## Markets — contexto global en microservicios (ADR-014)
+## Nivel 1 — Bloqueante (hacer antes del próximo deploy)
 
-### Principio en este repo
+### 1.1 Regenerar lockfile tras deps nuevas
 
-Los MS de ecosistema-ms son **consumidores del contexto de Market**, no dueños del modelo.
-El modelo Market vive en welver/realsass-sass-back.
+Cada vez que se agrega una dep al catalog, el lockfile queda desincronizado.
+CI falla en el primer \`pnpm install --frozen-lockfile\`.
 
-### Cómo llega el contexto
+\`\`\`bash
+pnpm install
+git add pnpm-lock.yaml
+git commit -m "chore: regenerar lockfile"
+\`\`\`
 
-```
-X-Market-Country: CO    →  header HTTP desde el caller
-X-Market-ID: <uuid>     →  header HTTP desde el caller (resuelto upstream)
-```
+**Regla permanente:** toda sesión que agrega deps termina con \`pnpm install\`
+y el lockfile commiteado. Sin excepción.
 
-Nunca se resuelve ni valida aquí. Si llega → se usa. Si no → comportamiento actual.
+### 1.2 Branch protection en GitHub
 
-### Impacto por MS
+Sin esto los CI existen pero no bloquean merge.
+Settings → Branches → Add rule → main → Required status checks:
 
-| MS | Campo nuevo | Uso |
-|----|------------|-----|
-| chatia-backend | `marketCountry` en Conversation | System prompt contextualizado |
-| pasarelapagos-backend | `marketCountry` en Transaction | Auditoría y reconciliación |
-| analytics-backend | `marketCountry` en AnalyticsEvent | Dimensión de segmentación |
-| notificaciones-backend | `marketCountry` en contexto | Templates localizados |
-| workers-backend | `marketCountry` en job payload | Contexto de fulfillment |
+MD
+}
 
-### Cambio en packages/auth-server (TenantContext)
+# =============================================================================
+# WELVER
+# =============================================================================
+write_welver() {
+  TARGET=".claude/architecture/10-monorepo-estructura.md"
 
-`marketCountry?: string` — campo opcional, backward compatible.
-Ver `.claude/modules/packages/markets-tenant-context.md`
-EOF
+  write_common_header "**welver** tiene 7 packages: 2 backs + 3 fronts + 2 packages compartidos.
+Turborepo agrega el 20% que falta: task graph declarado + caché de builds." > "$TARGET"
 
-echo "  ✓ CLAUDE.md actualizado"
-
-# -----------------------------------------------------------------------------
-# 7. lifecycle/tasks.md
-# -----------------------------------------------------------------------------
-mkdir -p .claude/lifecycle
-
-cat >> .claude/lifecycle/tasks.md << 'EOF'
+  cat >> "$TARGET" << 'MD'
+| Check requerido | Workflow |
+|----------------|----------|
+| ci-sass-back | typecheck + test + build |
+| ci-ecommerce-back | typecheck + test + build |
+| ci-packages | typecheck + build de @real/* |
 
 ---
 
-## Sprint Markets — ADR-014 (ecosistema-ms)
+## Nivel 2 — Turborepo (próximo sprint)
 
-### packages/auth-server (bloqueante para todos los MS)
+### 2.1 Instalar Turborepo
 
-- [ ] MKT-PKG-01: `marketCountry?` en TenantContext
-- [ ] MKT-PKG-02: Extraer X-Market-Country en TenantGuard
-- [ ] MKT-PKG-03: Bump minor del package
-- [ ] MKT-PKG-04: Actualizar imports en cada MS
+```bash
+pnpm add turbo --save-dev -w
+```
 
-### chatia-backend
+### 2.2 `turbo.json` en la raíz
 
-- [ ] MKT-CH-01..05 (ver modules/chatia-backend/markets.md)
+```json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**", ".next/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
 
-### pasarelapagos-backend
+**`dependsOn: ["^build"]`** es la clave: cuando cambia `@real/trpc`,
+Turborepo sabe que rebuildea sass-back y ecommerce-back antes de sus tests,
+en el orden correcto y en paralelo donde sea posible.
 
-- [ ] MKT-PP-01..04 (ver modules/pasarelapagos-backend/markets.md)
+### 2.3 Reemplazar scripts en `package.json` raíz
 
-### analytics-backend
+```json
+"scripts": {
+  "build":     "turbo build",
+  "typecheck": "turbo typecheck",
+  "test":      "turbo test",
+  "dev":       "turbo dev"
+}
+```
 
-- [ ] MKT-AN-01..04 (ver modules/analytics-backend/markets.md)
+### 2.4 Caché remota en CI
 
-### notificaciones-backend / workers-backend
+```yaml
+# Agregar en cada CI workflow después de pnpm install
+- name: Setup Turborepo cache
+  uses: rharkor/caching-for-turbo@v1.8
+```
 
-- [ ] Agregar marketCountry al payload de notificaciones
-- [ ] Agregar marketCountry al contexto de jobs BullMQ
-EOF
+---
 
-echo "  ✓ lifecycle/tasks.md actualizado"
+## Nivel 3 — dependency-cruiser (enforcement de fronteras)
+
+Hoy "ningún import entre backs" es una regla manual. dependency-cruiser la hace automática.
+
+```bash
+pnpm add dependency-cruiser --save-dev -w
+```
+
+**`.dependency-cruiser.cjs`:**
+```js
+module.exports = {
+  forbidden: [
+    {
+      name: 'no-cross-service-back',
+      severity: 'error',
+      comment: 'sass-back y ecommerce-back no se importan mutuamente',
+      from: { path: '^realsass-sass-back/src' },
+      to:   { path: '^realsass-ecommerce-back/src' },
+    },
+    {
+      name: 'no-cross-service-back-reverse',
+      severity: 'error',
+      from: { path: '^realsass-ecommerce-back/src' },
+      to:   { path: '^realsass-sass-back/src' },
+    },
+    {
+      name: 'no-prisma-in-service',
+      severity: 'warn',
+      comment: 'Services usan IRepository. Excepciones: orders.service (checkout $tx), inventory.service (reserveWithinTx)',
+      from: { path: '\\.service\\.ts$',
+              pathNot: ['orders\\.service', 'inventory\\.service', 'prisma\\.service'] },
+      to:   { path: '@prisma/client' },
+    },
+  ],
+  options: {
+    tsPreCompilationDeps: true,
+    tsConfig: { fileName: 'tsconfig.base.json' },
+  },
+};
+```
+
+**Agregar en `ci-sass-back.yml`:**
+```yaml
+- name: Check dependency boundaries
+  run: pnpm depcruise realsass-sass-back/src --config .dependency-cruiser.cjs
+```
+
+---
+
+## Estado actual vs 10/10
+
+| Item | Estado |
+|------|--------|
+| pnpm workspaces + catalog | ✅ |
+| packages/ compartidos (@real/*) | ✅ |
+| path filters en CI (5 workflows) | ✅ |
+| pnpm store cacheado en CI (config) | ✅ |
+| Lockfile actualizado | ⏳ `pnpm install` pendiente |
+| Branch protection en GitHub | ❌ Nivel 1.2 |
+| Turborepo task graph | ❌ Nivel 2 |
+| dependency-cruiser | ❌ Nivel 3 |
+| Turbo remote cache | ❌ Nivel 2.4 |
+
+---
+
+## Reglas duras de monorepo
+
+🔴 Nunca mergear con lockfile desactualizado.
+🔴 Ningún import entre realsass-sass-back y realsass-ecommerce-back.
+🔴 Toda dep nueva va primero al catalog de pnpm-workspace.yaml.
+🟡 Versiones de @nestjs/* alineadas con ecosistema-ms.
+🟡 pnpm-lock.yaml commiteado siempre — es la fuente de verdad de versiones exactas.
+MD
+
+  ok "10-monorepo-estructura.md creado para welver"
+}
+
+# =============================================================================
+# ECOSISTEMA-MS
+# =============================================================================
+write_ecosistema_ms() {
+  TARGET=".claude/architecture/10-monorepo-estructura.md"
+
+  write_common_header "**ecosistema-ms** tiene la mejor estructura de los 3 monorepos: 5 packages
+con roles explícitos (logger, metrics, auth-server, grpc-client, proto) + 6 servicios.
+Turborepo + dependency-cruiser completan el 10/10." > "$TARGET"
+
+  cat >> "$TARGET" << 'MD'
+| Check requerido | Workflow |
+|----------------|----------|
+| ci-chatia | typecheck + test + build |
+| ci-pasarelapagos | typecheck + test + build |
+| ci-packages | typecheck auth-server + grpc-client + build logger + metrics |
+
+---
+
+## Nivel 2 — Turborepo (próximo sprint)
+
+### 2.1 Instalar Turborepo
+
+```bash
+pnpm add turbo --save-dev -w
+```
+
+### 2.2 `turbo.json` en la raíz
+
+```json
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "typecheck": {
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "start:dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}
+```
+
+**Qué resuelve:** cuando cambia `packages/auth-server`, Turborepo sabe
+que tiene que rebuildear los 5 servicios que lo consumen — en paralelo
+y solo los afectados.
+
+### 2.3 Reemplazar scripts en `package.json` raíz
+
+```json
+"scripts": {
+  "build":     "turbo build",
+  "typecheck": "turbo typecheck",
+  "test":      "turbo test",
+  "dev":       "turbo dev"
+}
+```
+
+### 2.4 Caché remota en CI
+
+```yaml
+- name: Setup Turborepo cache
+  uses: rharkor/caching-for-turbo@v1.8
+```
+
+---
+
+## Nivel 3 — dependency-cruiser (enforcement de fronteras)
+
+La regla "ningún servicio importa de otro servicio" y
+"ningún servicio reimplementa Firebase sin @ecosistema-ms/auth-server"
+son hoy manuales. dependency-cruiser las automatiza.
+
+```bash
+pnpm add dependency-cruiser --save-dev -w
+```
+
+**`.dependency-cruiser.cjs`:**
+```js
+const SERVICES = [
+  'chatia-backend',
+  'pasarelapagos-backend',
+  'notificaciones-backend',
+  'analytics-backend',
+  'workers-backend',
+  'marketing-backend',
+];
+
+const crossServiceRules = SERVICES.flatMap(from =>
+  SERVICES
+    .filter(to => to !== from)
+    .map(to => ({
+      name: `no-cross-import-${from}-to-${to}`,
+      severity: 'error',
+      from: { path: `^${from}/src` },
+      to:   { path: `^${to}/src` },
+    }))
+);
+
+module.exports = {
+  forbidden: [
+    ...crossServiceRules,
+    {
+      name: 'no-local-firebase-verify',
+      severity: 'error',
+      comment: 'Usar @ecosistema-ms/auth-server — nunca reimplementar firebase-admin directamente',
+      from: { path: '^(chatia|pasarelapagos|notificaciones|analytics|workers)-backend/src',
+              pathNot: 'firebase/firebase.module' },
+      to:   { path: 'firebase-admin' },
+    },
+  ],
+  options: {
+    tsPreCompilationDeps: true,
+    tsConfig: { fileName: 'tsconfig.base.json' },
+  },
+};
+```
+
+---
+
+## Estado actual vs 10/10
+
+| Item | Estado |
+|------|--------|
+| pnpm workspaces + catalog completo | ✅ |
+| packages/ con roles explícitos (5 packages) | ✅ |
+| Build order correcto (packages → servicios) | ✅ |
+| path filters en CI (6 workflows) | ✅ |
+| pnpm store cacheado en CI (config) | ✅ |
+| Lockfile actualizado | ⏳ `pnpm install` pendiente |
+| Branch protection en GitHub | ❌ Nivel 1.2 |
+| Turborepo task graph | ❌ Nivel 2 |
+| dependency-cruiser (cross-service) | ❌ Nivel 3 |
+| Turbo remote cache | ❌ Nivel 2.4 |
+
+---
+
+## Reglas duras de monorepo
+
+🔴 Nunca mergear con lockfile desactualizado.
+🔴 Ningún servicio importa de otro servicio — solo de packages/*.
+🔴 Ningún servicio reimplementa Firebase directamente — usar @ecosistema-ms/auth-server.
+🔴 Toda dep nueva va primero al catalog de pnpm-workspace.yaml.
+🟡 Versiones de @nestjs/* alineadas con welver.
+🟡 Cuando cambia la firma de un export en packages/auth-server → bump version minor.
+MD
+
+  ok "10-monorepo-estructura.md creado para ecosistema-ms"
+}
+
+# =============================================================================
+# SUPERADMIN
+# =============================================================================
+write_superadmin() {
+  TARGET=".claude/architecture/10-monorepo-estructura.md"
+
+  write_common_header "**superadmin** tiene 2 servicios (backend + frontend) + 1 package de tipos.
+Con este tamaño, Turborepo NO se justifica — el overhead supera el beneficio.
+Los 2 CI workflows con path filters son suficientes para el 10/10." > "$TARGET"
+
+  cat >> "$TARGET" << 'MD'
+| Check requerido | Workflow |
+|----------------|----------|
+| ci-control-backend | typecheck + test + build |
+| ci-control-frontend | typecheck + build |
+
+---
+
+## Nivel 2 — Lo que completa el 10/10 (sin Turborepo)
+
+### 2.1 Caché de pnpm store en CI
+
+Ya está configurado en los workflows con `cache: 'pnpm'` en `setup-node`.
+Solo falta el lockfile actualizado (Nivel 1.1) para que la caché sea estable.
+
+### 2.2 dependency-cruiser (opcional — bajo impacto con 2 servicios)
+
+Con solo 2 servicios el cruce de imports es difícil de hacer por accidente.
+Agregar solo si el monorepo crece a 4+ servicios.
+
+Si se decide agregar, la regla clave es:
+```js
+{
+  name: 'no-frontend-in-backend',
+  severity: 'error',
+  from: { path: '^grupojl-control-backend/src' },
+  to:   { path: '^grupojl-control-frontend' },
+}
+```
+
+### 2.3 Typecheck cruzado en CI
+
+Cuando cambia `packages/shared-types`, ambos servicios deben typecheck.
+Ya está cubierto por el path filter `packages/**` en ambos workflows.
+
+---
+
+## Estado actual vs 10/10
+
+| Item | Estado |
+|------|--------|
+| pnpm workspaces | ✅ |
+| shared-types como package único | ✅ |
+| path filters en CI (2 workflows) | ✅ |
+| pnpm store cacheado en CI (config) | ✅ |
+| Lockfile actualizado | ⏳ `pnpm install` pendiente |
+| Branch protection en GitHub | ❌ Nivel 1.2 |
+| Turborepo | ❌ NO aplicar — 2 servicios no lo justifican |
+| dependency-cruiser | ❌ Opcional si crece a 4+ servicios |
+
+---
+
+## Reglas duras de monorepo
+
+🔴 Nunca mergear con lockfile desactualizado.
+🔴 grupojl-control-backend no importa desde grupojl-control-frontend.
+🔴 Toda dep nueva va en grupojl-control-backend/package.json o grupojl-control-frontend/package.json según corresponda. No compartir deps entre los 2 servicios — son independientes en Railway.
+🟡 Versiones de @nestjs/* alineadas con welver y ecosistema-ms.
+🟡 shared-types: cuando se agrega un tipo nuevo, verificar que ambos servicios lo consumen correctamente antes de mergear.
+MD
+
+  ok "10-monorepo-estructura.md creado para superadmin"
+}
+
+# =============================================================================
+# Dispatch
+# =============================================================================
+case "$REPO_MODE" in
+  welver)        write_welver        ;;
+  ecosistema-ms) write_ecosistema_ms ;;
+  superadmin)    write_superadmin    ;;
+esac
+
+# Git commit
+log "Git commit..."
+if git rev-parse --git-dir &>/dev/null; then
+  git add .claude/architecture/10-monorepo-estructura.md 2>/dev/null || true
+  git commit -m "docs(.claude): arquitectura monorepo 10/10 — Turborepo + dependency-cruiser [$REPO_MODE]
+
+- 10-monorepo-estructura.md: gap actual vs referentes mundiales
+- Nivel 1: lockfile + branch protection (bloqueante)
+- Nivel 2: Turborepo task graph + remote cache (welver + ecosistema-ms)
+- Nivel 3: dependency-cruiser enforcement de fronteras
+- Reglas duras de monorepo permanentes" \
+    && ok "Commit creado" || warn "Sin cambios"
+fi
 
 echo ""
-echo "✅ [ecosistema-ms] Markets documentado en .claude/"
-echo ""
-echo "Archivos creados/modificados:"
-echo "  .claude/decisions/ADR-014-markets-context.md"
-echo "  .claude/modules/chatia-backend/markets.md"
-echo "  .claude/modules/pasarelapagos-backend/markets.md"
-echo "  .claude/modules/analytics-backend/markets.md"
-echo "  .claude/modules/packages/markets-tenant-context.md"
-echo "  .claude/CLAUDE.md  (append)"
-echo "  .claude/lifecycle/tasks.md  (append)"
-echo ""
-echo "Siguiente paso: bash x-markets-superadmin.sh (en grupojl-control/)"
+echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}  ✓ .claude/architecture/10-monorepo-estructura.md creado [$REPO_MODE]${NC}"
+echo -e "${GREEN}═══════════════════════════════════════════════════════════${NC}"
