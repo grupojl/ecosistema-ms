@@ -34,7 +34,7 @@ y poder arreglarlo antes de que el cliente lo note.
 - [x] `X-Request-Id` middleware en cada servicio
 - [x] Propagación de requestId en metadata gRPC
 - [x] `/metrics` endpoint en cada servicio
-- [ ] Health check enriquecido (DB + Redis + BullMQ + CBs)
+- [x] Health check enriquecido (DB + Redis + BullMQ + CBs)
 - [ ] Dashboard Grafana Cloud con métricas base
 
 ### Tests (Escalón 1 — completar)

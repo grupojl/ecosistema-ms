@@ -56,3 +56,18 @@ pnpm --filter analytics-backend typecheck
 - [ ] MKT-PP-02/03: marketCountry en PaymentController + listados
 - [ ] MKT-AN-02/03: marketCountry en gRPC TrackEvent + proyecciones por Market
 - [ ] Migraciones Prisma (requieren DB): chatia + pasarela + analytics
+
+---
+
+## Observabilidad ✅ COMPLETADA 2026-09-21
+
+- [x] LoggerModule + PrometheusModule + RequestIdMiddleware en los 5 servicios
+- [x] Health checks extendidos: DB + Redis + CBs + DLQ + uptime + version
+- [x] grpc-metadata.helper.ts: X-Request-Id propagado en gRPC inter-servicio
+- [x] ci-packages.yml: CI para proto + auth-server + grpc-client
+- [x] pino-pretty en catalog + RequestIdMiddleware en pasarelapagos
+
+### Pendiente
+- [ ] Adopción de grpcMetadata() en callers concretos
+- [ ] Branch protection en GitHub
+- [ ] pnpm install para regenerar lockfile
