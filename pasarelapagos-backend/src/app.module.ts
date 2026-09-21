@@ -1,5 +1,6 @@
 // src/app.module.ts
-import { Module } from '@nestjs/common';
+import { Module, type NestModule, type MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
@@ -95,4 +96,10 @@ import { TenantThrottlerGuard } from './common/guards/tenant-throttler.guard';
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}
