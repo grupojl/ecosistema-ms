@@ -88,9 +88,9 @@ Ver: `.claude/checklists/observabilidad.md`
 - Parche DT-023 documentado en .claude/patches/
 
 ### Pendiente manual post-ejecución
-- [ ] Importar createLoggerModule() en app.module.ts de cada servicio
-- [ ] Importar createMetricsModule() en app.module.ts de cada servicio
-- [ ] Importar RequestIdMiddleware en app.module.ts de cada servicio
+- [x] Importar createLoggerModule() en app.module.ts de cada servicio
+- [x] Importar createMetricsModule() en app.module.ts de cada servicio
+- [x] Importar RequestIdMiddleware en app.module.ts de cada servicio
 - [ ] Agregar packages/logger y packages/metrics a pnpm-workspace.yaml
 - [ ] Agregar pino, nestjs-pino, @willsoto/nestjs-prometheus al catalog raíz
 - [ ] Aplicar parche DT-023 en analytics-backend manualmente
