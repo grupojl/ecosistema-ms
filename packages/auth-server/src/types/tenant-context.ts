@@ -14,4 +14,5 @@ export interface TenantContext {
   canRead:          boolean;
   canWrite:         boolean;
   agentId?:         string;
+  marketCountry?:   string;   // ISO 3166-1 alpha-2 — undefined si no aplica (ADR-014)
 }

@@ -20,6 +20,7 @@ datasource db {
   eventType      String
   payload        Json
   occurredAt     DateTime
+  marketCountry  String?  @map("market_country")  // ADR-014 — dimensión de segmentación
   processedAt    DateTime @default(now())
 
   @@index([organizationId, eventType, occurredAt])
@@ -27,6 +28,7 @@ datasource db {
   @@index([organizationId, occurredAt])
   @@index([organizationId, ecosystemId, eventType, occurredAt])
   @@index([organizationId, ecosystemId, occurredAt])
+  @@index([organizationId, marketCountry, occurredAt])
 }
 
 /// Proyeccion materializada — recalculada cada hora por ProjectionsService

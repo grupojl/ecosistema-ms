@@ -125,6 +125,7 @@ model Payment {
   externalId     String?
   description    String?
   metadata       Json?
+  marketCountry  String?  @map("market_country")  // ADR-014 — Market resuelto upstream
   failureCode    String?
   failureMessage String?
   createdAt      DateTime          @default(now())

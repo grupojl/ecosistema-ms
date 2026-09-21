@@ -31,4 +31,5 @@ export interface TenantContext {
 
   // agentId opcional — lo upsertea el TenantGuard reescrito en Sprint 2
   agentId?: string;
+  marketCountry?: string;   // ISO 3166-1 alpha-2 — undefined si no aplica (ADR-014)
 }

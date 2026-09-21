@@ -275,6 +275,7 @@ model Conversation {
   summary           String?
   tags              String[] @default([])
 
+  marketCountry  String?  @map("market_country")  // ADR-014 — ISO 3166-1 alpha-2
   lastMessageAt DateTime?
   resolvedAt    DateTime?
   deletedAt     DateTime?
