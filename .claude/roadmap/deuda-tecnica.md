@@ -39,3 +39,20 @@ pnpm --filter analytics-backend typecheck
 - main.ts con ValidationPipe global coexiste con ZodExceptionFilter (DT-027)
   — documentado, no rompe, se resuelve en S4
 - DT-ECO-01 (domain/repo en ecommerce-back) — cerrado en sesión 2026-09-17
+
+---
+
+## Sprint Markets — ADR-014 ✅ COMPLETADO 2026-09-21
+
+### Cerrado
+- [x] MKT-PKG-01: TenantContext.marketCountry? en packages/auth-server
+- [x] MKT-PKG-02: TenantGuard extrae X-Market-Country
+- [x] MKT-CH-01/02/03: TenantContext local + TenantGuard chatia + Prisma Conversation
+- [x] MKT-PP-01: Prisma Payment.market_country
+- [x] MKT-AN-01: Prisma AnalyticsEvent.market_country + índice
+
+### Pendiente siguiente sprint
+- [ ] MKT-CH-04: system prompt contextualizado por país en agente chatia
+- [ ] MKT-PP-02/03: marketCountry en PaymentController + listados
+- [ ] MKT-AN-02/03: marketCountry en gRPC TrackEvent + proyecciones por Market
+- [ ] Migraciones Prisma (requieren DB): chatia + pasarela + analytics

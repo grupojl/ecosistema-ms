@@ -42,7 +42,7 @@ X-Market-ID:       <marketId>         // NUEVO — opcional, UUID del Market res
 
 ## Checklist
 
-- [ ] MKT-PKG-01: Agregar `marketCountry?` a TenantContext interface
-- [ ] MKT-PKG-02: Extraer `X-Market-Country` en TenantGuard
-- [ ] MKT-PKG-03: Bump de versión del package (minor — cambio backward compatible)
-- [ ] MKT-PKG-04: Actualizar tipos en todos los MS que importan TenantContext
+- [x] MKT-PKG-01: Agregar `marketCountry?` a TenantContext interface
+- [x] MKT-PKG-02: Extraer `X-Market-Country` en TenantGuard
+- [x] MKT-PKG-03: Bump de versión del package (minor — cambio backward compatible)
+- [x] MKT-PKG-04: Actualizar tipos en todos los MS que importan TenantContext
