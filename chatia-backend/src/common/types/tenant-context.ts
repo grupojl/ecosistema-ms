@@ -9,7 +9,7 @@
 //
 // Migrar usos de tenant.roles:
 //   tenant.roles.includes('admin')  →  tenant.role === 'OWNER' || tenant.role === 'ADMIN'
-import type { TenantRole } from '../schemas/tenant-claims.schema';
+import type { TenantRole } from '@/schemas/tenant-claims.schema';
 
 export interface TenantContext {
   // ── Plataforma ──────────────────────────────────────────────────────────────

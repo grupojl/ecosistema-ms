@@ -1,7 +1,7 @@
 // notificaciones-backend/src/notifications/channels/email/email.adapter.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
-import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
+import type { INotificationChannel, SendPayload } from '@/interfaces/notification-channel.interface.js';
 
 const RESEND_API_URL = 'https://api.resend.com/emails';
 

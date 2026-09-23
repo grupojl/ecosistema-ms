@@ -5,10 +5,10 @@ import {
   Param, Body, Query, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { CampaignsService }  from './campaigns.service.js';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
-import { CreateCampaignSchema } from './schemas.js';
-import type { CreateCampaignInput } from './schemas.js';
+import { CampaignsService }  from '@/campaigns/campaigns.service.js';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
+import { CreateCampaignSchema } from '@/campaigns/schemas.js';
+import type { CreateCampaignInput } from '@/campaigns/schemas.js';
 import { z } from 'zod';
 
 const PatchCampaignSchema = z.object({

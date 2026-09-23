@@ -1,11 +1,11 @@
 // src/assistant/chat/assistant-chat.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssistantChatService } from './assistant-chat.service';
-import { AssistantConfigService } from '../config/assistant-config.service';
-import { AssistantSessionService } from '../session/assistant-session.service';
-import { GroqService } from '../../groq/groq.service';
-import { EventsGateway } from '../../events/events.gateway';
-import { PrismaService } from '../../prisma/prisma.service';
+import { AssistantChatService } from '@/assistant/chat/assistant-chat.service';
+import { AssistantConfigService } from '@/config/assistant-config.service';
+import { AssistantSessionService } from '@/session/assistant-session.service';
+import { GroqService } from '@/groq/groq.service';
+import { EventsGateway } from '@/events/events.gateway';
+import { PrismaService } from '@/prisma/prisma.service';
 
 const mockConfig = {
   id: 'config-1', projectId: 'proj-1', organizationId: 'org-1',

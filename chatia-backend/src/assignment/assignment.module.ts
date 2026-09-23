@@ -1,6 +1,6 @@
 // src/assignment/assignment.module.ts
 import { Module } from '@nestjs/common';
-import { AssignmentService } from './assignment.service';
+import { AssignmentService } from '@/assignment/assignment.service';
 
 @Module({
   providers: [AssignmentService],

@@ -2,8 +2,8 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUES } from '../../queue/queue.constants';
-import { AssistantChatService, ChatInput } from '../chat/assistant-chat.service';
+import { QUEUES } from '@/queue/queue.constants';
+import { AssistantChatService, ChatInput } from '@/chat/assistant-chat.service';
 
 export type AssistantChatJobData = ChatInput;
 

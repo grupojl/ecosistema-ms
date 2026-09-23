@@ -3,7 +3,7 @@ import {
   Controller, Get, Post, Param, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
-import { DlqService } from './dlq.service.js';
+import { DlqService } from '@/dlq/dlq.service.js';
 
 @ApiTags('dlq')
 @ApiBearerAuth()

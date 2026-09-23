@@ -1,8 +1,8 @@
 // notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts
 import { Controller, Logger }    from '@nestjs/common';
 import { GrpcMethod }            from '@nestjs/microservices';
-import { PrismaService }         from '../prisma/prisma.service.js';
-import { NotificationsService }  from '../notifications/notifications.service.js';
+import { PrismaService }         from '@/prisma/prisma.service.js';
+import { NotificationsService }  from '@/notifications/notifications.service.js';
 
 interface SendNotificationRequest {
   ecosystemId:    string;

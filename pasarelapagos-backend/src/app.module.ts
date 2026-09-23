@@ -1,34 +1,34 @@
 // src/app.module.ts
 import { Module, type NestModule, type MiddlewareConsumer, RequestMethod } from '@nestjs/common';
-import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
+import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware.js';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { LoggerModule } from 'nestjs-pino';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { envSchema } from './config/env.validation';
+import { envSchema } from '@/config/env.validation';
 
 // Core
-import { InternalModule } from './internal/internal.module.js';
-import { PrismaModule }   from './modules/prisma/prisma.module';
-import { FirebaseModule }    from './modules/firebase/firebase.module';
-import { SharedGuardsModule } from './common/shared-guards.module';
-import { RedisModule }    from './modules/redis/redis.module';
-import { QueueModule }    from './modules/queue/queue.module';
-import { AuditModule }    from './modules/audit/audit.module';
-import { MetricsModule }  from './modules/metrics/metrics.module';
+import { InternalModule } from '@/internal/internal.module.js';
+import { PrismaModule }   from '@/modules/prisma/prisma.module';
+import { FirebaseModule }    from '@/modules/firebase/firebase.module';
+import { SharedGuardsModule } from '@/common/shared-guards.module';
+import { RedisModule }    from '@/modules/redis/redis.module';
+import { QueueModule }    from '@/modules/queue/queue.module';
+import { AuditModule }    from '@/modules/audit/audit.module';
+import { MetricsModule }  from '@/modules/metrics/metrics.module';
 
 // Business
-import { AuthModule }      from './modules/auth/auth.module';
-import { PaymentsModule }  from './modules/payments/payments.module';
-import { WebhooksModule }  from './modules/webhooks/webhooks.module';
-import { TenantsModule }   from './modules/tenants/tenants.module';
-import { ProvidersModule } from './modules/providers/providers.module';
-import { HealthModule }    from './modules/health/health.module';
+import { AuthModule }      from '@/modules/auth/auth.module';
+import { PaymentsModule }  from '@/modules/payments/payments.module';
+import { WebhooksModule }  from '@/modules/webhooks/webhooks.module';
+import { TenantsModule }   from '@/modules/tenants/tenants.module';
+import { ProvidersModule } from '@/modules/providers/providers.module';
+import { HealthModule }    from '@/modules/health/health.module';
 
 // Guards globales
-import { TenantThrottlerGuard } from './common/guards/tenant-throttler.guard';
+import { TenantThrottlerGuard } from '@/common/guards/tenant-throttler.guard';
 
 @Module({
   imports: [

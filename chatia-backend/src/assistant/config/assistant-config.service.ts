@@ -1,7 +1,7 @@
 // src/assistant/config/assistant-config.service.ts
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { UpdateAssistantConfigDto } from './dto/assistant-config.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import { UpdateAssistantConfigDto } from '@/assistant/config/dto/assistant-config.dto';
 
 const DEFAULT_SYSTEM_PROMPT = `Sos un asistente virtual. Respondé de forma amigable, breve y en español.
 

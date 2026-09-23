@@ -12,7 +12,7 @@ import { InjectQueue }                               from '@nestjs/bullmq';
 import { Queue }                                     from 'bullmq';
 import type { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom }                            from 'rxjs';
-import { QUEUES }                                    from '../notifications.constants.js';
+import { QUEUES }                                    from '@/notifications.constants.js';
 
 const DLQ_WARN_THRESHOLD  = 50;   // warning en log
 const DLQ_ALERT_THRESHOLD = 100;  // alerta a chatia via gRPC

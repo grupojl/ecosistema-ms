@@ -10,14 +10,14 @@ import {
   Controller, Get, Post, Param,
   Query, Body, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import { ExportSchema, type ExportInput } from './schemas.js';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { ExportSchema, type ExportInput } from '@/analytics/schemas.js';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
 import {
   ApiTags, ApiBearerAuth, ApiOperation,
   ApiResponse, ApiQuery, ApiBody,
 } from '@nestjs/swagger';
-import { AnalyticsService } from './analytics.service.js';
-import { ExportService }    from './export.service.js';
+import { AnalyticsService } from '@/analytics/analytics.service.js';
+import { ExportService }    from '@/analytics/export.service.js';
 
 @ApiTags('analytics')
 @ApiBearerAuth()

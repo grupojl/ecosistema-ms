@@ -20,12 +20,12 @@ import type { Job }              from 'bullmq';
 import { firstValueFrom }        from 'rxjs';
 import { createHash }            from 'node:crypto';
 
-import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
-import { JobsService }                 from '../jobs.service.js';
+import { WORKER_QUEUES, QUEUE_CONFIG } from '@/jobs.constants.js';
+import { JobsService }                 from '@/jobs.service.js';
 import type {
   CampaignEmailJobData,
   CampaignEmailJobResult,
-}                                      from '../dto/campaign-email-job.dto.js';
+}                                      from '@/dto/campaign-email-job.dto.js';
 
 const BATCH_SIZE    = 50;
 const NOTIFY_QUEUE  = 'notify.email';

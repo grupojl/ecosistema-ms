@@ -4,7 +4,7 @@
 import { Injectable, Logger }    from '@nestjs/common';
 import { InjectQueue }           from '@nestjs/bullmq';
 import { Queue }                 from 'bullmq';
-import { QUEUES }                from '../queue.constants.js';
+import { QUEUES }                from '@/queue.constants.js';
 
 @Injectable()
 export class DlqService {

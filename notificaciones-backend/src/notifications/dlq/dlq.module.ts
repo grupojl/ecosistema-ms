@@ -4,8 +4,8 @@ import { Module }           from '@nestjs/common';
 import { BullModule }       from '@nestjs/bullmq';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { QUEUES }           from '../notifications.constants.js';
-import { DlqMonitorService } from './dlq-monitor.service.js';
+import { QUEUES }           from '@/notifications.constants.js';
+import { DlqMonitorService } from '@/notifications/dlq/dlq-monitor.service.js';
 
 @Module({
   imports: [

@@ -2,11 +2,11 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUES, JOBS } from '../queue.constants';
-import { ConversationsService } from '../../conversations/conversations.service';
-import { MultimodalService } from '../../channels/multimodal.service.js';
+import { QUEUES, JOBS } from '@/queue.constants';
+import { ConversationsService } from '@/conversations/conversations.service';
+import { MultimodalService } from '@/channels/multimodal.service.js';
 import { ChannelType } from '@prisma/client';
-import { IncomingMessage } from '../../channels/channel.interface';
+import { IncomingMessage } from '@/channels/channel.interface';
 
 export interface IncomingMessageJobData {
   channelAccountId: string;

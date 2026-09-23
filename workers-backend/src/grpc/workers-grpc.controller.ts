@@ -1,6 +1,6 @@
 import { Controller, Logger } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { JobsService } from "../jobs/jobs.service.js";
+import { JobsService } from "@/jobs/jobs.service.js";
 @Controller()
 export class WorkersGrpcController {
   private readonly logger = new Logger(WorkersGrpcController.name);

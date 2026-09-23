@@ -12,9 +12,9 @@
 import { Injectable, Logger }    from '@nestjs/common';
 import type { AssistantSession } from '@prisma/client';
 
-import type { ProjectStrategy }           from '../../core/strategies/project-strategy.interface';
-import { ProjectContext, ProjectType }    from '../../core/strategies/project-context.interface';
-import { WELVER_CONFIG }        from './welver.config';
+import type { ProjectStrategy }           from '@/core/strategies/project-strategy.interface';
+import { ProjectContext, ProjectType }    from '@/core/strategies/project-context.interface';
+import { WELVER_CONFIG }        from '@/modules/welver/welver.config';
 
 @Injectable()
 export class WELVERStrategy implements ProjectStrategy {

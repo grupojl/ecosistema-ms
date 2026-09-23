@@ -1,7 +1,7 @@
 // src/langgraph/nodes/index.ts
 import { Logger } from '@nestjs/common';
-import { GroqService, GROQ_MODELS } from '../../groq/groq.service';
-import { GraphState, ClassifyResult, INTENTS } from '../langgraph.types';
+import { GroqService, GROQ_MODELS } from '@/groq/groq.service';
+import { GraphState, ClassifyResult, INTENTS } from '@/langgraph.types';
 import { ConversationStage } from '@prisma/client';
 
 const logger = new Logger('LangGraphNodes');
@@ -222,4 +222,3 @@ Instrucción para este stage: ${stageContext[state.currentStage]}
 ${entities ? `Datos del cliente: ${entities}` : ''}
 
 Respondé en español, de forma conversacional y breve (máximo 3 oraciones).`.trim();
-}

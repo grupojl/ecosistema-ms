@@ -1,12 +1,12 @@
 // src/notifications/notifications.controller.ts
 import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
-import { ListNotificationsSchema, type ListNotificationsInput } from './schemas';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { ListNotificationsSchema, type ListNotificationsInput } from '@/notifications/schemas';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { NotificationsService } from './notifications.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
+import { NotificationsService } from '@/notifications/notifications.service';
+import { TenantGuard } from '@/common/guards/tenant.guard';
+import { Tenant } from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
 
 @ApiTags('Notifications')
 @ApiBearerAuth()

@@ -1,7 +1,7 @@
 // src/notifications/notifications.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { EventsGateway } from '../events/events.gateway';
+import { PrismaService } from '@/prisma/prisma.service';
+import { EventsGateway } from '@/events/events.gateway';
 import { NotificationType } from '@prisma/client';
 import { randomUUID } from 'crypto';
 

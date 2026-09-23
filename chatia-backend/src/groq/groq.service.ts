@@ -92,4 +92,3 @@ export class GroqService {
       throw new Error(`Groq devolvió JSON inválido: ${response.content}`);
     }
   }
-}

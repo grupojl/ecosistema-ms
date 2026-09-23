@@ -7,7 +7,7 @@
 // Fallback: si no se puede leer → pregunta al usuario qué necesita
 // Ref: .claude/modules/chatia-backend/multimodal-adapters.md
 import { Injectable, Logger } from '@nestjs/common';
-import type { IMultimodalAdapter, MultimodalInput } from './multimodal.interface.js';
+import type { IMultimodalAdapter, MultimodalInput } from '@/channels/adapters/multimodal.interface.js';
 
 const MAX_CHARS = 4_000; // truncar documentos largos antes de enviar al LLM
 

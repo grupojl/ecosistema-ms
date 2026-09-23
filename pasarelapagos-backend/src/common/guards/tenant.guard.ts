@@ -23,8 +23,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { OrgContext } from '../interfaces/org-context.interface';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import type { OrgContext } from '@/interfaces/org-context.interface';
+import { IS_PUBLIC_KEY } from '@/decorators/public.decorator';
 import { Reflector } from '@nestjs/core';
 
 const PRODUCT_KEY = 'payments';

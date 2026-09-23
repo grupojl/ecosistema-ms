@@ -1,7 +1,7 @@
 // notificaciones-backend/src/preferences/preferences.service.ts
 // DT-014 fix: ecosystemId en getPreferences() para aislamiento multi-tenant
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
 
 @Injectable()
 export class PreferencesService {

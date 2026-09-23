@@ -1,6 +1,6 @@
 import { Controller, Get, Put, Param, Body } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
-import { PreferencesService } from "./preferences.service.js";
+import { PreferencesService } from "@/preferences/preferences.service.js";
 @ApiTags("preferences") @ApiBearerAuth()
 @Controller("api/v1/preferences")
 export class PreferencesController {

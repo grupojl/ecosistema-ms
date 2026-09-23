@@ -1,5 +1,5 @@
 // pasarelapagos-backend/src/modules/payments/repository/payments.repository.interface.ts
-import type { Payment, PaymentStatus } from '../domain/payment.entity.js';
+import type { Payment, PaymentStatus } from '@/domain/payment.entity.js';
 
 export const PAYMENTS_REPOSITORY = Symbol('PAYMENTS_REPOSITORY');
 

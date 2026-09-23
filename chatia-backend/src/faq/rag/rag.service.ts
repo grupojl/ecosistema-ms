@@ -1,7 +1,7 @@
 // src/faq/rag/rag.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { GroqService } from '../../groq/groq.service';
-import { FaqQueryService, ChunkResult } from '../query/faq-query.service';
+import { GroqService } from '@/groq/groq.service';
+import { FaqQueryService, ChunkResult } from '@/query/faq-query.service';
 
 export interface RagAnswer {
   answer: string;

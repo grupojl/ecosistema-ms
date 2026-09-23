@@ -5,7 +5,7 @@
 
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
-import { CircuitBreakerService }            from './circuit-breaker.service.js';
+import { CircuitBreakerService }            from '@/jobs/services/circuit-breaker.service.js';
 
 const GROQ_EMBED_URL = 'https://api.groq.com/openai/v1/embeddings';
 const DEFAULT_MODEL  = 'nomic-embed-text-v1_5';

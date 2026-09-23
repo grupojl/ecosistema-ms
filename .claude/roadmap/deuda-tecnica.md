@@ -71,3 +71,38 @@ pnpm --filter analytics-backend typecheck
 - [ ] Adopción de grpcMetadata() en callers concretos
 - [ ] Branch protection en GitHub
 - [ ] pnpm install para regenerar lockfile
+
+---
+
+## ProjectStrategy — scaffold + tipado pendiente (ADR-019, 2026-09-23)
+
+### [ECO-PS-01] Wiring manual de app.module.ts — P0
+`pasarelapagos-backend` y `notificaciones-backend` tienen `core/strategies/`
+y `modules/{welver,manzana,mexus}/` generados, pero **no están importados**
+en `app.module.ts` todavía. Sin esto el registry nunca se inicializa.
+
+```ts
+// pasarelapagos-backend/src/app.module.ts y notificaciones-backend/src/app.module.ts
+import { ProjectStrategyModule } from '@/core/strategies/project-strategy.module';
+import { WelverModule }  from '@/modules/welver/welver.module';
+import { ManzanaModule } from '@/modules/manzana/manzana.module';
+import { MexusModule }   from '@/modules/mexus/mexus.module';
+// agregar los 4 al array imports: []
+```
+
+### [ECO-PS-02] Estrategias son placeholders vacíos — P1
+`{eco}.strategy.ts` en pasarelapagos-backend y notificaciones-backend tienen
+`businessData: {}` y comentarios `TODO`. Igual que las estrategias de
+chatia-backend — hoy son la estructura correcta esperando contenido real.
+Completar cuando cada ecosistema defina su lógica de routing/templates real.
+
+### [ECO-PS-03] `businessData: Record<string, unknown>` sin tipar — P2
+Deuda consciente documentada en ADR-019. Aceptable con 3 ecosistemas en
+placeholder. Bloqueante apenas la primera estrategia tenga lógica real —
+tipar con un shape concreto por ecosistema en `modules/{eco}/types/context.ts`
+en vez de dejar `Record<string, unknown>`.
+
+### [ECO-PS-04] Evaluar marketing-backend — P3, no urgente
+Candidato a Strategy (reglas de automatización por ecosistema) pero fuera
+de scope de esta iteración. No agregar preventivamente — ver criterio de
+decisión en `architecture/12-project-strategy-pattern.md`.

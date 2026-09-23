@@ -6,8 +6,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-import type { RegisterEcosystemDto } from './dto/register-ecosystem.dto';
+import { PrismaService } from '@/prisma/prisma.service';
+import type { RegisterEcosystemDto } from '@/ecosystem/dto/register-ecosystem.dto';
 
 @Injectable()
 export class EcosystemService {

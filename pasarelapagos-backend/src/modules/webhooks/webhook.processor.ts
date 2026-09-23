@@ -3,12 +3,12 @@ import { InjectQueue }                          from '@nestjs/bullmq';
 import { Queue }                               from 'bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
-import { assertValidTransition } from '../payments/payment-state.machine';
-import { QUEUE_WEBHOOKS, QUEUE_MARKETING_ATTRIBUTION, JOB_ATTRIBUTE_CONVERSION } from '../../common/constants/queues';
-import { WebhookEvent } from '../providers/provider.interface';
+import { PrismaService } from '@/prisma/prisma.service';
+import { assertValidTransition } from '@/payments/payment-state.machine';
+import { QUEUE_WEBHOOKS, QUEUE_MARKETING_ATTRIBUTION, JOB_ATTRIBUTE_CONVERSION } from '@/common/constants/queues';
+import { WebhookEvent } from '@/providers/provider.interface';
 import { PaymentStatus } from '@prisma/client';
-import { MetricsService } from '../metrics/metrics.service';
+import { MetricsService } from '@/metrics/metrics.service';
 
 export interface WebhookJobData {
   webhookInboundId: string;

@@ -5,9 +5,9 @@
 // DLQ: DlqMonitorService.getDlqStats() — ya implementado
 // Sin auth: Railway healthcheck no tiene token
 import { Controller, Get }        from '@nestjs/common';
-import { PrismaService }           from '../prisma/prisma.service.js';
-import { CircuitBreakerService }   from '../notifications/circuit-breaker.service.js';
-import { DlqMonitorService }       from '../notifications/dlq/dlq-monitor.service.js';
+import { PrismaService }           from '@/prisma/prisma.service.js';
+import { CircuitBreakerService }   from '@/notifications/circuit-breaker.service.js';
+import { DlqMonitorService }       from '@/notifications/dlq/dlq-monitor.service.js';
 
 interface ExtendedHealth {
   status:          'ok' | 'degraded' | 'down';

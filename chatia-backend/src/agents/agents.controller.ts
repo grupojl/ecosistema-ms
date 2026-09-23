@@ -6,15 +6,15 @@ import {
   UseGuards, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { PrismaService }    from '../prisma/prisma.service';
-import { TenantGuard }      from '../common/guards/tenant.guard';
-import { RolesGuard }       from '../common/guards/roles.guard';
-import { Roles }            from '../common/decorators/roles.decorator';
-import { Tenant }           from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { RegisterAgentSchema, UpdateAgentSchema } from './schemas';
-import type { RegisterAgentInput, UpdateAgentInput } from './schemas';
+import { PrismaService }    from '@/prisma/prisma.service';
+import { TenantGuard }      from '@/common/guards/tenant.guard';
+import { RolesGuard }       from '@/common/guards/roles.guard';
+import { Roles }            from '@/common/decorators/roles.decorator';
+import { Tenant }           from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
+import { RegisterAgentSchema, UpdateAgentSchema } from '@/agents/schemas';
+import type { RegisterAgentInput, UpdateAgentInput } from '@/agents/schemas';
 
 @ApiTags('agents')
 @Controller('api/v1/agents')

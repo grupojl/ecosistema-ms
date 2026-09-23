@@ -1,10 +1,10 @@
 // src/assistant/chat/assistant-chat.service.ts
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { GroqService, GroqMessage } from '../../groq/groq.service';
-import { EventsGateway } from '../../events/events.gateway';
-import { PrismaService } from '../../prisma/prisma.service';
-import { AssistantConfigService } from '../config/assistant-config.service';
-import { AssistantSessionService } from '../session/assistant-session.service';
+import { GroqService, GroqMessage } from '@/groq/groq.service';
+import { EventsGateway } from '@/events/events.gateway';
+import { PrismaService } from '@/prisma/prisma.service';
+import { AssistantConfigService } from '@/config/assistant-config.service';
+import { AssistantSessionService } from '@/session/assistant-session.service';
 
 // Importación lazy para evitar dependencia circular — FaqModule exporta RagService
 export type RagServiceLike = {

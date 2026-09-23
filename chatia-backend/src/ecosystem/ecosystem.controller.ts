@@ -7,10 +7,10 @@ import {
   HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
-import { EcosystemService }  from './ecosystem.service';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { RegisterEcosystemSchema } from './schemas';
-import type { RegisterEcosystemInput } from './schemas';
+import { EcosystemService }  from '@/ecosystem/ecosystem.service';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
+import { RegisterEcosystemSchema } from '@/ecosystem/schemas';
+import type { RegisterEcosystemInput } from '@/ecosystem/schemas';
 
 @ApiTags('ecosystem')
 @ApiHeader({ name: 'x-platform-admin-key', required: true })

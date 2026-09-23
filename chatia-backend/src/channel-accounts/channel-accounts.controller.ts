@@ -6,10 +6,10 @@ import {
   ChannelAccountsService,
   CreateChannelAccountDto,
   UpdateChannelAccountDto,
-} from './channel-accounts.service';
-import { TenantGuard } from '../common/guards/tenant.guard';
-import { Tenant } from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
+} from '@/channel-accounts/channel-accounts.service';
+import { TenantGuard } from '@/common/guards/tenant.guard';
+import { Tenant } from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
 
 @Controller('channel-accounts')
 @UseGuards(TenantGuard)
@@ -45,4 +45,3 @@ export class ChannelAccountsController {
   rotateToken(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.svc.rotateToken(id, tenant.organizationId);
   }
-}

@@ -1,7 +1,7 @@
 // workers-backend/src/metrics/metrics.module.ts
 import { Global, Module } from '@nestjs/common';
-import { WorkersMetricsService } from './metrics.service.js';
-import { CircuitBreakerService } from '../jobs/services/circuit-breaker.service.js';
+import { WorkersMetricsService } from '@/metrics/metrics.service.js';
+import { CircuitBreakerService } from '@/jobs/services/circuit-breaker.service.js';
 
 @Global()
 @Module({

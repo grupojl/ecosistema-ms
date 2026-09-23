@@ -5,16 +5,16 @@ import { BullModule }    from '@nestjs/bullmq';
 import { ConfigModule, ConfigService }   from '@nestjs/config';
 import { ClientsModule, Transport }      from '@nestjs/microservices';
 
-import { WORKER_QUEUES, QUEUE_CONFIG }       from './jobs.constants.js';
-import { JobsService }                       from './jobs.service.js';
-import { JobsController }                    from './jobs.controller.js';
-import { EmbeddingService }                  from './services/embedding.service.js';
-import { ChunkingService }                   from './services/chunking.service.js';
-import { CircuitBreakerService }             from './services/circuit-breaker.service.js';
-import { FaqIngestProcessor }                from './processors/faq-ingest.processor.js';
-import { VectorIndexProcessor }              from './processors/vector-index.processor.js';
-import { CampaignEmailProcessor }            from './processors/campaign-email.processor.js';
-import { AnalyticsExportProcessor }          from './processors/analytics-export.processor.js';
+import { WORKER_QUEUES, QUEUE_CONFIG }       from '@/jobs/jobs.constants.js';
+import { JobsService }                       from '@/jobs/jobs.service.js';
+import { JobsController }                    from '@/jobs/jobs.controller.js';
+import { EmbeddingService }                  from '@/jobs/services/embedding.service.js';
+import { ChunkingService }                   from '@/jobs/services/chunking.service.js';
+import { CircuitBreakerService }             from '@/jobs/services/circuit-breaker.service.js';
+import { FaqIngestProcessor }                from '@/jobs/processors/faq-ingest.processor.js';
+import { VectorIndexProcessor }              from '@/jobs/processors/vector-index.processor.js';
+import { CampaignEmailProcessor }            from '@/jobs/processors/campaign-email.processor.js';
+import { AnalyticsExportProcessor }          from '@/jobs/processors/analytics-export.processor.js';
 
 const PROTO_DIR = join(process.cwd(), 'proto');
 const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';

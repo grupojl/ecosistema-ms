@@ -5,13 +5,13 @@ import {
   Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { ProjectsService }   from './projects.service';
-import { TenantGuard }       from '../common/guards/tenant.guard';
-import { Tenant }            from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { CreateProjectSchema, UpdateProjectSchema } from './schemas';
-import type { CreateProjectInput, UpdateProjectInput } from './schemas';
+import { ProjectsService }   from '@/projects/projects.service';
+import { TenantGuard }       from '@/common/guards/tenant.guard';
+import { Tenant }            from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
+import { CreateProjectSchema, UpdateProjectSchema } from '@/projects/schemas';
+import type { CreateProjectInput, UpdateProjectInput } from '@/projects/schemas';
 
 @ApiTags('projects')
 @ApiBearerAuth()

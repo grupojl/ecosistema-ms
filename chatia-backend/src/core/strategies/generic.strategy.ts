@@ -5,8 +5,8 @@
 // =============================================================================
 
 import { Injectable }                                        from '@nestjs/common';
-import type { ProjectStrategy }                              from './project-strategy.interface';
-import { ProjectContext, ProjectType }                       from './project-context.interface';
+import type { ProjectStrategy }                              from '@/core/strategies/project-strategy.interface';
+import { ProjectContext, ProjectType }                       from '@/core/strategies/project-context.interface';
 import type { AssistantSession }                             from '@prisma/client';
 
 @Injectable()

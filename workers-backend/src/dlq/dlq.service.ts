@@ -2,8 +2,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                           from '@nestjs/bullmq';
 import { Queue }                                 from 'bullmq';
-import { PrismaService }                         from '../prisma/prisma.service.js';
-import { WORKER_QUEUES }                         from '../jobs/jobs.constants.js';
+import { PrismaService }                         from '@/prisma/prisma.service.js';
+import { WORKER_QUEUES }                         from '@/jobs/jobs.constants.js';
 
 const DLQ_WARN_THRESHOLD = 500;
 const DLQ_MAX_THRESHOLD  = 1_000;

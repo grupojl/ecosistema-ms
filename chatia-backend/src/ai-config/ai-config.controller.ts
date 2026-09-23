@@ -5,13 +5,13 @@ import {
   Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
-import { AiConfigService }   from './ai-config.service';
-import { TenantGuard }       from '../common/guards/tenant.guard';
-import { Tenant }            from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { UpdateAiConfigSchema, ToggleAiSchema } from './schemas';
-import type { UpdateAiConfigInput, ToggleAiInput } from './schemas';
+import { AiConfigService }   from '@/ai-config/ai-config.service';
+import { TenantGuard }       from '@/common/guards/tenant.guard';
+import { Tenant }            from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
+import { UpdateAiConfigSchema, ToggleAiSchema } from '@/ai-config/schemas';
+import type { UpdateAiConfigInput, ToggleAiInput } from '@/ai-config/schemas';
 
 @ApiTags('ai-config')
 @ApiBearerAuth()

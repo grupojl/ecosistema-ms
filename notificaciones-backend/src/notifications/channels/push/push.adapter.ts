@@ -9,7 +9,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
 import type { App }                         from 'firebase-admin/app';
 import type { Message, MulticastMessage }   from 'firebase-admin/messaging';
-import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
+import type { INotificationChannel, SendPayload } from '@/interfaces/notification-channel.interface.js';
 
 const FCM_BATCH_SIZE = 500; // límite de la API de FCM
 

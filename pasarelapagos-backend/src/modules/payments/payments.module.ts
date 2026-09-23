@@ -2,13 +2,13 @@
 // FASE 4: Repository conectado — PaymentsService inyecta IPaymentsRepository
 import { Module }           from '@nestjs/common';
 import { BullModule }       from '@nestjs/bullmq';
-import { PaymentsController }         from './payments.controller';
-import { PaymentsService }            from './payments.service';
-import { ReconciliationService }      from './reconciliation.service';
-import { ReconcileProcessor }         from './reconcile.processor';
-import { PrismaPaymentsRepository }   from './repository/prisma-payments.repository';
-import { PAYMENTS_REPOSITORY }        from './repository/payments.repository.interface';
-import { QUEUE_RECONCILE }            from '../../common/constants/queues';
+import { PaymentsController }         from '@/modules/payments/payments.controller';
+import { PaymentsService }            from '@/modules/payments/payments.service';
+import { ReconciliationService }      from '@/modules/payments/reconciliation.service';
+import { ReconcileProcessor }         from '@/modules/payments/reconcile.processor';
+import { PrismaPaymentsRepository }   from '@/modules/payments/repository/prisma-payments.repository';
+import { PAYMENTS_REPOSITORY }        from '@/modules/payments/repository/payments.repository.interface';
+import { QUEUE_RECONCILE }            from '@/common/constants/queues';
 
 @Module({
   imports: [

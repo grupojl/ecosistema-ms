@@ -6,7 +6,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '../channel.interface';
+} from '@/channel.interface';
 
 @Injectable()
 export class InstagramChannel implements IChannel {
@@ -100,4 +100,3 @@ export class InstagramChannel implements IChannel {
       throw new Error(`Instagram send failed: ${error}`);
     }
   }
-}

@@ -1,380 +1,465 @@
-#!/usr/bin/env bash
+#!/bin/bash
+set -euo pipefail
+
 # =============================================================================
-# x-markets-ecosistema-ms.sh
-# Escribe la documentación de Markets en el monorepo ecosistema-ms/
-# Ejecutar desde la raíz de ecosistema-ms/
-# Git Bash (Windows): bash x-markets-ecosistema-ms.sh
+# x.sh — actualiza .claude/ con la decisión de replicar ProjectStrategy
+#
+# Documenta:
+#   1. ADR-019: por qué se replica el patrón, referentes de industria
+#      (Salesforce, Shopify) y qué se toma de cada uno
+#   2. architecture/12-project-strategy-pattern.md: el patrón en sí,
+#      como referencia técnica permanente (mismo nivel que 00-principios.md)
+#   3. roadmap/deuda-tecnica.md: deuda de tipado de businessData + pasos
+#      manuales pendientes del scaffold
+#   4. lifecycle/tasks.md: tasks ejecutables de esta iniciativa
+#   5. CLAUDE.md: referencia rápida actualizada
+#
+# Uso: bash x.sh   (desde la raíz del monorepo, junto a .claude/)
+# No toca schema.prisma ni app.module.ts — eso sigue siendo manual.
 # =============================================================================
-set -e
 
-echo "▶ [ecosistema-ms] Escribiendo documentación de Markets..."
+CLAUDE_DIR=".claude"
 
-# -----------------------------------------------------------------------------
-# 1. ADR-014 — Markets en ecosistema-ms
-# -----------------------------------------------------------------------------
-mkdir -p .claude/decisions
+if [ ! -d "$CLAUDE_DIR" ]; then
+  echo "[ERROR] No existe $CLAUDE_DIR — correr desde la raíz del monorepo."
+  exit 1
+fi
 
-cat > .claude/decisions/ADR-014-markets-context.md << 'EOF'
-# ADR-014 — Markets: contexto global en microservicios
+echo "=== Actualizando $CLAUDE_DIR ==="
 
-**Fecha:** 2026-09-19
-**Estado:** Aceptado
-**Referencia:** welver/ADR-014-markets-global.md (fuente de verdad del modelo)
+mkdir -p "$CLAUDE_DIR/decisions"
+mkdir -p "$CLAUDE_DIR/architecture"
+mkdir -p "$CLAUDE_DIR/roadmap"
+mkdir -p "$CLAUDE_DIR/lifecycle"
 
----
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. ADR-019 — decisión + referentes de industria
+# ─────────────────────────────────────────────────────────────────────────────
+cat > "$CLAUDE_DIR/decisions/ADR-019-project-strategy-multi-servicio.md" <<'EOF'
+# ADR-019 — Replicar ProjectStrategy en pasarelapagos-backend y notificaciones-backend
+
+**Fecha:** 2026-09-23
+**Estado:** Aceptado — scaffold generado, wiring manual pendiente
+**Repo:** grupojl/ecosistema-ms
 
 ## Contexto
 
-Los microservicios de ecosistema-ms operan en contexto multi-tenant.
-Cada tenant es una Organization de welver que tiene un `ecosystemId`.
-Con la introducción de Markets, cada request puede tener además un `marketId`
-que indica el contexto geográfico de la operación.
+`chatia-backend` tiene el patrón `ProjectStrategy` / `ProjectStrategyRegistry`
+(`src/core/strategies/`) que permite que cada ecosistema (welver, manzana,
+mexus) personalice comportamiento del core sin que el core conozca al
+ecosistema concreto. El core solo depende de la interface `ProjectStrategy`;
+el registry resuelve en runtime cuál usar, con `GenericStrategy` como
+fallback seguro si no hay estrategia registrada.
 
----
+Los otros 5 microservicios resuelven multi-tenancy solo con
+`ecosystemId` + `organizationId` como filtro de query — eso es aislamiento
+de **datos**, no personalización de **comportamiento**. Si welver necesita
+un flujo de pago distinto a manzana (otro provider preferido, otra regla
+de routing), hoy no hay dónde poner esa lógica sin `if (ecosystemId === X)`
+esparcido en el service.
 
 ## Decisión
 
-### Markets NO se modelan en ecosistema-ms
+Replicar el patrón `ProjectStrategy` en los microservicios donde el
+**comportamiento** (no solo los datos) difiere por ecosistema:
 
-El modelo `Market` vive en `welver/realsass-sass-back`.
-Los microservicios de este repo son **consumidores del contexto** — no dueños del modelo.
+- `pasarelapagos-backend` — routing de providers, métodos de pago habilitados
+- `notificaciones-backend` — templates, canales preferidos, horarios de envío
 
-### Cómo llega el contexto de Market a cada MS
+**No se replica (todavía) en:**
 
-El contexto de Market se propaga como header HTTP desde el caller:
+- `analytics-backend` — es dimensión de datos (`ecosystemId` en el where),
+  no comportamiento. Agregar Strategy ahí hoy sería abstracción sin uso.
+- `workers-backend` — los jobs ya reciben `ecosystemId` en el payload; el
+  *procesamiento* no difiere por ecosistema todavía.
+- `marketing-backend` — candidato futuro (reglas de automatización por
+  ecosistema) pero fuera de scope de esta iteración.
 
-```
-X-Tenant-ID:       <organizationId>     (ya existe — TenantGuard)
-X-Ecosystem-ID:    <ecosystemId>        (ya existe — TenantGuard)
-X-Market-Country:  CO                  (nuevo — ISO 3166-1 alpha-2)
-X-Market-ID:       <marketId>          (nuevo — resuelto por ecommerce-back)
-```
+Criterio para decidir si un microservicio nuevo necesita el patrón:
 
-### Microservicio por microservicio
+> ¿El *comportamiento* de negocio cambia por ecosistema, o solo cambian
+> los *datos* que se leen/escriben? Si es solo datos, un filtro
+> `ecosystemId` en el where alcanza. Si es comportamiento, Strategy.
 
-| MS | Uso de Market | Detalle |
-|----|--------------|---------|
-| `chatia-backend` | Contexto de respuesta | El agente responde con contexto del país del cliente |
-| `pasarelapagos-backend` | País de la transacción | Registro de país para auditoría y reconciliación |
-| `notificaciones-backend` | Localización de mensajes | Template de notificación según país |
-| `analytics-backend` | Dimensión de análisis | Métricas segmentadas por Market/país |
-| `workers-backend` | Contexto de jobs | Jobs de fulfillment con contexto del Market |
+## Referentes de industria
 
----
+### Salesforce — multi-tenancy real con personalización tipada
+
+Salesforce corre miles de organizaciones sobre el mismo core; cada una
+personaliza comportamiento via Apex Triggers y Custom Metadata sin forkear
+el motor. El paralelismo es directo:
+
+| Nuestro patrón | Salesforce |
+|---|---|
+| `ProjectStrategy` interface | Trigger framework |
+| `ProjectStrategyRegistry.get(type)` | Runtime resuelve Apex según Org ID |
+| `GenericStrategy` fallback | Comportamiento default sin triggers |
+| `businessData: Record<string, unknown>` | Custom Fields / Custom Metadata Types |
+
+Lo que tomamos de Salesforce: **nunca dejar `businessData` como blob sin
+tipo**. Ellos fuerzan que cada organización declare sus Custom Fields con
+tipo explícito. Ver sección "Deuda consciente" — hoy `businessData` es
+`Record<string, unknown>` en los 3 servicios con Strategy; es aceptable en
+el arranque, no lo es a 5+ ecosistemas.
+
+### Shopify — extensibilidad desacoplada del ciclo de deploy
+
+Shopify Functions/Apps permiten que un merchant personalice comportamiento
+del core sin que el ciclo de release del merchant dependa del ciclo de
+release de la plataforma — la personalización corre en un proceso separado
+invocado por contrato (webhook/extension point).
+
+Lo que **no** tomamos de Shopify todavía: hoy agregar un ecosistema nuevo
+implica agregar una carpeta en `modules/` y redeployar el microservicio.
+Es aceptable con 3 ecosistemas. Si algún ecosistema necesita iterar su
+lógica de negocio sin esperar nuestro pipeline de CI, la migración natural
+es sacar `modules/{eco}/` a un servicio separado que el core invoca por
+HTTP/evento — la interface `ProjectStrategy` no cambia, solo el transporte
+detrás de la implementación. Esto es exactamente el valor de haber puesto
+la interface primero.
+
+## Alternativas descartadas
+
+| Alternativa | Por qué se descartó |
+|---|---|
+| `if (ecosystemId === 'welver')` inline en el service | No escala más allá de 2 ecosistemas, imposible de testear en aislamiento, mezcla infraestructura con reglas de negocio |
+| Config JSON en DB sin código | Sirve para umbrales/flags simples, no para lógica de routing o side-effects — se evaluará como complemento, no reemplazo |
+| Microservicio por ecosistema | Multiplica la superficie de deploy y mantenimiento sin necesidad real a este tamaño — el patrón Strategy da el mismo aislamiento de lógica sin el costo operacional |
 
 ## Consecuencias
 
-- Cada MS lee `X-Market-Country` del header — nunca lo resuelve ni lo valida
-- La validación del Market ocurre upstream (ecommerce-back o sass-back)
-- Si el header no llega → los MS operan sin contexto de país (comportamiento actual)
-- Backward compatible — los MS existentes no rompen
+**Ganancia:**
+- El core de pagos y notificaciones nunca conoce el ecosistema concreto —
+  testeable en aislamiento con `GenericStrategy`
+- Agregar un ecosistema nuevo no toca el core, solo agrega `modules/{eco}/`
+- Un bug de una estrategia de ecosistema no puede romper el flujo de los
+  demás (hooks obligados a no lanzar)
+
+**Costo / deuda técnica consciente:**
+- `businessData: Record<string, unknown>` sin tipar en los 3 servicios —
+  aceptable ahora, bloqueante a 5+ ecosistemas (ver roadmap/deuda-tecnica.md)
+- Wiring de `app.module.ts` es manual — el scaffold no lo automatiza
+  porque tocar imports de módulos de forma automática es más riesgoso que
+  el ahorro de tiempo que da
+- Los 3 `*.strategy.ts` generados son placeholders (`TODO`) — no hay
+  lógica real todavía, igual que las estrategias de chatia-backend
+
+**Regla permanente que queda:**
+Antes de replicar este patrón en un microservicio nuevo, responder primero
+la pregunta del criterio de decisión (comportamiento vs. datos). Si la
+respuesta es "solo datos", no se agrega `core/strategies/` — se resuelve
+con el filtro `ecosystemId` + `organizationId` estándar del ecosistema-ms.
+
+## Referencias
+
+- `architecture/12-project-strategy-pattern.md` — el patrón documentado
+  como referencia técnica permanente
+- `chatia-backend/src/core/strategies/` — implementación de referencia
+- `roadmap/deuda-tecnica.md` — sección "ProjectStrategy — tipado pendiente"
+- `lifecycle/tasks.md` — tasks ejecutables de esta iniciativa
 EOF
+echo "  [OK] decisions/ADR-019-project-strategy-multi-servicio.md"
 
-echo "  ✓ ADR-014-markets-context.md"
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. architecture/12-project-strategy-pattern.md — referencia técnica permanente
+# ─────────────────────────────────────────────────────────────────────────────
+cat > "$CLAUDE_DIR/architecture/12-project-strategy-pattern.md" <<'EOF'
+# 12 — Patrón ProjectStrategy: personalización por ecosistema sin acoplar el core
 
-# -----------------------------------------------------------------------------
-# 2. chatia-backend — cómo usa Market
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/chatia-backend
-
-cat > .claude/modules/chatia-backend/markets.md << 'EOF'
-# Markets en chatia-backend
-
-## Rol
-
-El agente de chat IA recibe el contexto de país del cliente para:
-- Adaptar las respuestas al contexto local (ej: "enviamos desde Bogotá" en CO)
-- Registrar el país en cada conversación para analytics
-- Seleccionar templates de respuesta localizados (si existen)
-
-## Cómo llega el contexto
-
-Header `X-Market-Country: CO` en cada request de conversación.
-Extraído en el TenantGuard extendido o en el ConversationController.
-
-## Cambios necesarios
-
-### En TenantContext (packages/auth-server)
-
-```typescript
-// types/tenant-context.ts — agregar campo opcional
-export interface TenantContext {
-  organizationId: string
-  ecosystemId:    string
-  userId:         string
-  role:           Role
-  marketCountry?: string   // NUEVO — ISO 3166-1 alpha-2, opcional
-}
-```
-
-### En ConversationService
-
-```typescript
-// Al crear/actualizar conversación
-await this.repo.saveConversation({
-  ...existingFields,
-  marketCountry: tenantContext.marketCountry ?? null,
-})
-```
-
-### En el agente IA
-
-Incluir `marketCountry` en el system prompt cuando esté disponible:
-
-```typescript
-const systemPrompt = marketCountry
-  ? `${basePrompt}\n\nContexto geográfico del cliente: ${marketCountry}.
-     Adapta las respuestas de logística y envíos a este país.`
-  : basePrompt
-```
-
-## Checklist
-
-- [ ] MKT-CH-01: Agregar `marketCountry?` a `TenantContext`
-- [ ] MKT-CH-02: Extraer `X-Market-Country` en el guard/middleware
-- [ ] MKT-CH-03: Guardar `marketCountry` en Conversation model (Prisma migration)
-- [ ] MKT-CH-04: Inyectar en system prompt del agente
-- [ ] MKT-CH-05: Dimensión `market_country` en eventos de analytics
-EOF
-
-echo "  ✓ modules/chatia-backend/markets.md"
-
-# -----------------------------------------------------------------------------
-# 3. pasarelapagos-backend — cómo usa Market
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/pasarelapagos-backend
-
-cat > .claude/modules/pasarelapagos-backend/markets.md << 'EOF'
-# Markets en pasarelapagos-backend
-
-## Rol
-
-Pagos ya usa Stripe que maneja multi-moneda y multi-país de forma nativa.
-El rol de Market aquí es de **auditoría y trazabilidad**, no de lógica de pago.
-
-## Lo que se registra
-
-En cada transacción se guarda el país del comprador para:
-- Reconciliación contable por mercado
-- Reportes de revenue por país en el superadmin
-- Cumplimiento fiscal (saber en qué país ocurrió la transacción)
-
-## Cambios en el modelo de Transaction
-
-```prisma
-model Transaction {
-  // ... campos existentes ...
-  marketCountry  String?  @map("market_country")  // NUEVO — ISO 3166-1 alpha-2
-  // Stripe ya registra country en el PaymentIntent — esto lo espeja en nuestra DB
-}
-```
-
-## Checklist
-
-- [ ] MKT-PP-01: Migración Prisma — `marketCountry` en Transaction
-- [ ] MKT-PP-02: Extraer de header `X-Market-Country` en PaymentController
-- [ ] MKT-PP-03: Pasar a TransactionService al registrar pago
-- [ ] MKT-PP-04: Incluir en listado interno de transacciones (para superadmin)
-EOF
-
-echo "  ✓ modules/pasarelapagos-backend/markets.md"
-
-# -----------------------------------------------------------------------------
-# 4. analytics-backend — Markets como dimensión de análisis
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/analytics-backend
-
-cat > .claude/modules/analytics-backend/markets.md << 'EOF'
-# Markets en analytics-backend
-
-## Rol
-
-`marketCountry` es una **dimensión de segmentación** en todos los eventos de analytics.
-Permite responder: "¿cuántas ventas tuve en CO este mes?" sin joins complejos.
-
-## Cambios en el schema de eventos
-
-```prisma
-model AnalyticsEvent {
-  // ... campos existentes ...
-  marketCountry  String?  @map("market_country")  // NUEVO — dimensión de análisis
-}
-```
-
-## Proyecciones afectadas
-
-Las proyecciones de `ProjectionsService` deben incluir `marketCountry`
-como dimensión de agrupación cuando esté disponible:
-
-```typescript
-// projections.service.ts — agregar agrupación por market
-async getRevenueByMarket(organizationId: string, from: Date, to: Date) {
-  return this.prisma.analyticsEvent.groupBy({
-    by: ['marketCountry'],
-    where: { organizationId, eventType: 'ORDER_COMPLETED', createdAt: { gte: from, lte: to } },
-    _sum: { amountCents: true },
-  })
-}
-```
-
-## Checklist
-
-- [ ] MKT-AN-01: Migración Prisma — `marketCountry` en AnalyticsEvent
-- [ ] MKT-AN-02: Extraer de payload o header en AnalyticsController
-- [ ] MKT-AN-03: `getRevenueByMarket()` en ProjectionsService
-- [ ] MKT-AN-04: Endpoint gRPC para que superadmin consulte revenue por Market
-EOF
-
-echo "  ✓ modules/analytics-backend/markets.md"
-
-# -----------------------------------------------------------------------------
-# 5. packages/auth-server — TenantContext extendido
-# -----------------------------------------------------------------------------
-mkdir -p .claude/modules/packages
-
-cat > .claude/modules/packages/markets-tenant-context.md << 'EOF'
-# TenantContext extendido con Market
-
-## Cambio en @ecosistema-ms/auth-server
-
-El `TenantContext` es el contrato central que fluye por todos los microservicios.
-Agregar `marketCountry` como campo opcional mantiene backward compatibility total.
-
-```typescript
-// packages/auth-server/src/types/tenant-context.ts
-
-export interface TenantContext {
-  organizationId: string    // existente
-  ecosystemId:    string    // existente
-  userId:         string    // existente
-  role:           Role      // existente
-  marketCountry?: string    // NUEVO — ISO 3166-1 alpha-2, undefined si no aplica
-}
-```
-
-## Dónde se extrae
-
-En el `TenantGuard` o en un middleware previo al guard:
-
-```typescript
-// guards/tenant.guard.ts — agregar extracción de header
-const marketCountry = request.headers['x-market-country'] as string | undefined
-
-context.set<TenantContext>('tenant', {
-  ...existingFields,
-  marketCountry: marketCountry?.toUpperCase() ?? undefined,
-})
-```
-
-## Headers estándar
-
-```
-X-Tenant-ID:       <organizationId>   // existente
-X-Ecosystem-ID:    <ecosystemId>      // existente
-X-Market-Country:  CO                 // NUEVO — opcional
-X-Market-ID:       <marketId>         // NUEVO — opcional, UUID del Market resuelto
-```
-
-## Checklist
-
-- [ ] MKT-PKG-01: Agregar `marketCountry?` a TenantContext interface
-- [ ] MKT-PKG-02: Extraer `X-Market-Country` en TenantGuard
-- [ ] MKT-PKG-03: Bump de versión del package (minor — cambio backward compatible)
-- [ ] MKT-PKG-04: Actualizar tipos en todos los MS que importan TenantContext
-EOF
-
-echo "  ✓ modules/packages/markets-tenant-context.md"
-
-# -----------------------------------------------------------------------------
-# 6. Norte en CLAUDE.md
-# -----------------------------------------------------------------------------
-
-cat >> .claude/CLAUDE.md << 'EOF'
+> Referentes: **Salesforce** (multi-tenancy con Custom Fields tipados) ·
+> **Shopify** (extensibilidad desacoplada del ciclo de deploy)
+>
+> Decisión formal: `decisions/ADR-019-project-strategy-multi-servicio.md`
 
 ---
 
-## Markets — contexto global en microservicios (ADR-014)
+## El principio
 
-### Principio en este repo
+> El core de un microservicio nunca debe conocer qué ecosistema lo está
+> llamando. Solo conoce un contrato (`ProjectStrategy`); quién lo implementa
+> es responsabilidad de `modules/{ecosistema}/`.
 
-Los MS de ecosistema-ms son **consumidores del contexto de Market**, no dueños del modelo.
-El modelo Market vive en welver/realsass-sass-back.
-
-### Cómo llega el contexto
-
-```
-X-Market-Country: CO    →  header HTTP desde el caller
-X-Market-ID: <uuid>     →  header HTTP desde el caller (resuelto upstream)
-```
-
-Nunca se resuelve ni valida aquí. Si llega → se usa. Si no → comportamiento actual.
-
-### Impacto por MS
-
-| MS | Campo nuevo | Uso |
-|----|------------|-----|
-| chatia-backend | `marketCountry` en Conversation | System prompt contextualizado |
-| pasarelapagos-backend | `marketCountry` en Transaction | Auditoría y reconciliación |
-| analytics-backend | `marketCountry` en AnalyticsEvent | Dimensión de segmentación |
-| notificaciones-backend | `marketCountry` en contexto | Templates localizados |
-| workers-backend | `marketCountry` en job payload | Contexto de fulfillment |
-
-### Cambio en packages/auth-server (TenantContext)
-
-`marketCountry?: string` — campo opcional, backward compatible.
-Ver `.claude/modules/packages/markets-tenant-context.md`
-EOF
-
-echo "  ✓ CLAUDE.md actualizado"
-
-# -----------------------------------------------------------------------------
-# 7. lifecycle/tasks.md
-# -----------------------------------------------------------------------------
-mkdir -p .claude/lifecycle
-
-cat >> .claude/lifecycle/tasks.md << 'EOF'
+Esto es lo mismo que dice `architecture/00-principios.md` para la frontera
+entre microservicios, aplicado ahora a la frontera entre el core de un
+microservicio y sus ecosistemas cliente.
 
 ---
 
-## Sprint Markets — ADR-014 (ecosistema-ms)
+## Cuándo aplica este patrón
 
-### packages/auth-server (bloqueante para todos los MS)
+Antes de agregar `core/strategies/` a un microservicio nuevo, responder:
 
-- [ ] MKT-PKG-01: `marketCountry?` en TenantContext
-- [ ] MKT-PKG-02: Extraer X-Market-Country en TenantGuard
-- [ ] MKT-PKG-03: Bump minor del package
-- [ ] MKT-PKG-04: Actualizar imports en cada MS
+**¿El comportamiento de negocio cambia por ecosistema, o solo cambian los
+datos que se leen/escriben?**
 
-### chatia-backend
+- Solo datos → alcanza con `ecosystemId` + `organizationId` en el `where`
+  (ver `architecture/00-principios.md`, regla de multi-tenant)
+- Comportamiento (routing, reglas, side-effects, contenido de templates,
+  umbrales de negocio) → aplica Strategy
 
-- [ ] MKT-CH-01..05 (ver modules/chatia-backend/markets.md)
+| Microservicio | ¿Strategy? | Motivo |
+|---|---|---|
+| chatia-backend | ✅ implementado | prompt, tono, reglas de escalación por ecosistema |
+| pasarelapagos-backend | ✅ implementado | routing de providers, métodos de pago habilitados |
+| notificaciones-backend | ✅ implementado | templates, canales preferidos, horarios |
+| marketing-backend | 🔲 candidato futuro | reglas de automatización por ecosistema — fuera de scope actual |
+| analytics-backend | ❌ no aplica | es dimensión de datos, no comportamiento |
+| workers-backend | ❌ no aplica hoy | procesamiento no difiere por ecosistema todavía |
 
-### pasarelapagos-backend
+---
 
-- [ ] MKT-PP-01..04 (ver modules/pasarelapagos-backend/markets.md)
+## Estructura canónica
 
-### analytics-backend
+```
+{servicio}-backend/src/
+  core/strategies/
+    project-context.interface.ts   # shape del contexto enriquecido
+    project-strategy.interface.ts  # contrato que cada ecosistema implementa
+    project-strategy.registry.ts   # resuelve estrategia en runtime
+    generic.strategy.ts            # fallback — nunca falla
+    project-strategy.module.ts     # exporta el registry
+  modules/
+    welver/
+      welver.config.ts             # flags, overrides default
+      welver.strategy.ts           # implementa ProjectStrategy
+      welver.module.ts             # se auto-registra en onModuleInit
+      types/context.ts             # TODO: tipar businessData
+    manzana/  (mismo molde)
+    mexus/    (mismo molde)
+```
 
-- [ ] MKT-AN-01..04 (ver modules/analytics-backend/markets.md)
+## Contrato `ProjectStrategy`
 
-### notificaciones-backend / workers-backend
+Dos hooks, nombrados según el dominio del microservicio (no genéricos —
+`enrichPaymentContext`/`afterChargeResult` en pagos, no
+`enrichContext`/`afterResponse` copiado literal de chatia). La razón:
+si el método se llama igual en los 6 microservicios pero hace cosas
+distintas, se pierde legibilidad al leer una estrategia concreta.
 
-- [ ] Agregar marketCountry al payload de notificaciones
-- [ ] Agregar marketCountry al contexto de jobs BullMQ
+```ts
+interface ProjectStrategy {
+  // Se llama ANTES de la operación de negocio.
+  // Si falla: loguea y devuelve contexto vacío. NUNCA lanza.
+  enrichXContext(ecosystemId, organizationId, input): Promise<ProjectContext>;
+
+  // Se llama DESPUÉS de la operación.
+  // Si falla: solo loguea. NUNCA lanza.
+  afterXResult(result, context): Promise<void>;
+
+  getProjectType(): ProjectType;
+}
+```
+
+## Regla dura: los hooks nunca lanzan
+
+Un bug en la estrategia de un ecosistema no puede romper el flujo de los
+demás. Si `enrichXContext` o `afterXResult` fallan, capturan el error,
+loguean y devuelven un valor neutro (contexto vacío / no-op). Esto es
+lo mismo que ya aplica `04-degradacion-elegante.md` para integraciones
+externas — un fallo de personalización es una integración más.
+
+## Registry con fallback obligatorio
+
+```ts
+get(type: ProjectType): ProjectStrategy {
+  const strategy = this.strategies.get(type);
+  if (!strategy) {
+    // warning, nunca throw — GenericStrategy responde con comportamiento default
+    return this.strategies.get(ProjectType.GENERIC)!;
+  }
+  return strategy;
+}
+```
+
+Un ecosistema mal configurado (o uno nuevo sin estrategia todavía) nunca
+tira el microservicio — cae a comportamiento genérico.
+
+---
+
+## Deuda consciente: `businessData` sin tipar
+
+`ProjectContext.businessData` es `Record<string, unknown>` en las tres
+implementaciones actuales. Es aceptable en el arranque (3 ecosistemas,
+estrategias todavía placeholder). **No es aceptable pasado ese punto.**
+
+Salesforce fuerza Custom Fields tipados por organización — nosotros debemos
+tipar `businessData` por ecosistema apenas la primera estrategia tenga
+lógica real:
+
+```ts
+// ❌ hoy
+businessData: Record<string, unknown>;
+
+// ✅ objetivo, cuando welver tenga lógica real en pasarelapagos-backend
+interface WelverPaymentBusinessData {
+  preferredProvider: 'mercadopago' | 'stripe';
+  maxInstallments: number;
+}
+```
+
+Ver `roadmap/deuda-tecnica.md` para el ticket concreto.
+
+---
+
+## Evolución futura: cuándo desacoplar del ciclo de deploy
+
+Hoy agregar un ecosistema implica agregar `modules/{eco}/` y redeployar.
+Aceptable con 3 ecosistemas. Si algún ecosistema necesita iterar su lógica
+sin esperar el pipeline de CI del ecosistema-ms, la migración (inspirada en
+Shopify Functions) es sacar `modules/{eco}/` a un servicio invocado por
+HTTP/evento — la interface `ProjectStrategy` no cambia, solo el transporte
+detrás de la implementación concreta. No se hace preventivamente: es deuda
+técnica aceptar el redeploy hasta que haya una necesidad real.
+
+## Checklist antes de escribir una estrategia nueva
+
+1. ¿Ya evalué que es comportamiento y no solo datos? (ver tabla arriba)
+2. ¿Los dos hooks están envueltos en try/catch que nunca relanza?
+3. ¿`GenericStrategy` sigue siendo el fallback si el registry no encuentra el tipo?
+4. ¿El nombre de los hooks tiene sentido en el dominio del microservicio,
+   no es un copy-paste literal de chatia?
+5. ¿`businessData` tiene un tipo definido en `types/context.ts`, o sigue
+   como `unknown` a sabiendas de que es deuda?
 EOF
+echo "  [OK] architecture/12-project-strategy-pattern.md"
 
-echo "  ✓ lifecycle/tasks.md actualizado"
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. roadmap/deuda-tecnica.md — agregar sección (append, no destructivo)
+# ─────────────────────────────────────────────────────────────────────────────
+DEUDA_FILE="$CLAUDE_DIR/roadmap/deuda-tecnica.md"
+touch "$DEUDA_FILE"
+
+if ! grep -q "## ProjectStrategy — tipado pendiente" "$DEUDA_FILE" 2>/dev/null; then
+  cat >> "$DEUDA_FILE" <<'EOF'
+
+---
+
+## ProjectStrategy — scaffold + tipado pendiente (ADR-019, 2026-09-23)
+
+### [ECO-PS-01] Wiring manual de app.module.ts — P0
+`pasarelapagos-backend` y `notificaciones-backend` tienen `core/strategies/`
+y `modules/{welver,manzana,mexus}/` generados, pero **no están importados**
+en `app.module.ts` todavía. Sin esto el registry nunca se inicializa.
+
+```ts
+// pasarelapagos-backend/src/app.module.ts y notificaciones-backend/src/app.module.ts
+import { ProjectStrategyModule } from '@/core/strategies/project-strategy.module';
+import { WelverModule }  from '@/modules/welver/welver.module';
+import { ManzanaModule } from '@/modules/manzana/manzana.module';
+import { MexusModule }   from '@/modules/mexus/mexus.module';
+// agregar los 4 al array imports: []
+```
+
+### [ECO-PS-02] Estrategias son placeholders vacíos — P1
+`{eco}.strategy.ts` en pasarelapagos-backend y notificaciones-backend tienen
+`businessData: {}` y comentarios `TODO`. Igual que las estrategias de
+chatia-backend — hoy son la estructura correcta esperando contenido real.
+Completar cuando cada ecosistema defina su lógica de routing/templates real.
+
+### [ECO-PS-03] `businessData: Record<string, unknown>` sin tipar — P2
+Deuda consciente documentada en ADR-019. Aceptable con 3 ecosistemas en
+placeholder. Bloqueante apenas la primera estrategia tenga lógica real —
+tipar con un shape concreto por ecosistema en `modules/{eco}/types/context.ts`
+en vez de dejar `Record<string, unknown>`.
+
+### [ECO-PS-04] Evaluar marketing-backend — P3, no urgente
+Candidato a Strategy (reglas de automatización por ecosistema) pero fuera
+de scope de esta iteración. No agregar preventivamente — ver criterio de
+decisión en `architecture/12-project-strategy-pattern.md`.
+EOF
+  echo "  [OK] roadmap/deuda-tecnica.md — sección agregada"
+else
+  echo "  [SKIP] roadmap/deuda-tecnica.md — sección ya existe"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. lifecycle/tasks.md — agregar tasks ejecutables (append, no destructivo)
+# ─────────────────────────────────────────────────────────────────────────────
+TASKS_FILE="$CLAUDE_DIR/lifecycle/tasks.md"
+touch "$TASKS_FILE"
+
+if ! grep -q "## ProjectStrategy multi-servicio — ADR-019" "$TASKS_FILE" 2>/dev/null; then
+  cat >> "$TASKS_FILE" <<'EOF'
+
+---
+
+## ProjectStrategy multi-servicio — ADR-019 (2026-09-23)
+
+- [ ] **[PS-01]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
+      `pasarelapagos-backend/src/app.module.ts`
+      → Done cuando: log de arranque muestra
+      `Registry inicializado con estrategias: [WELVER, MANZANA, MEXUS, GENERIC]`
+
+- [ ] **[PS-02]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
+      `notificaciones-backend/src/app.module.ts`
+      → Done cuando: mismo log de arranque en este servicio
+
+- [ ] **[PS-03]** Completar `welver.strategy.ts` en pasarelapagos-backend con
+      routing real de provider preferido de welver
+      → Done cuando: `enrichPaymentContext` retorna `businessData` no vacío
+      para al menos un caso real
+
+- [ ] **[PS-04]** Completar `welver.strategy.ts` en notificaciones-backend con
+      templates/canal preferido real de welver
+      → Done cuando: `enrichNotificationContext` retorna overrides no vacíos
+
+- [ ] **[PS-05]** Repetir PS-03/PS-04 para manzana y mexus cuando tengan
+      requerimientos de negocio concretos — no antes (evitar lógica placeholder
+      que nadie usa)
+
+- [ ] **[PS-06]** Tipar `businessData` por ecosistema en
+      `modules/{eco}/types/context.ts` de ambos servicios, reemplazando
+      `Record<string, unknown>` — solo cuando PS-03/04 tengan contenido real
+EOF
+  echo "  [OK] lifecycle/tasks.md — sección agregada"
+else
+  echo "  [SKIP] lifecycle/tasks.md — sección ya existe"
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. CLAUDE.md — referencia rápida (append, no destructivo)
+# ─────────────────────────────────────────────────────────────────────────────
+CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
+touch "$CLAUDE_MD"
+
+if ! grep -q "## ProjectStrategy — personalización por ecosistema" "$CLAUDE_MD" 2>/dev/null; then
+  cat >> "$CLAUDE_MD" <<'EOF'
+
+---
+
+## ProjectStrategy — personalización por ecosistema (ADR-019)
+
+Patrón replicado desde chatia-backend hacia pasarelapagos-backend y
+notificaciones-backend: el core del microservicio nunca conoce el
+ecosistema concreto, solo el contrato `ProjectStrategy`. Ver
+`architecture/12-project-strategy-pattern.md` para el detalle y el
+criterio de "cuándo aplica" antes de replicarlo en un microservicio nuevo.
+
+Estado: scaffold generado, wiring de `app.module.ts` pendiente (manual,
+ver `lifecycle/tasks.md` sección PS-01/PS-02).
+
+Referentes de industria: Salesforce (Custom Fields tipados — de ahí sale
+la regla de no dejar `businessData` como `Record<string, unknown>` para
+siempre) y Shopify (extensibilidad desacoplada del deploy — evolución
+futura, no urgente hoy).
+EOF
+  echo "  [OK] CLAUDE.md — referencia agregada"
+else
+  echo "  [SKIP] CLAUDE.md — referencia ya existe"
+fi
 
 echo ""
-echo "✅ [ecosistema-ms] Markets documentado en .claude/"
+echo "=== .claude/ actualizado ==="
 echo ""
-echo "Archivos creados/modificados:"
-echo "  .claude/decisions/ADR-014-markets-context.md"
-echo "  .claude/modules/chatia-backend/markets.md"
-echo "  .claude/modules/pasarelapagos-backend/markets.md"
-echo "  .claude/modules/analytics-backend/markets.md"
-echo "  .claude/modules/packages/markets-tenant-context.md"
-echo "  .claude/CLAUDE.md  (append)"
-echo "  .claude/lifecycle/tasks.md  (append)"
+echo "Archivos nuevos:"
+echo "  decisions/ADR-019-project-strategy-multi-servicio.md"
+echo "  architecture/12-project-strategy-pattern.md"
 echo ""
-echo "Siguiente paso: bash x-markets-superadmin.sh (en grupojl-control/)"
+echo "Archivos actualizados (append):"
+echo "  roadmap/deuda-tecnica.md"
+echo "  lifecycle/tasks.md"
+echo "  CLAUDE.md"
+echo ""
+echo "Pendiente real (no lo hace este script, es código no docs):"
+echo "  → correr scaffold-project-strategy.sh si todavía no se corrió"
+echo "  → wiring manual de app.module.ts en pasarelapagos y notificaciones"

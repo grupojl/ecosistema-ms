@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '../../../../common/errors/payment-error.catalog';
-import { PaymentException } from '../../../../common/errors/payment.exception';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
+import { PaymentException } from '@/common/errors/payment.exception';
 
 /**
  * Mapea códigos de estado/error de MercadoPago a PaymentErrorCode interno.

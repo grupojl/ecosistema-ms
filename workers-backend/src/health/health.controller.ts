@@ -7,9 +7,9 @@
 import { Controller, Get }           from '@nestjs/common';
 import { InjectQueue }                from '@nestjs/bullmq';
 import type { Queue }                 from 'bullmq';
-import { PrismaService }              from '../prisma/prisma.service.js';
-import { CircuitBreakerService }      from '../jobs/services/circuit-breaker.service.js';
-import { WORKER_QUEUES }              from '../jobs/jobs.constants.js';
+import { PrismaService }              from '@/prisma/prisma.service.js';
+import { CircuitBreakerService }      from '@/jobs/services/circuit-breaker.service.js';
+import { WORKER_QUEUES }              from '@/jobs/jobs.constants.js';
 
 interface ExtendedHealth {
   status:          'ok' | 'degraded' | 'down';

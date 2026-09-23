@@ -8,7 +8,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Cron, CronExpression }             from '@nestjs/schedule';
 import { ConfigService }                    from '@nestjs/config';
-import { PrismaService }                    from '../../prisma/prisma.service.js';
+import { PrismaService }                    from '@/prisma/prisma.service.js';
 import { Redis }                            from 'ioredis';
 
 const LOCK_KEY    = 'analytics:projections:lock';

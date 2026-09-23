@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import CircuitBreaker from 'opossum';
-import { PaymentException } from '../../common/errors/payment.exception';
-import { PaymentErrorCode } from '../../common/errors/payment-error.catalog';
+import { PaymentException } from '@/common/errors/payment.exception';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
 
 export interface CircuitBreakerOptions {
   timeout?: number;       // ms antes de considerar fallido (default: 5000)

@@ -2,14 +2,14 @@
 // Adaptador concreto de IContactsRepository.
 // ÚNICO archivo del módulo contacts que puede importar PrismaService.
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { PrismaService } from "@/prisma/prisma.service.js";
 import type {
   IContactsRepository,
   ContactRecord,
   ContactWithConversations,
   ListContactsFilter,
   ContactStats,
-} from "./contacts.repository.interface.js";
+} from "@/contacts/repository/contacts.repository.interface.js";
 
 @Injectable()
 export class PrismaContactsRepository implements IContactsRepository {

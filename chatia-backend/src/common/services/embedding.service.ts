@@ -1,6 +1,6 @@
 // src/common/services/embedding.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { GroqService } from '../../groq/groq.service';
+import { GroqService } from '@/groq/groq.service';
 
 @Injectable()
 export class EmbeddingService {

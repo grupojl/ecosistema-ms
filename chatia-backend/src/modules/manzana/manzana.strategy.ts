@@ -12,9 +12,9 @@
 import { Injectable, Logger }    from '@nestjs/common';
 import type { AssistantSession } from '@prisma/client';
 
-import type { ProjectStrategy }           from '../../core/strategies/project-strategy.interface';
-import { ProjectContext, ProjectType }    from '../../core/strategies/project-context.interface';
-import { MANZANA_CONFIG }        from './manzana.config';
+import type { ProjectStrategy }           from '@/core/strategies/project-strategy.interface';
+import { ProjectContext, ProjectType }    from '@/core/strategies/project-context.interface';
+import { MANZANA_CONFIG }        from '@/modules/manzana/manzana.config';
 
 @Injectable()
 export class MANZANAStrategy implements ProjectStrategy {

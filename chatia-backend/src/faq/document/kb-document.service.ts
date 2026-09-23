@@ -2,9 +2,9 @@
 import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { InjectQueue }  from '@nestjs/bullmq';
 import { Queue }        from 'bullmq';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateKbDocumentDto } from './dto/kb-document.dto';
-import { QUEUES, JOBS } from '../../queue/queue.constants';
+import { PrismaService } from '@/prisma/prisma.service';
+import { CreateKbDocumentDto } from '@/faq/document/dto/kb-document.dto';
+import { QUEUES, JOBS } from '@/queue/queue.constants';
 
 export interface IngestJobData { documentId: string; organizationId: string; }
 

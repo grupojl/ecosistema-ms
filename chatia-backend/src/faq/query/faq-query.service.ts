@@ -1,7 +1,7 @@
 // src/faq/query/faq-query.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { EmbeddingService } from '../../common/services/embedding.service';
+import { PrismaService } from '@/prisma/prisma.service';
+import { EmbeddingService } from '@/common/services/embedding.service';
 
 export interface ChunkResult {
   chunkId: string;

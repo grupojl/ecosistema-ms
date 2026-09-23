@@ -132,3 +132,33 @@ grep -n "InternalModule" \
 
 - [ ] Agregar marketCountry al payload de notificaciones
 - [ ] Agregar marketCountry al contexto de jobs BullMQ
+
+---
+
+## ProjectStrategy multi-servicio — ADR-019 (2026-09-23)
+
+- [ ] **[PS-01]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
+      `pasarelapagos-backend/src/app.module.ts`
+      → Done cuando: log de arranque muestra
+      `Registry inicializado con estrategias: [WELVER, MANZANA, MEXUS, GENERIC]`
+
+- [ ] **[PS-02]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
+      `notificaciones-backend/src/app.module.ts`
+      → Done cuando: mismo log de arranque en este servicio
+
+- [ ] **[PS-03]** Completar `welver.strategy.ts` en pasarelapagos-backend con
+      routing real de provider preferido de welver
+      → Done cuando: `enrichPaymentContext` retorna `businessData` no vacío
+      para al menos un caso real
+
+- [ ] **[PS-04]** Completar `welver.strategy.ts` en notificaciones-backend con
+      templates/canal preferido real de welver
+      → Done cuando: `enrichNotificationContext` retorna overrides no vacíos
+
+- [ ] **[PS-05]** Repetir PS-03/PS-04 para manzana y mexus cuando tengan
+      requerimientos de negocio concretos — no antes (evitar lógica placeholder
+      que nadie usa)
+
+- [ ] **[PS-06]** Tipar `businessData` por ecosistema en
+      `modules/{eco}/types/context.ts` de ambos servicios, reemplazando
+      `Record<string, unknown>` — solo cuando PS-03/04 tengan contenido real

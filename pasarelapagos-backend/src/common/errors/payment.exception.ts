@@ -2,7 +2,7 @@ import { HttpException } from '@nestjs/common';
 import {
   PaymentErrorCode,
   PAYMENT_ERROR_CATALOG,
-} from './payment-error.catalog';
+} from '@/common/errors/payment-error.catalog';
 
 export class PaymentException extends HttpException {
   readonly code: PaymentErrorCode;

@@ -2,10 +2,10 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUES } from '../queue.constants';
-import { ChannelRegistry } from '../../channels/channel.registry';
-import { PrismaService } from '../../prisma/prisma.service';
-import { EventsGateway } from '../../events/events.gateway';
+import { QUEUES } from '@/queue.constants';
+import { ChannelRegistry } from '@/channels/channel.registry';
+import { PrismaService } from '@/prisma/prisma.service';
+import { EventsGateway } from '@/events/events.gateway';
 import { ChannelType } from '@prisma/client';
 
 export interface OutgoingMessageJobData {

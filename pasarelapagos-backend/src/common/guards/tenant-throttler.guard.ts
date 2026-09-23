@@ -13,8 +13,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { ThrottlerException } from '@nestjs/throttler';
 import Redis from 'ioredis';
-import { REDIS_CLIENT } from '../../modules/redis/redis.module';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { REDIS_CLIENT } from '@/modules/redis/redis.module';
+import { IS_PUBLIC_KEY } from '@/decorators/public.decorator';
 
 @Injectable()
 export class TenantThrottlerGuard implements CanActivate {

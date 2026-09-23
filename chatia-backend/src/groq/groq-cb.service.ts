@@ -3,8 +3,8 @@
 // Si Groq cae: CircuitOpenError → fallback a AssistantConfig.fallbackMessage.
 // El AssistantChatService debe capturar CircuitOpenError y devolver el fallback.
 import { Injectable, Logger }         from '@nestjs/common';
-import { GroqService, GroqMessage }   from './groq.service.js';
-import { CircuitBreakerService, CircuitOpenError } from '../common/services/circuit-breaker.service.js';
+import { GroqService, GroqMessage }   from '@/groq/groq.service.js';
+import { CircuitBreakerService, CircuitOpenError } from '@/common/services/circuit-breaker.service.js';
 
 const CB_KEY     = 'groq-llm';
 // LLM es el componente mas fragil — timeout alto, threshold bajo, recuperacion lenta

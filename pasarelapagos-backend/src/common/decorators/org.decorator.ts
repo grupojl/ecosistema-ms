@@ -1,6 +1,6 @@
 // src/common/decorators/org.decorator.ts
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import type { OrgContext } from '../interfaces/org-context.interface';
+import type { OrgContext } from '@/interfaces/org-context.interface';
 
 /**
  * @OrgCtx() — inyecta el OrgContext en el parámetro del controller.

@@ -5,7 +5,7 @@ import {
   ExecutionContext,
   ForbiddenException,
 } from '@nestjs/common';
-import type { TenantContext } from '../types/tenant-context';
+import type { TenantContext } from '@/types/tenant-context';
 
 /**
  * Guard liviano que verifica tenant.canWrite.

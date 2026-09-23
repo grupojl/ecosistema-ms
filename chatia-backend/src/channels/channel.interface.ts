@@ -62,4 +62,3 @@ export interface ChannelAccountConfig {
   accessToken: string;
   extraConfig: Record<string, unknown>;
   webhookVerifyToken: string;
-}

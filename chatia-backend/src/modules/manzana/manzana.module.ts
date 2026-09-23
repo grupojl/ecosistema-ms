@@ -11,8 +11,8 @@
 // =============================================================================
 
 import { Module, OnModuleInit }       from '@nestjs/common';
-import { MANZANAStrategy }  from './manzana.strategy';
-import { ProjectStrategyRegistry }    from '../../core/strategies/project-strategy.registry';
+import { MANZANAStrategy }  from '@/modules/manzana/manzana.strategy';
+import { ProjectStrategyRegistry }    from '@/core/strategies/project-strategy.registry';
 
 @Module({
   providers: [MANZANAStrategy],

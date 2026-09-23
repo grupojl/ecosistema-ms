@@ -6,7 +6,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '../channel.interface';
+} from '@/channel.interface';
 
 @Injectable()
 export class WhatsAppChannel implements IChannel {
@@ -132,4 +132,3 @@ export class WhatsAppChannel implements IChannel {
   private extractMediaUrl(msg: any): string | undefined {
     return msg.image?.id || msg.video?.id || msg.audio?.id || msg.document?.id;
   }
-}

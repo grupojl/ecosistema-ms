@@ -11,8 +11,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import type * as admin from 'firebase-admin';
-import { FIREBASE_ADMIN } from '../../modules/firebase/firebase.module';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { FIREBASE_ADMIN } from '@/modules/firebase/firebase.module';
+import { IS_PUBLIC_KEY } from '@/decorators/public.decorator';
 
 @Injectable()
 export class FirebaseAuthGuard implements CanActivate {

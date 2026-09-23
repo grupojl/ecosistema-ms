@@ -6,7 +6,7 @@
 //
 // Ref: .claude/modules/chatia-backend/multimodal-adapters.md
 import { Injectable, Logger } from '@nestjs/common';
-import type { IMultimodalAdapter, MultimodalInput } from './multimodal.interface.js';
+import type { IMultimodalAdapter, MultimodalInput } from '@/channels/adapters/multimodal.interface.js';
 
 @Injectable()
 export class VideoToTextAdapter implements IMultimodalAdapter {

@@ -1,0 +1,116 @@
+packages:
+  - "chatia-backend"
+  - "pasarelapagos-backend"
+  - "workers-backend"
+  - "analytics-backend"
+  - "notificaciones-backend"
+  - "marketing-backend"
+  - "packages/*"
+catalog:
+  # ── Core ──────────────────────────────────────────────
+  typescript: "^6.0.3"
+  zod: "^4.6.5"
+  uuid: "^11.1.1"
+  axios: "^1.20.0"
+
+  # ── Types ─────────────────────────────────────────────
+  "@types/node": "^24.13.5"
+  "@types/express": "^5.0.6"
+  "@types/bcryptjs": "^2.4.6"
+  "@types/uuid": "^10.0.0"
+  "@types/multer": "^1.4.12"
+  "@types/jest": "^30.0.0"
+  "@types/supertest": "^7.2.1"
+
+  # ── NestJS ────────────────────────────────────────────
+  "@nestjs/common": "^11.2.5"
+  "@nestjs/core": "^11.2.5"
+  "@nestjs/platform-express": "^11.2.5"
+  "@nestjs/config": "^4.0.4"
+  "@nestjs/microservices": "^11.2.5"
+  "@nestjs/event-emitter": "^3.1.0"
+  "@nestjs/bullmq": "^11.0.5"
+  "@nestjs/throttler": "^6.7.0"
+  "@nestjs/swagger": "^11.4.7"
+  "@nestjs/terminus": "^11.0.0"
+  "@nestjs/mapped-types": "^2.0.6"
+  "@nestjs/schedule": "^5.0.1"
+  "@nestjs/cache-manager": "^3.1.3"
+  "@nestjs/cli": "^11.0.24"
+  "@nestjs/schematics": "^11.1.0"
+  "@nestjs/testing": "^11.2.5"
+
+  # ── Prisma ────────────────────────────────────────────
+  "@prisma/client": "^7.10.0"
+  "@prisma/adapter-pg": "^7.10.0"
+  prisma: "^7.10.0"
+
+  # ── DB / Cache ────────────────────────────────────────
+  pg: "^8.23.0"
+  ioredis: "^6.0.0"
+  bullmq: "^6.3.8"
+  cache-manager: "^7.2.9"
+
+  # ── Auth / Security ───────────────────────────────────
+  bcryptjs: "^3.0.3"
+  firebase-admin: "^14.4.0"
+  helmet: "^8.3.0"
+
+  # ── Validation / Transform ────────────────────────────
+  class-validator: "^0.15.1"
+  class-transformer: "^0.5.1"
+
+  # ── HTTP / Runtime ────────────────────────────────────
+  reflect-metadata: "^0.2.2"
+  rxjs: "^7.8.2"
+  dotenv: "^17.4.2"
+  swagger-ui-express: "^5.0.1"
+
+  # ── Logging ───────────────────────────────────────────
+  nestjs-pino: "^4.6.1"
+  pino: "^10.3.1"
+  pino-pretty: "^13.1.3"
+  pino-http: "^11.0.0"
+
+  # ── gRPC ──────────────────────────────────────────────
+  "@grpc/grpc-js": "^1.14.5"
+  "@grpc/proto-loader": "^0.8.1"
+  protobufjs: "^7.5.3"
+
+  # ── Payment providers ─────────────────────────────────
+  stripe: "^22.6.2"
+  mercadopago: "^3.6.1"
+
+  # ── OpenTelemetry ─────────────────────────────────────
+  "@opentelemetry/sdk-node": "^0.222.0"
+  "@opentelemetry/auto-instrumentations-node": "^0.80.0"
+  "@opentelemetry/exporter-prometheus": "^0.222.0"
+
+  "@willsoto/nestjs-prometheus": "^6.1.1"
+  "prom-client": "^15.1.3"
+  # ── Dev / Build ───────────────────────────────────────
+  "@eslint/js": "^10.0.1"
+  "@eslint/eslintrc": "^3.2.0"
+  eslint: "^10.11.0"
+  eslint-config-prettier: "^10.0.1"
+  eslint-plugin-prettier: "^5.2.2"
+  globals: "^17.12.0"
+  prettier: "^3.9.8"
+  typescript-eslint: "^8.70.0"
+  jest: "^30.5.2"
+  supertest: "^7.2.2"
+  ts-node: "^10.9.2"
+  ts-jest: "^29.4.12"
+  ts-loader: "^9.5.2"
+  tsconfig-paths: "^4.2.0"
+  source-map-support: "^0.5.21"
+  # ── Adicionales ────────────────────────────────────────────
+  keyv: "^5.6.0"
+  opossum: "^10.0.0"
+  nanoid: "^6.0.1"
+  mammoth: "^1.12.3"
+  pdf-parse: "^2.4.5"
+  @nestjs/platform-socket.io: "^11.2.5"
+  @nestjs/websockets: "^11.2.5"
+  @opentelemetry/exporter-metrics-otlp-http: "^0.222.0"
+  @opentelemetry/sdk-metrics: "^2.11.0"

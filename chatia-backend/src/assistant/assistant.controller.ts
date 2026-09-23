@@ -5,14 +5,14 @@ import {
   Body, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { AssistantChatService }   from './chat/assistant-chat.service';
-import { AssistantConfigService } from './config/assistant-config.service';
-import { TenantGuard }            from '../common/guards/tenant.guard';
-import { Tenant }                 from '../common/decorators/tenant.decorator';
-import type { TenantContext }     from '../common/types/tenant-context';
-import { ZodValidationPipe }      from '../common/pipes/zod-validation.pipe';
-import { ChatSchema, UpdateAssistantConfigSchema } from './schemas';
-import type { ChatInput, UpdateAssistantConfigInput } from './schemas';
+import { AssistantChatService }   from '@/assistant/chat/assistant-chat.service';
+import { AssistantConfigService } from '@/assistant/config/assistant-config.service';
+import { TenantGuard }            from '@/common/guards/tenant.guard';
+import { Tenant }                 from '@/common/decorators/tenant.decorator';
+import type { TenantContext }     from '@/common/types/tenant-context';
+import { ZodValidationPipe }      from '@/common/pipes/zod-validation.pipe';
+import { ChatSchema, UpdateAssistantConfigSchema } from '@/assistant/schemas';
+import type { ChatInput, UpdateAssistantConfigInput } from '@/assistant/schemas';
 
 @ApiTags('assistant')
 @ApiBearerAuth()

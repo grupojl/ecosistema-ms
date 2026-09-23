@@ -1,5 +1,5 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { UserRole } from './roles.decorator';
+import { UserRole } from '@/common/decorators/roles.decorator';
 
 export interface UserContext {
   id:       string;       // User.id de la DB

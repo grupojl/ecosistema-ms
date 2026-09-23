@@ -1,10 +1,10 @@
 // @ecosistema-ms/grpc-client
-export { ChatiaGrpcModule }         from "./chatia/chatia-grpc.module.js";
-export { PagosGrpcModule }          from "./pagos/pagos-grpc.module.js";
+export { ChatiaGrpcModule }         from "@/chatia/chatia-grpc.module.js";
+export { PagosGrpcModule }          from "@/pagos/pagos-grpc.module.js";
 // ADR-003
-export { NotificacionesGrpcModule } from "./notificaciones/notificaciones-grpc.module.js";
-export { AnalyticsGrpcModule }      from "./analytics/analytics-grpc.module.js";
-export { WorkersGrpcModule }        from "./workers/workers-grpc.module.js";
+export { NotificacionesGrpcModule } from "@/notificaciones/notificaciones-grpc.module.js";
+export { AnalyticsGrpcModule }      from "@/analytics/analytics-grpc.module.js";
+export { WorkersGrpcModule }        from "@/workers/workers-grpc.module.js";
 
-export { grpcMetadata, extractRequestId } from './grpc-metadata.helper.js';
-export type { GrpcMetadataOptions }      from './grpc-metadata.helper.js';
+export { grpcMetadata, extractRequestId } from '@/grpc-metadata.helper.js';
+export type { GrpcMetadataOptions }      from '@/grpc-metadata.helper.js';

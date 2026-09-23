@@ -14,10 +14,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '../../provider.interface';
-import { ProviderRegistry } from '../../provider.registry';
-import { CircuitBreakerService } from '../../circuit-breaker.service';
-import { mapMercadoPagoError } from './mercadopago-error.mapper';
+} from '@/provider.interface';
+import { ProviderRegistry } from '@/provider.registry';
+import { CircuitBreakerService } from '@/circuit-breaker.service';
+import { mapMercadoPagoError } from '@/modules/providers/adapters/mercadopago/mercadopago-error.mapper';
 
 @Injectable()
 export class MercadoPagoProvider implements PaymentProvider, OnModuleInit {

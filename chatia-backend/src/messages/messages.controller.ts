@@ -2,13 +2,13 @@
 // Migrado de class-validator PaginationDto → Zod inline (ADR-001)
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }                   from '@nestjs/swagger';
-import { MessagesService }   from './messages.service';
-import { TenantGuard }       from '../common/guards/tenant.guard';
-import { Tenant }            from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { PaginationSchema }  from './schemas';
-import type { PaginationInput } from './schemas';
+import { MessagesService }   from '@/messages/messages.service';
+import { TenantGuard }       from '@/common/guards/tenant.guard';
+import { Tenant }            from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
+import { PaginationSchema }  from '@/messages/schemas';
+import type { PaginationInput } from '@/messages/schemas';
 
 @ApiTags('messages')
 @ApiBearerAuth()

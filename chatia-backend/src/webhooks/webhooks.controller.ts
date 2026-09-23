@@ -5,13 +5,13 @@ import {
   Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }    from '@nestjs/swagger';
-import { WebhooksService }   from './webhooks.service';
-import { TenantGuard }       from '../common/guards/tenant.guard';
-import { Tenant }            from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
-import { CreateWebhookSchema, UpdateWebhookSchema } from './schemas';
-import type { CreateWebhookInput, UpdateWebhookInput } from './schemas';
+import { WebhooksService }   from '@/webhooks/webhooks.service';
+import { TenantGuard }       from '@/common/guards/tenant.guard';
+import { Tenant }            from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
+import { CreateWebhookSchema, UpdateWebhookSchema } from '@/webhooks/schemas';
+import type { CreateWebhookInput, UpdateWebhookInput } from '@/webhooks/schemas';
 
 @ApiTags('webhooks')
 @ApiBearerAuth()

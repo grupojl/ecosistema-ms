@@ -1,8 +1,8 @@
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { JobsService } from "../jobs.service.js";
-import { WORKER_QUEUES } from "../jobs.constants.js";
+import { JobsService } from "@/jobs.service.js";
+import { WORKER_QUEUES } from "@/jobs.constants.js";
 export interface FaqIngestJobData {
   ecosystemId: string; organizationId: string; documentId: string;
   sourceUrl?: string; base64Content?: string; mimeType: string;

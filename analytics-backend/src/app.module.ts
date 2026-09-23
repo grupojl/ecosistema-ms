@@ -5,10 +5,10 @@ import { BullModule }     from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CacheModule }    from '@nestjs/cache-manager';
 
-import { PrismaModule }    from './prisma/prisma.module.js';
-import { HealthModule }    from './health/health.module.js';
-import { AnalyticsModule } from './analytics/analytics.module.js';
-import { GrpcModule }      from './grpc/grpc.module.js';
+import { PrismaModule }    from '@/prisma/prisma.module.js';
+import { HealthModule }    from '@/health/health.module.js';
+import { AnalyticsModule } from '@/analytics/analytics.module.js';
+import { GrpcModule }      from '@/grpc/grpc.module.js';
 
 @Module({
   imports: [

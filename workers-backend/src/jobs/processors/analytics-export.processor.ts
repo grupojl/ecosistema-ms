@@ -14,7 +14,7 @@ import { firstValueFrom }        from 'rxjs';
 import { writeFile, mkdir }      from 'node:fs/promises';
 import { join }                  from 'node:path';
 
-import { JobsService } from '../jobs.service.js';
+import { JobsService } from '@/jobs.service.js';
 
 const EXPORT_QUEUE   = 'workers.analytics-export';
 const MAX_SIZE_BYTES = 100 * 1_024 * 1_024; // 100MB

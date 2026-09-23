@@ -1,5 +1,5 @@
 // workers-backend/src/campaigns/domain/campaign.errors.ts
-import type { CampaignStatus } from './campaign.entity.js';
+import type { CampaignStatus } from '@/campaigns/domain/campaign.entity.js';
 
 export class InvalidCampaignTransitionError extends Error {
   constructor(from: CampaignStatus, to: CampaignStatus) {

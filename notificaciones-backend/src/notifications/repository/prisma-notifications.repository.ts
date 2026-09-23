@@ -1,9 +1,9 @@
 // notificaciones-backend/src/notifications/repository/prisma-notifications.repository.ts
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { PrismaService } from "@/prisma/prisma.service.js";
 import type {
   INotificationsRepository, NotificationRecord, StatsQuery, ChannelStats,
-} from "./notifications.repository.interface.js";
+} from "@/notifications/repository/notifications.repository.interface.js";
 
 @Injectable()
 export class PrismaNotificationsRepository implements INotificationsRepository {

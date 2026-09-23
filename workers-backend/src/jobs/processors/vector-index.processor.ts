@@ -12,13 +12,13 @@ import type { ClientGrpc } from '@nestjs/microservices';
 import type { Job }              from 'bullmq';
 import { firstValueFrom }        from 'rxjs';
 
-import { WORKER_QUEUES, QUEUE_CONFIG } from '../jobs.constants.js';
-import { JobsService }                 from '../jobs.service.js';
-import { EmbeddingService }            from '../services/embedding.service.js';
+import { WORKER_QUEUES, QUEUE_CONFIG } from '@/jobs.constants.js';
+import { JobsService }                 from '@/jobs.service.js';
+import { EmbeddingService }            from '@/services/embedding.service.js';
 import type {
   VectorIndexJobData,
   VectorIndexJobResult,
-}                                      from '../dto/vector-index-job.dto.js';
+}                                      from '@/dto/vector-index-job.dto.js';
 
 const EMBED_CONCURRENCY = 5; // paralelo para generación de embeddings
 

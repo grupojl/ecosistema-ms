@@ -2,7 +2,7 @@
 // Puerto (interface + símbolo de inyección).
 // El Service inyecta esta interface via @Inject(CONVERSATIONS_REPOSITORY).
 // PrismaConversationsRepository es el único adaptador.
-import type { Conversation, ConversationStatus } from '../domain/conversation.entity.js';
+import type { Conversation, ConversationStatus } from '@/domain/conversation.entity.js';
 
 export const CONVERSATIONS_REPOSITORY = Symbol('CONVERSATIONS_REPOSITORY');
 

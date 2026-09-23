@@ -1,11 +1,11 @@
 // src/channels/channel.registry.ts
 import { Injectable } from '@nestjs/common';
 import { ChannelType } from '@prisma/client';
-import type { IChannel } from './channel.interface';
-import { WhatsAppChannel } from './whatsapp/whatsapp.channel';
-import { InstagramChannel } from './instagram/instagram.channel';
-import { MessengerChannel } from './messenger/messenger.channel';
-import { TikTokChannel } from './tiktok/tiktok.channel';
+import type { IChannel } from '@/channels/channel.interface';
+import { WhatsAppChannel } from '@/channels/whatsapp/whatsapp.channel';
+import { InstagramChannel } from '@/channels/instagram/instagram.channel';
+import { MessengerChannel } from '@/channels/messenger/messenger.channel';
+import { TikTokChannel } from '@/channels/tiktok/tiktok.channel';
 
 @Injectable()
 export class ChannelRegistry {
@@ -30,4 +30,3 @@ export class ChannelRegistry {
     if (!channel) throw new Error(`Canal no soportado: ${type}`);
     return channel;
   }
-}

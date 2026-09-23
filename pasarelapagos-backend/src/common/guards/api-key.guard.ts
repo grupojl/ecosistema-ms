@@ -5,8 +5,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import { ApiKeyService } from '../../modules/tenants/api-key.service';
+import { IS_PUBLIC_KEY } from '@/decorators/public.decorator';
+import { ApiKeyService } from '@/modules/tenants/api-key.service';
 
 /**
  * Guard de autenticación por API key.

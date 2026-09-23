@@ -19,14 +19,14 @@ import { InjectRedis }                            from '@nestjs-modules/ioredis'
 import { Inject }                                 from '@nestjs/common';
 import { Queue }                                  from 'bullmq';
 import Redis                                      from 'ioredis';
-import { PrismaService }                          from '../prisma/prisma.service.js';
-import { WORKER_QUEUES }                          from '../jobs/jobs.constants.js';
+import { PrismaService }                          from '@/prisma/prisma.service.js';
+import { WORKER_QUEUES }                          from '@/jobs/jobs.constants.js';
 import {
   CAMPAIGNS_REPOSITORY,
   type ICampaignsRepository,
-} from './repository/campaigns.repository.interface.js';
-import { assertValidCampaignTransition } from './domain/campaign.errors.js';
-import type { CreateCampaignDto, PatchCampaignDto } from './dto/campaign.dto.js';
+} from '@/campaigns/repository/campaigns.repository.interface.js';
+import { assertValidCampaignTransition } from '@/campaigns/domain/campaign.errors.js';
+import type { CreateCampaignDto, PatchCampaignDto } from '@/campaigns/dto/campaign.dto.js';
 
 const SCHEDULER_LOCK_KEY = 'workers:scheduler:campaigns';
 const SCHEDULER_LOCK_TTL = 55;

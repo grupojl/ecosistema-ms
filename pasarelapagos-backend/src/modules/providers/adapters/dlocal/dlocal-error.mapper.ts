@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '../../../../common/errors/payment-error.catalog';
-import { PaymentException } from '../../../../common/errors/payment.exception';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
+import { PaymentException } from '@/common/errors/payment.exception';
 
 /**
  * Referencia: https://docs.dlocal.com/reference/payment-error-codes

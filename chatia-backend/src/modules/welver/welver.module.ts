@@ -11,8 +11,8 @@
 // =============================================================================
 
 import { Module, OnModuleInit }       from '@nestjs/common';
-import { WELVERStrategy }  from './welver.strategy';
-import { ProjectStrategyRegistry }    from '../../core/strategies/project-strategy.registry';
+import { WELVERStrategy }  from '@/modules/welver/welver.strategy';
+import { ProjectStrategyRegistry }    from '@/core/strategies/project-strategy.registry';
 
 @Module({
   providers: [WELVERStrategy],

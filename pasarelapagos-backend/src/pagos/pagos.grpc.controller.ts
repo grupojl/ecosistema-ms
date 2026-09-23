@@ -1,6 +1,6 @@
 import { Controller } from "@nestjs/common";
 import { GrpcMethod } from "@nestjs/microservices";
-import { PagosService } from "./pagos.service";
+import { PagosService } from "@/pagos/pagos.service";
 
 // Implementa el contrato definido en packages/proto/proto/pagos.proto
 @Controller()

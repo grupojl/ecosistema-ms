@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '../../provider.interface';
-import { ProviderRegistry } from '../../provider.registry';
-import { CircuitBreakerService } from '../../circuit-breaker.service';
-import { mapPagarmeError } from './pagarme-error.mapper';
+} from '@/provider.interface';
+import { ProviderRegistry } from '@/provider.registry';
+import { CircuitBreakerService } from '@/circuit-breaker.service';
+import { mapPagarmeError } from '@/modules/providers/adapters/pagarme/pagarme-error.mapper';
 
 /**
  * Adapter Pagar.me v5 (Brasil).

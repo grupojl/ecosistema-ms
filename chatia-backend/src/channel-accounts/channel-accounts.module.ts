@@ -1,7 +1,7 @@
 // src/channel-accounts/channel-accounts.module.ts
 import { Module } from '@nestjs/common';
-import { ChannelAccountsController } from './channel-accounts.controller';
-import { ChannelAccountsService } from './channel-accounts.service';
+import { ChannelAccountsController } from '@/channel-accounts/channel-accounts.controller';
+import { ChannelAccountsService } from '@/channel-accounts/channel-accounts.service';
 
 @Module({
   controllers: [ChannelAccountsController],

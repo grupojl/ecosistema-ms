@@ -9,7 +9,7 @@
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { metrics }     from '@opentelemetry/api';
 import type { Counter, Histogram, UpDownCounter, ObservableGauge } from '@opentelemetry/api';
-import { CircuitBreakerService }            from '../jobs/services/circuit-breaker.service.js';
+import { CircuitBreakerService }            from '@/jobs/services/circuit-breaker.service.js';
 
 @Injectable()
 export class WorkersMetricsService implements OnModuleInit {

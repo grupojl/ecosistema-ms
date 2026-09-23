@@ -143,3 +143,21 @@ Lockfile   --frozen-lockfile en CI y en Railway
 ```
 
 Ver `architecture/11-dependencias-norte.md` y `decisions/ADR-018-politica-dependencias.md`.
+
+---
+
+## ProjectStrategy — personalización por ecosistema (ADR-019)
+
+Patrón replicado desde chatia-backend hacia pasarelapagos-backend y
+notificaciones-backend: el core del microservicio nunca conoce el
+ecosistema concreto, solo el contrato `ProjectStrategy`. Ver
+`architecture/12-project-strategy-pattern.md` para el detalle y el
+criterio de "cuándo aplica" antes de replicarlo en un microservicio nuevo.
+
+Estado: scaffold generado, wiring de `app.module.ts` pendiente (manual,
+ver `lifecycle/tasks.md` sección PS-01/PS-02).
+
+Referentes de industria: Salesforce (Custom Fields tipados — de ahí sale
+la regla de no dejar `businessData` como `Record<string, unknown>` para
+siempre) y Shopify (extensibilidad desacoplada del deploy — evolución
+futura, no urgente hoy).

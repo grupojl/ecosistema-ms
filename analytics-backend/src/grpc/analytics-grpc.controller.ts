@@ -1,7 +1,7 @@
 // analytics-backend/src/grpc/analytics-grpc.controller.ts
 import { Controller, Logger } from '@nestjs/common';
 import { GrpcMethod }         from '@nestjs/microservices';
-import { AnalyticsService }   from '../analytics/analytics.service.js';
+import { AnalyticsService }   from '@/analytics/analytics.service.js';
 
 interface TrackEventRequest {
   ecosystem_id:    string;

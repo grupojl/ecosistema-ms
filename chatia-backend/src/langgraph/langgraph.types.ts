@@ -66,4 +66,3 @@ export interface ClassifyResult {
   shouldEscalate: boolean;
   nextStage: ConversationStage | null;
   confidence: number;
-}

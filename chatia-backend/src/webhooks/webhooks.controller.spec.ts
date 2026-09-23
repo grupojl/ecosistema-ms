@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { WebhooksController } from './webhooks.controller';
-import { WebhooksService } from './webhooks.service';
+import { WebhooksController } from '@/webhooks/webhooks.controller';
+import { WebhooksService } from '@/webhooks/webhooks.service';
 
 describe('WebhooksController', () => {
   let controller: WebhooksController;

@@ -1,7 +1,7 @@
 // src/channel-accounts/channel-accounts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { CreateChannelAccountInput, UpdateChannelAccountInput } from './schemas';
-import { PrismaService } from '../prisma/prisma.service';
+import type { CreateChannelAccountInput, UpdateChannelAccountInput } from '@/channel-accounts/schemas';
+import { PrismaService } from '@/prisma/prisma.service';
 import { ChannelType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
@@ -123,4 +123,3 @@ export class ChannelAccountsService {
       data: { webhookVerifyToken: updated.webhookVerifyToken },
     };
   }
-}

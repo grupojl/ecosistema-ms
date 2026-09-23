@@ -10,11 +10,11 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '../prisma/prisma.service';
-import { ProviderRegistry } from '../providers/provider.registry';
-import { Public } from '../../common/decorators/public.decorator';
-import { QUEUE_WEBHOOKS, JOB_PROCESS_WEBHOOK } from '../../common/constants/queues';
-import { WebhookJobData } from './webhook.processor';
+import { PrismaService } from '@/prisma/prisma.service';
+import { ProviderRegistry } from '@/providers/provider.registry';
+import { Public } from '@/common/decorators/public.decorator';
+import { QUEUE_WEBHOOKS, JOB_PROCESS_WEBHOOK } from '@/common/constants/queues';
+import { WebhookJobData } from '@/modules/webhooks/webhook.processor';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('webhooks')

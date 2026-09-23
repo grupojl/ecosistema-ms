@@ -1,8 +1,8 @@
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { AnalyticsService } from "../analytics.service.js";
-import { ANALYTICS_EVENTS_QUEUE } from "../analytics.constants.js";
+import { AnalyticsService } from "@/analytics.service.js";
+import { ANALYTICS_EVENTS_QUEUE } from "@/analytics.constants.js";
 export interface AnalyticsEventJobData { ecosystemId: string; organizationId: string; eventType: string; payload: Record<string, unknown>; occurredAt: string; }
 @Processor(ANALYTICS_EVENTS_QUEUE, { concurrency: parseInt(process.env["ANALYTICS_EVENTS_CONCURRENCY"] ?? "10") })
 export class AnalyticsEventProcessor extends WorkerHost {

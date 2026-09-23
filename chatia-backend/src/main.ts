@@ -5,7 +5,7 @@ import { ValidationPipe }      from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { Logger }              from 'nestjs-pino';
 import { join }                from 'path';
-import { AppModule }           from './app.module.js';
+import { AppModule }           from '@/app.module.js';
 import { ZodExceptionFilter }  from '@ecosistema-ms/auth-server';
 
 async function bootstrap(): Promise<void> {

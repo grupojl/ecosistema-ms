@@ -13,7 +13,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectQueue }        from '@nestjs/bullmq';
 import { Queue }              from 'bullmq';
-import { PrismaService }      from '../../prisma/prisma.service.js';
+import { PrismaService }      from '@/prisma/prisma.service.js';
 
 const FAQ_INGEST_QUEUE = 'workers.faq-ingest';
 

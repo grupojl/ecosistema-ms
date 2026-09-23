@@ -1,7 +1,7 @@
 // notificaciones-backend/src/notifications/channels/whatsapp/whatsapp.adapter.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService }                    from '@nestjs/config';
-import type { INotificationChannel, SendPayload } from '../../interfaces/notification-channel.interface.js';
+import type { INotificationChannel, SendPayload } from '@/interfaces/notification-channel.interface.js';
 
 const META_API_VERSION = 'v21.0';
 

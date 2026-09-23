@@ -1,12 +1,12 @@
 // workers-backend/src/campaigns/repository/prisma-campaigns.repository.ts
 // Adaptador concreto — ÚNICO lugar con PrismaService en el módulo campaigns.
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "../../prisma/prisma.service.js";
+import { PrismaService } from "@/prisma/prisma.service.js";
 import type {
   ICampaignsRepository,
   CampaignRecord,
   CampaignRecipientRecord,
-} from "./campaigns.repository.interface.js";
+} from "@/campaigns/repository/campaigns.repository.interface.js";
 
 @Injectable()
 export class PrismaCampaignsRepository implements ICampaignsRepository {

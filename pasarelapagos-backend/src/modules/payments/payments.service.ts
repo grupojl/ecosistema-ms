@@ -12,20 +12,20 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService }    from '../prisma/prisma.service';
+import { PrismaService }    from '@/prisma/prisma.service';
 import {
   PAYMENTS_REPOSITORY,
   IPaymentsRepository,
-} from './repository/payments.repository.interface';
-import { ProviderRegistry } from '../providers/provider.registry';
-import { AuditService }     from '../audit/audit.service';
-import { MetricsService }   from '../metrics/metrics.service';
-import type { CreatePaymentInput } from './schemas';
-import { assertValidTransition }   from './payment-state.machine';
-import type { OrgContext }         from '../../common/interfaces/org-context.interface';
+} from '@/modules/payments/repository/payments.repository.interface';
+import { ProviderRegistry } from '@/providers/provider.registry';
+import { AuditService }     from '@/audit/audit.service';
+import { MetricsService }   from '@/metrics/metrics.service';
+import type { CreatePaymentInput } from '@/modules/payments/schemas';
+import { assertValidTransition }   from '@/modules/payments/payment-state.machine';
+import type { OrgContext }         from '@/common/interfaces/org-context.interface';
 import { PaymentStatus, Prisma }   from '@prisma/client';
 import { PaymentMethodKind as PrismaPaymentMethodKind } from '@prisma/client';
-import type { PaymentMethodKind as ProviderMethodKind } from '../providers/provider.interface';
+import type { PaymentMethodKind as ProviderMethodKind } from '@/providers/provider.interface';
 
 // ---------------------------------------------------------------------------
 // Mapper: convierte el value lowercase del provider al ENUM de Prisma

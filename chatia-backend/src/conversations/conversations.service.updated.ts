@@ -30,7 +30,7 @@ import { Injectable, Inject } from '@nestjs/common';
 import {
   CONVERSATIONS_REPOSITORY,
   IConversationsRepository,
-} from './repository/conversations.repository.interface';
+} from '@/conversations/repository/conversations.repository.interface';
 
 // Ejemplo de constructor correcto:
 @Injectable()

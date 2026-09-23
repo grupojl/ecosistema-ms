@@ -8,13 +8,13 @@ import {
   Controller, Post, Get, Param, Body,
   Query, HttpCode, HttpStatus,
 } from '@nestjs/common';
-import { EnqueueNotificationSchema, type EnqueueNotificationInput } from './schemas.js';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe.js';
+import { EnqueueNotificationSchema, type EnqueueNotificationInput } from '@/notifications/schemas.js';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
 import {
   ApiTags, ApiBearerAuth, ApiOperation,
   ApiResponse, ApiQuery,
 } from '@nestjs/swagger';
-import { NotificationsService } from './notifications.service.js';
+import { NotificationsService } from '@/notifications/notifications.service.js';
 
 @ApiTags('notifications')
 @ApiBearerAuth()

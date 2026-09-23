@@ -3,13 +3,13 @@ import {
   Controller, Get, Post, Param, Body, Res,
   HttpCode, HttpStatus, NotFoundException,
 } from '@nestjs/common';
-import { WidgetChatSchema, type WidgetChatInput } from './schemas';
-import { ZodValidationPipe } from '../common/pipes/zod-validation.pipe';
+import { WidgetChatSchema, type WidgetChatInput } from '@/widget/schemas';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { PrismaService } from '../prisma/prisma.service';
-import { AssistantChatService } from '../assistant/chat/assistant-chat.service';
-import { AssistantSessionService } from '../assistant/session/assistant-session.service';
+import { PrismaService } from '@/prisma/prisma.service';
+import { AssistantChatService } from '@/assistant/chat/assistant-chat.service';
+import { AssistantSessionService } from '@/assistant/session/assistant-session.service';
 
 @ApiTags('Widget (público)')
 @Controller('widget')

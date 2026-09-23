@@ -6,8 +6,8 @@
 // =============================================================================
 
 import { Module }                   from '@nestjs/common';
-import { ProjectStrategyRegistry }  from './project-strategy.registry';
-import { GenericStrategy }          from './generic.strategy';
+import { ProjectStrategyRegistry }  from '@/core/strategies/project-strategy.registry';
+import { GenericStrategy }          from '@/core/strategies/generic.strategy';
 
 @Module({
   providers: [

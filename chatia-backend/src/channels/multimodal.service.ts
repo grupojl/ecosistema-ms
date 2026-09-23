@@ -8,14 +8,14 @@
 // Invariante: el LLM siempre recibe texto — este service garantiza eso.
 // Ref: .claude/modules/chatia-backend/multimodal-adapters.md
 import { Injectable, Logger } from '@nestjs/common';
-import { SpeechToTextAdapter }   from './adapters/speech-to-text.adapter.js';
-import { ImageToTextAdapter }    from './adapters/image-to-text.adapter.js';
-import { DocumentToTextAdapter } from './adapters/document-to-text.adapter.js';
-import { LocationToTextAdapter } from './adapters/location-to-text.adapter.js';
-import { VideoToTextAdapter }    from './adapters/video-to-text.adapter.js';
-import { TextToSpeechAdapter }   from './adapters/text-to-speech.adapter.js';
-import type { IncomingMessage }  from './channel.interface.js';
-import type { TtsResult }        from './adapters/text-to-speech.adapter.js';
+import { SpeechToTextAdapter }   from '@/channels/adapters/speech-to-text.adapter.js';
+import { ImageToTextAdapter }    from '@/channels/adapters/image-to-text.adapter.js';
+import { DocumentToTextAdapter } from '@/channels/adapters/document-to-text.adapter.js';
+import { LocationToTextAdapter } from '@/channels/adapters/location-to-text.adapter.js';
+import { VideoToTextAdapter }    from '@/channels/adapters/video-to-text.adapter.js';
+import { TextToSpeechAdapter }   from '@/channels/adapters/text-to-speech.adapter.js';
+import type { IncomingMessage }  from '@/channels/channel.interface.js';
+import type { TtsResult }        from '@/channels/adapters/text-to-speech.adapter.js';
 
 export interface NormalizedMessage {
   text:           string;   // texto para el LLM — siempre presente

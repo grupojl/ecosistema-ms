@@ -7,14 +7,14 @@ import {
 import { InjectQueue }        from '@nestjs/bullmq';
 import { Queue }              from 'bullmq';
 import { Inject } from '@nestjs/common';
-import { CONVERSATIONS_REPOSITORY, IConversationsRepository } from './repository/conversations.repository.interface';
+import { CONVERSATIONS_REPOSITORY, IConversationsRepository } from '@/conversations/repository/conversations.repository.interface';
 import {
   ConversationStatus, ChannelType,
   MessageDirection, MessageType, MessageStatus,
 } from '@prisma/client';
-import type { IncomingMessage }       from '../channels/channel.interface';
-import { QUEUES, JOBS }               from '../queue/queue.constants';
-import { AnalyticsEventsService }     from '../analytics-events/analytics-events.service';
+import type { IncomingMessage }       from '@/channels/channel.interface';
+import { QUEUES, JOBS }               from '@/queue/queue.constants';
+import { AnalyticsEventsService }     from '@/analytics-events/analytics-events.service';
 
 @Injectable()
 export class ConversationsService {

@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '../../provider.interface';
-import { ProviderRegistry } from '../../provider.registry';
-import { CircuitBreakerService } from '../../circuit-breaker.service';
-import { mapDlocalError } from './dlocal-error.mapper';
+} from '@/provider.interface';
+import { ProviderRegistry } from '@/provider.registry';
+import { CircuitBreakerService } from '@/circuit-breaker.service';
+import { mapDlocalError } from '@/modules/providers/adapters/dlocal/dlocal-error.mapper';
 
 /**
  * Adapter dLocal — agregador LATAM.

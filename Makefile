@@ -56,14 +56,12 @@ help:
 	@echo "  make setup         → install + docker-up + migrate-all"
 	@echo "================================================="
 
+
 # ─────────────────────────────────────────────────────────────────────────────
 # R — REPOMIX → genera XMLs y los copia a Downloads
 # ─────────────────────────────────────────────────────────────────────────────
 r:
 	npx repomix --config repomix.config.json
-	npx repomix --config repomix.infra.json
-	cp ecosistema-ms.xml "/c/Users/Agustin/Downloads/ecosistema-ms.xml"
-	cp ecosistema-ms-infra.xml "/c/Users/Agustin/Downloads/ecosistema-ms-infra.xml"
 	@echo "[+] XMLs copiados a Downloads"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -72,7 +70,7 @@ r:
 x:
 	@[ -f x.sh ] || (echo "[✗] No existe x.sh en la raíz"; exit 1)
 	@echo "=== Ejecutando x.sh ==="
-	@bash x.sh
+	@bash x.sh ecosistema-ms
 
 # ─────────────────────────────────────────────────────────────────────────────
 # G — GIT: add + commit timestamp + push

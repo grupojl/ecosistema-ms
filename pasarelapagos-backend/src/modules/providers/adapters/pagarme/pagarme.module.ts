@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PagarmeProvider } from './pagarme.provider';
+import { PagarmeProvider } from '@/modules/providers/adapters/pagarme/pagarme.provider';
 
 @Module({
   providers: [PagarmeProvider],

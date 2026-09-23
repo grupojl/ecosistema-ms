@@ -10,9 +10,9 @@
 import { Controller, Get }         from '@nestjs/common';
 import { InjectQueue }              from '@nestjs/bullmq';
 import type { Queue }               from 'bullmq';
-import { PrismaService }            from '../prisma/prisma.service.js';
-import { CircuitBreakerService }    from '../common/services/circuit-breaker.service.js';
-import { QUEUES }                   from '../queue/queue.constants.js';
+import { PrismaService }            from '@/prisma/prisma.service.js';
+import { CircuitBreakerService }    from '@/common/services/circuit-breaker.service.js';
+import { QUEUES }                   from '@/queue/queue.constants.js';
 
 interface ExtendedHealth {
   status:          'ok' | 'degraded' | 'down';

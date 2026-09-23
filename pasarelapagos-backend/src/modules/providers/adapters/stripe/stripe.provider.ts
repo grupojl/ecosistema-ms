@@ -8,10 +8,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '../../provider.interface';
-import { ProviderRegistry } from '../../provider.registry';
-import { CircuitBreakerService } from '../../circuit-breaker.service';
-import { mapStripeError } from './stripe-error.mapper';
+} from '@/provider.interface';
+import { ProviderRegistry } from '@/provider.registry';
+import { CircuitBreakerService } from '@/circuit-breaker.service';
+import { mapStripeError } from '@/modules/providers/adapters/stripe/stripe-error.mapper';
 
 // Con moduleResolution: nodenext el namespace Stripe.* no resuelve en stripe@22.
 // Usamos ReturnType para tipar la instancia y strings literales para los enums.

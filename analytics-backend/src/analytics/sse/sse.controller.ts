@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import type { Request, Response }               from 'express';
-import { SseService }                           from './sse.service.js';
+import { SseService }                           from '@/analytics/sse/sse.service.js';
 
 @ApiTags('analytics')
 @ApiBearerAuth()

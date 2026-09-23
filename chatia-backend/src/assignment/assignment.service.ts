@@ -1,6 +1,6 @@
 // src/assignment/assignment.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@/prisma/prisma.service';
 
 export type AssignmentStrategy = 'round-robin' | 'least-load';
 

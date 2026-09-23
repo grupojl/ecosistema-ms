@@ -5,15 +5,15 @@ import {
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { ContactsService }    from './contacts.service';
-import { TenantGuard }        from '../common/guards/tenant.guard';
-import { Tenant }             from '../common/decorators/tenant.decorator';
-import type { TenantContext } from '../common/types/tenant-context';
-import { ZodValidationPipe }  from '../common/pipes/zod-validation.pipe';
+import { ContactsService }    from '@/contacts/contacts.service';
+import { TenantGuard }        from '@/common/guards/tenant.guard';
+import { Tenant }             from '@/common/decorators/tenant.decorator';
+import type { TenantContext } from '@/common/types/tenant-context';
+import { ZodValidationPipe }  from '@/common/pipes/zod-validation.pipe';
 import {
   UpdateContactSchema, ListContactsSchema,
-} from './schemas';
-import type { UpdateContactInput, ListContactsInput } from './schemas';
+} from '@/contacts/schemas';
+import type { UpdateContactInput, ListContactsInput } from '@/contacts/schemas';
 
 @ApiTags('contacts')
 @ApiBearerAuth()

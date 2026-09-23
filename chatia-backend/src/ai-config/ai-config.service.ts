@@ -1,7 +1,7 @@
 // src/ai-config/ai-config.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
-import type { UpdateAiConfigInput } from './schemas';
-import { PrismaService } from '../prisma/prisma.service';
+import type { UpdateAiConfigInput } from '@/ai-config/schemas';
+import { PrismaService } from '@/prisma/prisma.service';
 import {
   IsString, IsOptional, IsBoolean, IsNumber, IsInt,
   IsArray, Min, Max, MaxLength, MinLength,

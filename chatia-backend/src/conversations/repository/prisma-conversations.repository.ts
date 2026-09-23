@@ -7,16 +7,16 @@
 // MOLDE VIVO — todos los repositorios del ecosistema-ms siguen este patrón.
 
 import { Injectable }  from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
 import {
   IConversationsRepository,
   ListConversationsFilter,
-} from './conversations.repository.interface.js';
+} from '@/conversations/repository/conversations.repository.interface.js';
 import type {
   Conversation,
   ConversationStatus,
   ConversationStage,
-} from '../domain/conversation.entity.js';
+} from '@/domain/conversation.entity.js';
 import type { Conversation as PrismaConversation } from '@prisma/client';
 
 @Injectable()

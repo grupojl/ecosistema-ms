@@ -45,9 +45,9 @@
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
     "@types/compression": "^1.7.5",
-    "@types/cookie-parser": "^1.4.8",
+    "@types/cookie-parser": "^1.4.10",
     "axios": "catalog:",
-    "bcryptjs": "catalog:",
+    "bcryptjs": "^3.0.3",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
     "compression": "^1.7.5",
@@ -57,9 +57,9 @@
     "helmet": "catalog:",
     "ioredis": "catalog:",
     "mercadopago": "catalog:",
-    "nanoid": "^5.1.5",
+    "nanoid": "^6.0.1",
     "nestjs-pino": "catalog:",
-    "opossum": "^8.1.4",
+    "opossum": "^10.0.0",
     "pg": "catalog:",
     "pino": "catalog:",
     "pino-http": "catalog:",
@@ -108,6 +108,9 @@
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "moduleNameMapper": {
+      "^@\/(.*)$": "<rootDir>/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

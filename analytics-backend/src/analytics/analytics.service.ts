@@ -2,7 +2,7 @@
 import { Injectable, Logger, Inject } from '@nestjs/common';
 import { CACHE_MANAGER }              from '@nestjs/cache-manager';
 import type { Cache }                 from 'cache-manager';
-import { PrismaService }              from '../prisma/prisma.service.js';
+import { PrismaService }              from '@/prisma/prisma.service.js';
 
 const CACHE_TTL_5MIN  = 5 * 60 * 1_000;
 const CACHE_TTL_10MIN = 10 * 60 * 1_000;

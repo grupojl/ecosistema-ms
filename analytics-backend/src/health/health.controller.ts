@@ -4,7 +4,7 @@
 // analytics-backend no tiene Circuit Breakers ni DLQ propios.
 // Devuelve: status + db + redis + uptime + version con arrays vacíos.
 import { Controller, Get }  from '@nestjs/common';
-import { PrismaService }    from '../prisma/prisma.service.js';
+import { PrismaService }    from '@/prisma/prisma.service.js';
 
 interface ExtendedHealth {
   status:          'ok' | 'degraded' | 'down';

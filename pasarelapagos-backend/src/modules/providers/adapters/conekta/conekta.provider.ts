@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '../../provider.interface';
-import { ProviderRegistry } from '../../provider.registry';
-import { CircuitBreakerService } from '../../circuit-breaker.service';
-import { mapConektaError } from './conekta-error.mapper';
+} from '@/provider.interface';
+import { ProviderRegistry } from '@/provider.registry';
+import { CircuitBreakerService } from '@/circuit-breaker.service';
+import { mapConektaError } from '@/modules/providers/adapters/conekta/conekta-error.mapper';
 
 /**
  * Adapter Conekta v2 (México).

@@ -7,8 +7,8 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '../../provider.interface';
-import { ProviderRegistry } from '../../provider.registry';
+} from '@/provider.interface';
+import { ProviderRegistry } from '@/provider.registry';
 
 @Injectable()
 export class FakeProvider implements PaymentProvider, OnModuleInit {

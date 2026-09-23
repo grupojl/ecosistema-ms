@@ -4,13 +4,13 @@
 // toEntity() mapea campo por campo — TypeScript falla aquí si Prisma cambia el schema.
 
 import { Injectable }  from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
 import type {
   IPaymentsRepository,
   CreatePaymentInput,
   ListPaymentsFilter,
-} from './payments.repository.interface.js';
-import type { Payment, PaymentStatus, PaymentMethodKind } from '../domain/payment.entity.js';
+} from '@/modules/payments/repository/payments.repository.interface.js';
+import type { Payment, PaymentStatus, PaymentMethodKind } from '@/domain/payment.entity.js';
 import type { Payment as PrismaPayment, PaymentStatus as PrismaStatus } from '@prisma/client';
 
 @Injectable()

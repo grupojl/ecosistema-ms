@@ -5,19 +5,19 @@ import {
   Param, Query, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { ConversationsService } from './conversations.service';
-import { TenantGuard }          from '../common/guards/tenant.guard';
-import { Tenant }               from '../common/decorators/tenant.decorator';
-import type { TenantContext }   from '../common/types/tenant-context';
-import { ZodValidationPipe }    from '../common/pipes/zod-validation.pipe';
+import { ConversationsService } from '@/conversations/conversations.service';
+import { TenantGuard }          from '@/common/guards/tenant.guard';
+import { Tenant }               from '@/common/decorators/tenant.decorator';
+import type { TenantContext }   from '@/common/types/tenant-context';
+import { ZodValidationPipe }    from '@/common/pipes/zod-validation.pipe';
 import {
   ListConversationsSchema, SendMessageSchema,
   TakeoverSchema, AddTagSchema,
-} from './schemas';
+} from '@/conversations/schemas';
 import type {
   ListConversationsInput, SendMessageInput,
   TakeoverInput, AddTagInput,
-} from './schemas';
+} from '@/conversations/schemas';
 
 @ApiTags('conversations')
 @ApiBearerAuth()

@@ -3,12 +3,12 @@ import { Module }               from '@nestjs/common';
 import { ConfigModule }         from '@nestjs/config';
 import { BullModule }           from '@nestjs/bullmq';
 import { ScheduleModule }       from '@nestjs/schedule';
-import { PrismaModule }         from './prisma/prisma.module.js';
-import { HealthModule }         from './health/health.module.js';
-import { NotificationsModule }  from './notifications/notifications.module.js';
-import { PreferencesModule }    from './preferences/preferences.module.js';
-import { GrpcModule }           from './grpc/grpc.module.js';
-import { MetricsModule }        from './metrics/metrics.module.js';
+import { PrismaModule }         from '@/prisma/prisma.module.js';
+import { HealthModule }         from '@/health/health.module.js';
+import { NotificationsModule }  from '@/notifications/notifications.module.js';
+import { PreferencesModule }    from '@/preferences/preferences.module.js';
+import { GrpcModule }           from '@/grpc/grpc.module.js';
+import { MetricsModule }        from '@/metrics/metrics.module.js';
 
 @Module({
   imports: [

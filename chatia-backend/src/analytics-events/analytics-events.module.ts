@@ -1,7 +1,7 @@
 // chatia-backend/src/analytics-events/analytics-events.module.ts
 import { Module }       from '@nestjs/common';
 import { BullModule }   from '@nestjs/bullmq';
-import { ANALYTICS_QUEUE, AnalyticsEventsService } from './analytics-events.service.js';
+import { ANALYTICS_QUEUE, AnalyticsEventsService } from '@/analytics-events/analytics-events.service.js';
 
 @Module({
   imports: [

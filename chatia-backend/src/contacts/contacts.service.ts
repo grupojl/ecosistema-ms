@@ -10,10 +10,10 @@ import {
 import {
   CONTACTS_REPOSITORY,
   type IContactsRepository,
-} from './repository/contacts.repository.interface.js';
-import { assertNoDuplicateTags, ContactNotFoundError } from './domain/contact.errors.js';
-import type { UpdateContactDto }   from './dto/update-contact.dto.js';
-import type { ListContactsFilter } from './repository/contacts.repository.interface.js';
+} from '@/contacts/repository/contacts.repository.interface.js';
+import { assertNoDuplicateTags, ContactNotFoundError } from '@/contacts/domain/contact.errors.js';
+import type { UpdateContactDto }   from '@/contacts/dto/update-contact.dto.js';
+import type { ListContactsFilter } from '@/contacts/repository/contacts.repository.interface.js';
 
 @Injectable()
 export class ContactsService {

@@ -15,15 +15,15 @@ import {
   ApiHeader,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { PaymentsService } from './payments.service';
-import { CreatePaymentDto } from './dto/create-payment.dto';
-import { ListPaymentsDto } from './dto/list-payments.dto';
-import { AuthGuard } from '../../common/guards/auth.guard';
-import { TenantGuard } from '../../common/guards/tenant.guard';
-import { WriteGuard } from '../../common/guards/write.guard';
-import { PciGuard } from '../../common/guards/pci.guard';
-import { OrgCtx } from '../../common/decorators/org.decorator';
-import type { OrgContext } from '../../common/interfaces/org-context.interface';
+import { PaymentsService } from '@/modules/payments/payments.service';
+import { CreatePaymentDto } from '@/modules/payments/dto/create-payment.dto';
+import { ListPaymentsDto } from '@/modules/payments/dto/list-payments.dto';
+import { AuthGuard } from '@/common/guards/auth.guard';
+import { TenantGuard } from '@/common/guards/tenant.guard';
+import { WriteGuard } from '@/common/guards/write.guard';
+import { PciGuard } from '@/common/guards/pci.guard';
+import { OrgCtx } from '@/common/decorators/org.decorator';
+import type { OrgContext } from '@/common/interfaces/org-context.interface';
 
 @ApiTags('payments')
 @ApiSecurity('x-api-key')

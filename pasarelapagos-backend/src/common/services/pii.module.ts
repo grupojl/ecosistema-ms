@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { PiiService } from './pii.service';
+import { PiiService } from '@/common/services/pii.service';
 
 @Global()
 @Module({

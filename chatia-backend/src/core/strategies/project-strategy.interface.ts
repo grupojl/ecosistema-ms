@@ -7,7 +7,7 @@
 // getProjectType → identifica el tipo para el registry
 // =============================================================================
 
-import type { ProjectContext, ProjectType } from './project-context.interface';
+import type { ProjectContext, ProjectType } from '@/core/strategies/project-context.interface';
 import type { AssistantSession }            from '@prisma/client';
 
 export interface ProjectStrategy {

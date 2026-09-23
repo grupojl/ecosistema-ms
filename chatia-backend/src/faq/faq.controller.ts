@@ -5,19 +5,19 @@ import {
   Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
-import { KnowledgeBaseService }  from './knowledge-base/knowledge-base.service';
-import { KbDocumentService }     from './document/kb-document.service';
-import { FaqQueryService }       from './query/faq-query.service';
-import { TenantGuard }           from '../common/guards/tenant.guard';
-import { Tenant }                from '../common/decorators/tenant.decorator';
-import type { TenantContext }    from '../common/types/tenant-context';
-import { ZodValidationPipe }     from '../common/pipes/zod-validation.pipe';
+import { KnowledgeBaseService }  from '@/faq/knowledge-base/knowledge-base.service';
+import { KbDocumentService }     from '@/faq/document/kb-document.service';
+import { FaqQueryService }       from '@/faq/query/faq-query.service';
+import { TenantGuard }           from '@/common/guards/tenant.guard';
+import { Tenant }                from '@/common/decorators/tenant.decorator';
+import type { TenantContext }    from '@/common/types/tenant-context';
+import { ZodValidationPipe }     from '@/common/pipes/zod-validation.pipe';
 import {
   CreateKnowledgeBaseSchema, CreateKbDocumentSchema, FaqQuerySchema,
-} from './schemas';
+} from '@/faq/schemas';
 import type {
   CreateKnowledgeBaseInput, CreateKbDocumentInput, FaqQueryInput,
-} from './schemas';
+} from '@/faq/schemas';
 
 @ApiTags('faq')
 @ApiBearerAuth()

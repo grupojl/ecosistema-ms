@@ -13,9 +13,9 @@ import {
   Controller, Get, Query, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
-import { InternalApiKeyGuard }              from './internal-api-key.guard.js';
-import { PrismaService }                    from '../prisma/prisma.service.js';
-import { ZodValidationPipe }               from '../common/pipes/zod-validation.pipe.js';
+import { InternalApiKeyGuard }              from '@/internal/internal-api-key.guard.js';
+import { PrismaService }                    from '@/prisma/prisma.service.js';
+import { ZodValidationPipe }               from '@/common/pipes/zod-validation.pipe.js';
 import { z }                               from 'zod';
 
 // ── Schemas Zod ──────────────────────────────────────────────────────────────

@@ -6,14 +6,14 @@ import { BullModule }   from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
-import { InternalModule }  from './internal/internal.module.js';
-import { PrismaModule }    from './prisma/prisma.module.js';
-import { HealthModule }    from './health/health.module.js';
-import { MetricsModule }   from './metrics/metrics.module.js';
-import { JobsModule }      from './jobs/jobs.module.js';
-import { DlqModule }       from './dlq/dlq.module.js';
-import { GrpcModule }      from './grpc/grpc.module.js';
-import { CampaignsModule } from './campaigns/campaigns.module.js';
+import { InternalModule }  from '@/internal/internal.module.js';
+import { PrismaModule }    from '@/prisma/prisma.module.js';
+import { HealthModule }    from '@/health/health.module.js';
+import { MetricsModule }   from '@/metrics/metrics.module.js';
+import { JobsModule }      from '@/jobs/jobs.module.js';
+import { DlqModule }       from '@/dlq/dlq.module.js';
+import { GrpcModule }      from '@/grpc/grpc.module.js';
+import { CampaignsModule } from '@/campaigns/campaigns.module.js';
 
 const PROTO_DIR = join(process.cwd(), 'proto');
 

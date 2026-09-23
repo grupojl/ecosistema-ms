@@ -42,7 +42,6 @@ class RedisNoopClient {
         const redis = new Redis(url, {
           lazyConnect:          false,
           enableReadyCheck:     true,
-          maxRetriesPerRequest: 3,
           retryStrategy:        (t) => Math.min(t * 100, 3000),
         });
         redis.on('error', (err) => console.error('[Redis] error:', err.message));

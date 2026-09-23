@@ -13,7 +13,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '../channel.interface';
+} from '@/channel.interface';
 
 @Injectable()
 export class TikTokChannel implements IChannel {
@@ -105,4 +105,3 @@ export class TikTokChannel implements IChannel {
       throw new Error(`TikTok send failed: ${error}`);
     }
   }
-}

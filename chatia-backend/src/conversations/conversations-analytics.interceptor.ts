@@ -17,7 +17,7 @@ import {
 } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { tap }             from 'rxjs/operators';
-import { AnalyticsEventsService } from '../analytics-events/analytics-events.service.js';
+import { AnalyticsEventsService } from '@/analytics-events/analytics-events.service.js';
 
 @Injectable()
 export class ConversationsAnalyticsInterceptor implements NestInterceptor {

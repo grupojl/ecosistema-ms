@@ -5,13 +5,13 @@
 import { Injectable, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                                    from '@nestjs/bullmq';
 import { Queue }                                          from 'bullmq';
-import { QUEUES, QUEUE_DEFAULTS }                         from './notifications.constants.js';
-import { buildIdempotencyKey }                            from './dedup/idempotency.helper.js';
+import { QUEUES, QUEUE_DEFAULTS }                         from '@/notifications/notifications.constants.js';
+import { buildIdempotencyKey }                            from '@/notifications/dedup/idempotency.helper.js';
 import {
   NOTIFICATIONS_REPOSITORY,
   type INotificationsRepository,
   type StatsQuery,
-} from './repository/notifications.repository.interface.js';
+} from '@/notifications/repository/notifications.repository.interface.js';
 
 export interface EnqueueNotificationDto {
   ecosystemId:    string;

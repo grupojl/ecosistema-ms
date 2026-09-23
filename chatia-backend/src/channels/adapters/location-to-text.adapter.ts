@@ -9,7 +9,7 @@
 //
 // Ref: .claude/modules/chatia-backend/multimodal-adapters.md
 import { Injectable, Logger } from '@nestjs/common';
-import type { IMultimodalAdapter, MultimodalInput } from './multimodal.interface.js';
+import type { IMultimodalAdapter, MultimodalInput } from '@/channels/adapters/multimodal.interface.js';
 
 const NOMINATIM_URL  = 'https://nominatim.openstreetmap.org/reverse';
 const USER_AGENT     = 'chatia-backend/1.0'; // requerido por Nominatim ToS
