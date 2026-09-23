@@ -118,3 +118,28 @@ Nunca se resuelve ni valida aquí. Si llega → se usa. Si no → comportamiento
 
 `marketCountry?: string` — campo opcional, backward compatible.
 Ver `.claude/modules/packages/markets-tenant-context.md`
+
+<!-- ADR-018 -->
+---
+
+## Dependencias — política única (ADR-018)
+
+### El norte
+
+**Google** (una versión, dueño, strict deps) · **Microsoft Rush** (cero phantom deps) ·
+**OpenSSF / SLSA** (cadena de suministro)
+
+*Toda dependencia es código ajeno que corre con nuestros permisos: entra con dueño,
+con una sola versión y declarada donde se usa.*
+
+### Reglas no negociables
+
+```
+Versión    solo catalog: o workspace:*  — nada hardcodeado
+Declarar   todo import externo está en el package.json del workspace que lo usa
+Libs       packages/* → frameworks en peerDependencies, nunca en dependencies
+Nueva dep  checklist R4 del norte en el PR + dueño asignado
+Lockfile   --frozen-lockfile en CI y en Railway
+```
+
+Ver `architecture/11-dependencias-norte.md` y `decisions/ADR-018-politica-dependencias.md`.

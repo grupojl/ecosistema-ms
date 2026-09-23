@@ -90,3 +90,56 @@ Verificar antes de merge: `grep -l "LoggerModule" */src/app.module.ts`
 ### 🔴 Service con IRepository inyectado no puede tener this.prisma
 Si el service inyecta `@Inject(TOKEN) private repo: IRepo`,
 acceder a `this.prisma` rompe ADR-002. Todo acceso DB va por el repo.
+
+<!-- ADR-018 -->
+---
+
+## Dependencias (post ADR-018)
+
+Detalle, excepciones y estado actual en `architecture/11-dependencias-norte.md`.
+
+### 🔴 Cero versiones fuera del catalog
+Todo `package.json` usa `catalog:` o `workspace:*`. Única excepción automática: rangos en
+`peerDependencies` de `packages/*`. Cualquier otra se registra en el norte.
+```bash
+grep -rnE '^\s*"[^"]+":\s*"(\^|~|[0-9])' --include=package.json . \
+  --exclude-dir=node_modules | grep -vE '"version"'
+# → 0 resultados salvo excepciones registradas
+```
+→ Enforcement objetivo: paso `deps:check` en CI
+→ Estado: manual — ver baseline en el norte
+
+### 🔴 Todo import externo está declarado en su workspace
+"Funciona porque otro workspace lo trae" es un bug latente, no una excepción.
+Incluye tipos (`@types/express`) e imports dinámicos (`await import('pkg')`).
+```bash
+pnpm dlx knip --dependencies   # → 0 unlisted, 0 unused
+```
+→ Enforcement objetivo: `knip` en CI + `shamefully-hoist=false` (F2)
+→ Estado: manual
+
+### 🔴 Nombres de paquete válidos y catalog resoluble
+Una clave como `"/nestjs-prometheus"` o un `catalog:` sin entrada rompe el install del
+workspace completo — y con él el build de todos los servicios en Railway.
+```bash
+grep -rnE '^\s*"[/-][^"]*":' --include=package.json . --exclude-dir=node_modules  # → 0
+pnpm install --frozen-lockfile                                                     # → pasa
+```
+→ Enforcement objetivo: `pnpm install --frozen-lockfile` como primer paso del CI
+→ Estado: manual
+
+### 🟡 Libs de packages/* sin frameworks en dependencies
+`react`, `react-dom`, `@nestjs/*`, `firebase-admin`, `@prisma/client` →
+`peerDependencies` + `devDependencies`.
+→ Enforcement: code review de todo PR que toque `packages/*/package.json`
+→ Estado: manual
+
+### 🟡 Dependencia nueva con checklist R4 en el PR
+Sin checklist (licencia, Scorecard, mantenimiento, dueño) → se mergea solo con ticket de deuda.
+→ Enforcement objetivo: template de PR (F1)
+→ Estado: manual
+
+### 🟡 @types/* y tooling solo en devDependencies
+Un `@types/*` en `dependencies` termina en la imagen de producción.
+→ Enforcement: code review
+→ Estado: manual
