@@ -111,10 +111,10 @@ grep -n "InternalModule" \
 
 ### packages/auth-server (bloqueante para todos los MS)
 
-- [ ] MKT-PKG-01: `marketCountry?` en TenantContext
-- [ ] MKT-PKG-02: Extraer X-Market-Country en TenantGuard
-- [ ] MKT-PKG-03: Bump minor del package
-- [ ] MKT-PKG-04: Actualizar imports en cada MS
+- [x] MKT-PKG-01: `marketCountry?` en TenantContext
+- [x] MKT-PKG-02: Extraer X-Market-Country en TenantGuard
+- [x] MKT-PKG-03: Bump minor del package
+- [x] MKT-PKG-04: Actualizar imports en cada MS
 
 ### chatia-backend
 

@@ -32,7 +32,7 @@ async getRevenueByMarket(organizationId: string, from: Date, to: Date) {
 
 ## Checklist
 
-- [ ] MKT-AN-01: Migración Prisma — `marketCountry` en AnalyticsEvent
+- [x] MKT-AN-01: Migración Prisma — `marketCountry` en AnalyticsEvent
 - [ ] MKT-AN-02: Extraer de payload o header en AnalyticsController
 - [ ] MKT-AN-03: `getRevenueByMarket()` en ProjectionsService
 - [ ] MKT-AN-04: Endpoint gRPC para que superadmin consulte revenue por Market

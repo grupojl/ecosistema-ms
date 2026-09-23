@@ -50,8 +50,8 @@ const systemPrompt = marketCountry
 
 ## Checklist
 
-- [ ] MKT-CH-01: Agregar `marketCountry?` a `TenantContext`
-- [ ] MKT-CH-02: Extraer `X-Market-Country` en el guard/middleware
-- [ ] MKT-CH-03: Guardar `marketCountry` en Conversation model (Prisma migration)
+- [x] MKT-CH-01: Agregar `marketCountry?` a `TenantContext`
+- [x] MKT-CH-02: Extraer `X-Market-Country` en el guard/middleware
+- [x] MKT-CH-03: Guardar `marketCountry` en Conversation model (Prisma migration)
 - [ ] MKT-CH-04: Inyectar en system prompt del agente
 - [ ] MKT-CH-05: Dimensión `market_country` en eventos de analytics

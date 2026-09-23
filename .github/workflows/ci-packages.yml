@@ -1,0 +1,26 @@
+name: ci-packages
+on:
+  push:
+    paths: ['packages/**', 'pnpm-workspace.yaml']
+  pull_request:
+    paths: ['packages/**']
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22', cache: 'pnpm' }
+      - run: pnpm install --frozen-lockfile
+      - name: typecheck packages
+        run: |
+          pnpm --filter "@ecosistema-ms/auth-server" typecheck
+          pnpm --filter "@ecosistema-ms/grpc-client" typecheck
+      - name: build packages
+        run: |
+          pnpm --filter "@ecosistema-ms/logger"      build
+          pnpm --filter "@ecosistema-ms/metrics"     build
+          pnpm --filter "@ecosistema-ms/auth-server" build

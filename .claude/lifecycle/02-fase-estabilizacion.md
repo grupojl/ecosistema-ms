@@ -23,7 +23,7 @@ y poder arreglarlo antes de que el cliente lo note.
 - [x] `.github/workflows/ci-notificaciones.yml`
 - [x] `.github/workflows/ci-analytics.yml`
 - [x] `.github/workflows/ci-workers.yml`
-- [ ] `.github/workflows/ci-packages.yml` — proto + auth-server + grpc-client
+- [x] `.github/workflows/ci-packages.yml` — proto + auth-server + grpc-client
 - [ ] Branch protection rules en GitHub (bloquear merge sin CI verde)
 - [x] `jest.config.ts` con `coverageThreshold` en cada servicio
 
@@ -32,9 +32,9 @@ y poder arreglarlo antes de que el cliente lo note.
 - [x] `packages/logger/` — `createPinoLogger()` compartido
 - [x] `packages/metrics/` — `createPrometheusModule()` compartido
 - [x] `X-Request-Id` middleware en cada servicio
-- [ ] Propagación de requestId en metadata gRPC
+- [x] Propagación de requestId en metadata gRPC
 - [x] `/metrics` endpoint en cada servicio
-- [ ] Health check enriquecido (DB + Redis + BullMQ + CBs)
+- [x] Health check enriquecido (DB + Redis + BullMQ + CBs)
 - [ ] Dashboard Grafana Cloud con métricas base
 
 ### Tests (Escalón 1 — completar)

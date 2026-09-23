@@ -24,7 +24,7 @@ model Transaction {
 
 ## Checklist
 
-- [ ] MKT-PP-01: Migración Prisma — `marketCountry` en Transaction
+- [x] MKT-PP-01: Migración Prisma — `marketCountry` en Transaction
 - [ ] MKT-PP-02: Extraer de header `X-Market-Country` en PaymentController
 - [ ] MKT-PP-03: Pasar a TransactionService al registrar pago
 - [ ] MKT-PP-04: Incluir en listado interno de transacciones (para superadmin)

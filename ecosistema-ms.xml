@@ -546,6 +546,7 @@ packages/
       workers/
         workers-grpc.module.ts
       deadline.helper.ts
+      grpc-metadata.helper.ts
       index.ts
     package.json
     tsconfig.json
@@ -7806,206 +7807,6 @@ export class TenantThrottlerGuard extends ThrottlerGuard {
 }
 </file>
 
-<file path="chatia-backend/src/common/guards/tenant.guard.ts">
-// src/common/guards/tenant.guard.ts
-//
-// ADR-001 Sprint 2 — TenantGuard reescrito como plataforma independiente.
-//
-// Flujo:
-//   1. Extraer Bearer token
-//   2. Verificar con Firebase Admin SDK → decodedToken
-//   3. Extraer firebaseProjectId del token (campo 'aud')
-//   4. Resolver Ecosystem en DB por firebaseProjectId
-//   5. Validar custom claims con Zod (TenantClaimsSchema)
-//   6. Verificar claims.organizationId === header x-organization-id
-//   7. Verificar permissions.chat.canRead
-//   8. Upsert pasivo de Organization + Agent
-//   9. Poblar request.tenant con TenantContext completo
-//
-// Ya NO llama a DashboardAuthService ni a OrganizationsService.
-import {
-  Injectable,
-  CanActivate,
-  ExecutionContext,
-  UnauthorizedException,
-  ForbiddenException,
-  Logger,
-} from '@nestjs/common';
-import { ConfigService }    from '@nestjs/config';
-import { FirebaseService }  from '../../firebase/firebase.service';
-import { EcosystemService } from '../../ecosystem/ecosystem.service';
-import { PrismaService }    from '../../prisma/prisma.service';
-import { TenantClaimsSchema } from '../schemas/tenant-claims.schema';
-import type { TenantContext }  from '../types/tenant-context';
-
-const PRODUCT_KEY = 'chat';
-
-@Injectable()
-export class TenantGuard implements CanActivate {
-  private readonly logger = new Logger(TenantGuard.name);
-
-  constructor(
-    private readonly firebase:   FirebaseService,
-    private readonly ecosystem:  EcosystemService,
-    private readonly prisma:     PrismaService,
-    private readonly config:     ConfigService,
-  ) {}
-
-  async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request   = context.switchToHttp().getRequest();
-    const authHeader = request.headers['authorization'] as string | undefined;
-    const orgHeader  = request.headers['x-organization-id'] as string | undefined;
-    const isDev      = this.config.get('NODE_ENV') !== 'production';
-
-    // ── Modo desarrollo: Firebase no configurado ──────────────────────────────
-    if (!this.firebase.isInitialized) {
-      if (!isDev) {
-        throw new UnauthorizedException('Firebase no configurado en producción');
-      }
-      if (!orgHeader) {
-        throw new UnauthorizedException('x-organization-id requerido (modo dev)');
-      }
-      this.logger.warn(`[DEV] Sin Firebase — org: ${orgHeader}`);
-      request.tenant = {
-        ecosystemId:      'dev',
-        organizationId:   orgHeader,
-        organizationName: 'Dev Organization',
-        firebaseUid:      'dev-uid',
-        email:            'dev@localhost',
-        name:             'Dev User',
-        role:             'ADMIN',
-        canRead:          true,
-        canWrite:         true,
-      } satisfies TenantContext;
-      return true;
-    }
-
-    // ── Sin Bearer token (fallback dev) ───────────────────────────────────────
-    if (!authHeader?.startsWith('Bearer ')) {
-      if (isDev && orgHeader) {
-        this.logger.warn('[DEV] Sin Bearer token — usando x-organization-id');
-        request.tenant = {
-          ecosystemId:      'dev',
-          organizationId:   orgHeader,
-          organizationName: 'Dev Organization',
-          firebaseUid:      'dev-uid',
-          email:            'dev@localhost',
-          name:             'Dev User',
-          role:             'ADMIN',
-          canRead:          true,
-          canWrite:         true,
-        } satisfies TenantContext;
-        return true;
-      }
-      throw new UnauthorizedException('Authorization Bearer requerido');
-    }
-
-    const token = authHeader.slice(7);
-
-    // ── 1. Verificar token Firebase ───────────────────────────────────────────
-    let decoded: Awaited<ReturnType<typeof this.firebase.verifyIdToken>>;
-    try {
-      decoded = await this.firebase.verifyIdToken(token);
-    } catch {
-      throw new UnauthorizedException('Token Firebase inválido o expirado');
-    }
-
-    // ── 2. Resolver Ecosystem por firebaseProjectId ───────────────────────────
-    // El campo 'aud' del token es el firebaseProjectId del ecosistema emisor
-    const firebaseProjectId = Array.isArray(decoded.aud)
-      ? decoded.aud[0]
-      : decoded.aud;
-
-    const ecosystemRecord = await this.ecosystem.resolveByFirebaseProjectId(firebaseProjectId);
-
-    if (!ecosystemRecord) {
-      this.logger.warn(`Ecosistema no registrado: ${firebaseProjectId}`);
-      throw new ForbiddenException(
-        `Ecosistema no autorizado. Registralo en POST /api/v1/ecosystems.`,
-      );
-    }
-
-    if (!ecosystemRecord.isActive) {
-      throw new ForbiddenException('Ecosistema desactivado');
-    }
-
-    // ── 3. Validar custom claims con Zod ──────────────────────────────────────
-    const claimsResult = TenantClaimsSchema.safeParse(decoded);
-
-    if (!claimsResult.success) {
-      this.logger.warn(
-        `Claims inválidos para uid ${decoded.uid}: ${claimsResult.error.message}`,
-      );
-      throw new ForbiddenException(
-        'Token sin claims requeridos. El sass-back debe emitir organizationId, role y permissions.',
-      );
-    }
-
-    const claims = claimsResult.data;
-
-    // ── 4. Verificar organizationId del header ────────────────────────────────
-    if (!orgHeader) {
-      throw new UnauthorizedException('Header x-organization-id requerido');
-    }
-
-    if (claims.organizationId !== orgHeader) {
-      throw new ForbiddenException(
-        `organizationId del token (${claims.organizationId}) no coincide con el header (${orgHeader})`,
-      );
-    }
-
-    // ── 5. Verificar permissions.chat.canRead ─────────────────────────────────
-    const chatPerms = claims.permissions?.[PRODUCT_KEY];
-    if (!chatPerms?.canRead) {
-      throw new ForbiddenException(
-        `Sin acceso al módulo "${PRODUCT_KEY}" en esta organización`,
-      );
-    }
-
-    // ── 6. Upsert pasivo de Organization ──────────────────────────────────────
-    await this.ecosystem.ensureOrganization(
-      ecosystemRecord.id,
-      claims.organizationId,
-      claims.organizationName,
-      claims.organizationSlug,
-    );
-
-    // ── 7. Upsert pasivo de Agent ─────────────────────────────────────────────
-    const agent = await this.prisma.agent.upsert({
-      where:  { firebaseUid: decoded.uid },
-      update: {
-        name:  decoded.name  ?? decoded.email ?? decoded.uid,
-        email: decoded.email ?? `${decoded.uid}@unknown`,
-        role:  claims.role,
-      },
-      create: {
-        firebaseUid:    decoded.uid,
-        organizationId: claims.organizationId,
-        name:           decoded.name  ?? decoded.email ?? decoded.uid,
-        email:          decoded.email ?? `${decoded.uid}@unknown`,
-        role:           claims.role,
-      },
-    });
-
-    // ── 8. Poblar request.tenant ──────────────────────────────────────────────
-    request.tenant = {
-      ecosystemId:      ecosystemRecord.id,
-      organizationId:   claims.organizationId,
-      organizationName: claims.organizationName,
-      firebaseUid:      decoded.uid,
-      email:            decoded.email ?? '',
-      name:             decoded.name  ?? decoded.email ?? decoded.uid,
-      role:             claims.role,
-      canRead:          chatPerms.canRead,
-      canWrite:         chatPerms.canWrite ?? false,
-      agentId:          agent.id,
-    } satisfies TenantContext;
-
-    return true;
-  }
-}
-</file>
-
 <file path="chatia-backend/src/common/guards/write-permission.guard.ts">
 // src/common/guards/write-permission.guard.ts
 import {
@@ -8439,43 +8240,6 @@ export class EmbeddingService {
     const norm = Math.sqrt(v.reduce((sum, x) => sum + x * x, 0));
     return norm === 0 ? v : v.map((x) => x / norm);
   }
-}
-</file>
-
-<file path="chatia-backend/src/common/types/tenant-context.ts">
-// src/common/types/tenant-context.ts
-//
-// Contexto del tenant resuelto por TenantGuard en cada request autenticado.
-// Disponible via @Tenant() decorator en todos los controllers.
-//
-// BREAKING CHANGE (ADR-001 Sprint 0):
-//   roles: string[]  →  role: TenantRole  (un solo rol por sesión, del claim Firebase)
-//   ecosystemId agregado (id del Ecosystem registrado en chat-ia-back)
-//
-// Migrar usos de tenant.roles:
-//   tenant.roles.includes('admin')  →  tenant.role === 'OWNER' || tenant.role === 'ADMIN'
-import type { TenantRole } from '../schemas/tenant-claims.schema';
-
-export interface TenantContext {
-  // ── Plataforma ──────────────────────────────────────────────────────────────
-  ecosystemId: string;          // id del Ecosystem local (Sprint 1)
-
-  // ── Organización ────────────────────────────────────────────────────────────
-  organizationId:   string;
-  organizationName: string;
-
-  // ── Usuario ─────────────────────────────────────────────────────────────────
-  firebaseUid: string;
-  email:       string;
-  name:        string;
-
-  // ── Autorización ─────────────────────────────────────────────────────────────
-  role:     TenantRole;
-  canRead:  boolean;
-  canWrite: boolean;
-
-  // agentId opcional — lo upsertea el TenantGuard reescrito en Sprint 2
-  agentId?: string;
 }
 </file>
 
@@ -13130,26 +12894,6 @@ export class ZodExceptionFilter implements ExceptionFilter {
 }
 </file>
 
-<file path="packages/auth-server/src/types/tenant-context.ts">
-// TenantContext — contexto resuelto en cada request autenticado
-// Mismo contrato que welver/@real/auth-server para consistencia entre ecosistemas
-
-export type TenantRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
-
-export interface TenantContext {
-  ecosystemId:      string;
-  organizationId:   string;
-  organizationName: string;
-  firebaseUid:      string;
-  email:            string;
-  name:             string;
-  role:             TenantRole;
-  canRead:          boolean;
-  canWrite:         boolean;
-  agentId?:         string;
-}
-</file>
-
 <file path="packages/auth-server/package.json">
 {
   "name": "@ecosistema-ms/auth-server",
@@ -13223,14 +12967,51 @@ export function grpcDeadline(seconds = 5): { deadline: Date } {
 export const DEFAULT_GRPC_DEADLINE_S = 5;
 </file>
 
-<file path="packages/grpc-client/src/index.ts">
-// @ecosistema-ms/grpc-client
-export { ChatiaGrpcModule }         from "./chatia/chatia-grpc.module.js";
-export { PagosGrpcModule }          from "./pagos/pagos-grpc.module.js";
-// ADR-003
-export { NotificacionesGrpcModule } from "./notificaciones/notificaciones-grpc.module.js";
-export { AnalyticsGrpcModule }      from "./analytics/analytics-grpc.module.js";
-export { WorkersGrpcModule }        from "./workers/workers-grpc.module.js";
+<file path="packages/grpc-client/src/grpc-metadata.helper.ts">
+// packages/grpc-client/src/grpc-metadata.helper.ts
+//
+// OBS-MS-01 — Propagación de correlación en llamadas gRPC inter-servicio.
+// Patrón: ADR-008 / .claude/architecture/09-observabilidad-norte.md
+//
+// Uso:
+//   import { grpcMetadata, grpcDeadline } from '@ecosistema-ms/grpc-client';
+//
+//   this.chatiaClient.someMethod(
+//     request,
+//     grpcMetadata({ requestId, ecosystemId, organizationId }),
+//     grpcDeadline(),
+//   ).toPromise()
+
+import { Metadata } from '@grpc/grpc-js';
+
+export interface GrpcMetadataOptions {
+  requestId?:     string;
+  ecosystemId?:   string;
+  organizationId?: string;
+  service?:       string;
+}
+
+/**
+ * Crea un objeto Metadata gRPC con los campos de correlación.
+ * Si no se pasan valores, la metadata queda vacía (backward compatible).
+ */
+export function grpcMetadata(opts: GrpcMetadataOptions = {}): Metadata {
+  const meta = new Metadata();
+  if (opts.requestId)      meta.set('x-request-id',      opts.requestId);
+  if (opts.ecosystemId)    meta.set('x-ecosystem-id',    opts.ecosystemId);
+  if (opts.organizationId) meta.set('x-organization-id', opts.organizationId);
+  if (opts.service)        meta.set('x-source-service',  opts.service);
+  return meta;
+}
+
+/**
+ * Extrae el requestId de metadata gRPC entrante.
+ * Usar en los controllers gRPC (GrpcMethod handlers) para propagar el ID.
+ */
+export function extractRequestId(metadata: Metadata): string | undefined {
+  const values = metadata.get('x-request-id');
+  return values.length > 0 ? String(values[0]) : undefined;
+}
 </file>
 
 <file path="packages/grpc-client/package.json">
@@ -20503,62 +20284,6 @@ Ser específico — el "qué", no el "cómo".
 - Checklists actualizados por este ADR
 </file>
 
-<file path=".claude/lifecycle/02-fase-estabilizacion.md">
-# Fase 2 — Estabilización (antes de producción multitenante)
-
-## Objetivo
-
-Que el sistema sea operable en producción con confianza.
-No es sobre features nuevos — es sobre saber cuándo algo se rompe
-y poder arreglarlo antes de que el cliente lo note.
-
-## Escalones en esta fase
-
-| # | Escalón | Estado | ADR |
-|---|---------|--------|-----|
-| 3 | Infraestructura y Red | ⚠️ Parcial | — |
-| 5 | CI/CD y Despliegues | 🔴 En ejecución | ADR-008 |
-| 6 | Observabilidad y Operaciones | 🔴 En ejecución | ADR-008 |
-
-## Tareas concretas (en orden)
-
-### CI/CD (Escalón 5)
-
-- [x] `.github/workflows/ci-chatia.yml` — lint + typecheck + test + build
-- [x] `.github/workflows/ci-pasarelapagos.yml`
-- [x] `.github/workflows/ci-notificaciones.yml`
-- [x] `.github/workflows/ci-analytics.yml`
-- [x] `.github/workflows/ci-workers.yml`
-- [ ] `.github/workflows/ci-packages.yml` — proto + auth-server + grpc-client
-- [ ] Branch protection rules en GitHub (bloquear merge sin CI verde)
-- [x] `jest.config.ts` con `coverageThreshold` en cada servicio
-
-### Observabilidad (Escalón 6)
-
-- [x] `packages/logger/` — `createPinoLogger()` compartido
-- [x] `packages/metrics/` — `createPrometheusModule()` compartido
-- [x] `X-Request-Id` middleware en cada servicio
-- [ ] Propagación de requestId en metadata gRPC
-- [x] `/metrics` endpoint en cada servicio
-- [ ] Health check enriquecido (DB + Redis + BullMQ + CBs)
-- [ ] Dashboard Grafana Cloud con métricas base
-
-### Tests (Escalón 1 — completar)
-
-- [ ] `jest.config.ts` base en `packages/` reutilizable
-- [ ] Tests de dominio: `conversations`, `payments`
-- [ ] Integration tests: contratos HTTP críticos (payments, conversations, auth)
-- [ ] Suite multi-tenant: cross-ecosystem isolation test por servicio
-- [ ] 85% cobertura enforceada en CI
-
-## Criterio de salida de esta fase
-
-- Todo PR en `main` pasa CI completo (lint + type + test + build)
-- Todos los servicios tienen `/metrics` con al menos request_duration y errors
-- Logs en JSON en producción con requestId trazable
-- Health checks usados por Railway para restart automático
-</file>
-
 <file path=".claude/lifecycle/05-tasks.md">
 # Tasks — Cómo escalar a cada fase
 
@@ -21096,6 +20821,66 @@ Este módulo será el MOLDE VIVO para todos los demás.
 - `AnalyticsEventsService` — emite eventos al analytics-backend
 </file>
 
+<file path=".claude/modules/chatia-backend/markets.md">
+# Markets en chatia-backend
+
+## Rol
+
+El agente de chat IA recibe el contexto de país del cliente para:
+- Adaptar las respuestas al contexto local (ej: "enviamos desde Bogotá" en CO)
+- Registrar el país en cada conversación para analytics
+- Seleccionar templates de respuesta localizados (si existen)
+
+## Cómo llega el contexto
+
+Header `X-Market-Country: CO` en cada request de conversación.
+Extraído en el TenantGuard extendido o en el ConversationController.
+
+## Cambios necesarios
+
+### En TenantContext (packages/auth-server)
+
+```typescript
+// types/tenant-context.ts — agregar campo opcional
+export interface TenantContext {
+  organizationId: string
+  ecosystemId:    string
+  userId:         string
+  role:           Role
+  marketCountry?: string   // NUEVO — ISO 3166-1 alpha-2, opcional
+}
+```
+
+### En ConversationService
+
+```typescript
+// Al crear/actualizar conversación
+await this.repo.saveConversation({
+  ...existingFields,
+  marketCountry: tenantContext.marketCountry ?? null,
+})
+```
+
+### En el agente IA
+
+Incluir `marketCountry` en el system prompt cuando esté disponible:
+
+```typescript
+const systemPrompt = marketCountry
+  ? `${basePrompt}\n\nContexto geográfico del cliente: ${marketCountry}.
+     Adapta las respuestas de logística y envíos a este país.`
+  : basePrompt
+```
+
+## Checklist
+
+- [x] MKT-CH-01: Agregar `marketCountry?` a `TenantContext`
+- [x] MKT-CH-02: Extraer `X-Market-Country` en el guard/middleware
+- [x] MKT-CH-03: Guardar `marketCountry` en Conversation model (Prisma migration)
+- [ ] MKT-CH-04: Inyectar en system prompt del agente
+- [ ] MKT-CH-05: Dimensión `market_country` en eventos de analytics
+</file>
+
 <file path=".claude/modules/chatia-backend/README.md">
 # chatia-backend — Panel de módulos
 
@@ -21141,6 +20926,90 @@ idempotencia y DLQ para reintentos.
 
 ⚠️ Sin Domain/Repository en `notifications/` ni `preferences/`.
 La interface de canales (`notification-channel.interface.ts`) es BLOQUEANTE.
+</file>
+
+<file path=".claude/modules/packages/markets-tenant-context.md">
+# TenantContext extendido con Market
+
+## Cambio en @ecosistema-ms/auth-server
+
+El `TenantContext` es el contrato central que fluye por todos los microservicios.
+Agregar `marketCountry` como campo opcional mantiene backward compatibility total.
+
+```typescript
+// packages/auth-server/src/types/tenant-context.ts
+
+export interface TenantContext {
+  organizationId: string    // existente
+  ecosystemId:    string    // existente
+  userId:         string    // existente
+  role:           Role      // existente
+  marketCountry?: string    // NUEVO — ISO 3166-1 alpha-2, undefined si no aplica
+}
+```
+
+## Dónde se extrae
+
+En el `TenantGuard` o en un middleware previo al guard:
+
+```typescript
+// guards/tenant.guard.ts — agregar extracción de header
+const marketCountry = request.headers['x-market-country'] as string | undefined
+
+context.set<TenantContext>('tenant', {
+  ...existingFields,
+  marketCountry: marketCountry?.toUpperCase() ?? undefined,
+})
+```
+
+## Headers estándar
+
+```
+X-Tenant-ID:       <organizationId>   // existente
+X-Ecosystem-ID:    <ecosystemId>      // existente
+X-Market-Country:  CO                 // NUEVO — opcional
+X-Market-ID:       <marketId>         // NUEVO — opcional, UUID del Market resuelto
+```
+
+## Checklist
+
+- [x] MKT-PKG-01: Agregar `marketCountry?` a TenantContext interface
+- [x] MKT-PKG-02: Extraer `X-Market-Country` en TenantGuard
+- [x] MKT-PKG-03: Bump de versión del package (minor — cambio backward compatible)
+- [x] MKT-PKG-04: Actualizar tipos en todos los MS que importan TenantContext
+</file>
+
+<file path=".claude/modules/pasarelapagos-backend/markets.md">
+# Markets en pasarelapagos-backend
+
+## Rol
+
+Pagos ya usa Stripe que maneja multi-moneda y multi-país de forma nativa.
+El rol de Market aquí es de **auditoría y trazabilidad**, no de lógica de pago.
+
+## Lo que se registra
+
+En cada transacción se guarda el país del comprador para:
+- Reconciliación contable por mercado
+- Reportes de revenue por país en el superadmin
+- Cumplimiento fiscal (saber en qué país ocurrió la transacción)
+
+## Cambios en el modelo de Transaction
+
+```prisma
+model Transaction {
+  // ... campos existentes ...
+  marketCountry  String?  @map("market_country")  // NUEVO — ISO 3166-1 alpha-2
+  // Stripe ya registra country en el PaymentIntent — esto lo espeja en nuestra DB
+}
+```
+
+## Checklist
+
+- [x] MKT-PP-01: Migración Prisma — `marketCountry` en Transaction
+- [ ] MKT-PP-02: Extraer de header `X-Market-Country` en PaymentController
+- [ ] MKT-PP-03: Pasar a TransactionService al registrar pago
+- [ ] MKT-PP-04: Incluir en listado interno de transacciones (para superadmin)
 </file>
 
 <file path=".claude/modules/pasarelapagos-backend/payments.md">
@@ -21797,526 +21666,6 @@ export class AppModule implements NestModule {
 }
 </file>
 
-<file path="chatia-backend/prisma/schema.prisma">
-// =============================================================================
-// prisma/schema.prisma
-// Chat IA — Sistema hoja del ecosistema SaaS multi-tenant
-//
-// CAMBIOS vs versión anterior:
-//   • Organization: @id sin @default(cuid()) — el ID lo asigna el owner-dashboard
-//   • Organization: se agrega slug + isActive para referencia local
-//   • Agent: se agrega roles String[] y email unique para upsert SSO
-//   • Todo lo demás sin cambios
-//
-// MIGRACIÓN: pnpm prisma migrate dev --name sso_ecosystem_contract
-// =============================================================================
-
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
-
-datasource db {
-  provider = "postgresql"
-}
-
-
-// ─────────────────────────────────────────────
-// ENUMS
-// ─────────────────────────────────────────────
-
-enum ChannelType {
-  WHATSAPP
-  INSTAGRAM
-  MESSENGER
-  TIKTOK
-}
-
-enum ConversationStatus {
-  OPEN
-  HUMAN_TAKEOVER
-  RESOLVED
-  EXPIRED
-}
-
-enum ConversationStage {
-  INITIAL
-  QUALIFYING
-  INFORMED
-  NEGOTIATING
-  CLOSING
-  FOLLOW_UP
-  HUMAN
-}
-
-enum MessageDirection {
-  INBOUND
-  OUTBOUND
-}
-
-enum MessageStatus {
-  PENDING
-  SENT
-  DELIVERED
-  READ
-  FAILED
-}
-
-enum MessageType {
-  TEXT
-  IMAGE
-  AUDIO
-  VIDEO
-  DOCUMENT
-  STICKER
-  LOCATION
-  TEMPLATE
-  SYSTEM
-}
-
-enum ContactStatus {
-  ACTIVE
-  BLOCKED
-  UNSUBSCRIBED
-}
-
-enum KbDocumentStatus {
-  PENDING
-  PROCESSING
-  INDEXED
-  FAILED
-}
-
-enum KbSourceType {
-  TEXT
-  MARKDOWN
-  PDF
-  URL
-  JSON
-}
-
-enum NotificationType {
-  NEW_CONVERSATION
-  NEW_MESSAGE
-  ESCALATION
-}
-
-// ─────────────────────────────────────────────
-// ECOSYSTEM — plataforma multi-ecosistema (ADR-001)
-// ─────────────────────────────────────────────
-
-model Ecosystem {
-  id                String   @id @default(cuid())
-  firebaseProjectId String   @unique
-  name              String
-  isActive          Boolean  @default(true)
-  config            Json     @default("{}")
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  organizations Organization[]
-
-  @@index([firebaseProjectId])
-}
-
-// ─────────────────────────────────────────────
-// ORGANIZACIÓN
-// Referencia ligera — source of truth es el owner-dashboard.
-// El ID viene del dashboard (UUID externo), no se genera localmente.
-// Se crea/actualiza automáticamente en cada request via TenantGuard (upsert pasivo).
-// ─────────────────────────────────────────────
-
-model Organization {
-  id          String   @id
-  ecosystemId String                    // ← NUEVO
-  name        String
-  slug        String?  @unique
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  ecosystem       Ecosystem        @relation(fields: [ecosystemId], references: [id])  // ← NUEVO
-  channelAccounts ChannelAccount[]
-  contacts        Contact[]
-  agents          Agent[]
-  projects        Project[]
-
-  @@index([ecosystemId])  // ← NUEVO
-  @@index([slug])
-}
-
-// ─────────────────────────────────────────────
-// AGENTE (usuario del dashboard con acceso a Chat IA)
-// Se crea/actualiza via upsert en TenantGuard en cada login.
-// Los roles se cachean desde productPermissions del owner-dashboard.
-// ─────────────────────────────────────────────
-
-model Agent {
-  id             String   @id @default(cuid())
-  organizationId String
-  firebaseUid    String   @unique
-  name           String
-  email          String   @unique  // agregado para upsert por email
-  avatarUrl      String?
-  role   String   @default("MEMBER")  // cacheado desde owner-dashboard
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization   Organization   @relation(fields: [organizationId], references: [id])
-  conversations  Conversation[]
-  notifications  Notification[]
-
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// PROYECTO (agrupa configuraciones de IA)
-// ─────────────────────────────────────────────
-
-model Project {
-  id             String   @id @default(cuid())
-  organizationId String
-  slug           String
-  name           String
-  description    String?
-  isActive       Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  organization     Organization      @relation(fields: [organizationId], references: [id])
-  assistantConfigs AssistantConfig[]
-  knowledgeBases   KnowledgeBase[]
-  channelAccounts  ChannelAccount[]
-
-  @@unique([organizationId, slug])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// CANAL (multi-canal: WhatsApp, IG, Messenger, TikTok)
-// ─────────────────────────────────────────────
-
-model ChannelAccount {
-  id             String      @id @default(cuid())
-  organizationId String
-  channelType    ChannelType
-  name           String
-
-  externalId         String
-  accessToken        String
-  extraConfig        Json    @default("{}")
-  webhookVerifyToken String  @default(cuid())
-  isActive           Boolean @default(true)
-
-  projectId String?
-  project   Project? @relation(fields: [projectId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  conversations Conversation[]
-  aiConfig      AiConfig?
-
-  @@unique([channelType, externalId])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// CONTACTO
-// ─────────────────────────────────────────────
-
-model Contact {
-  id             String        @id @default(cuid())
-  organizationId String
-  channelType    ChannelType
-  externalId     String
-
-  name       String?
-  avatarUrl  String?
-  email      String?
-  phone      String?
-  username   String?
-
-  status    ContactStatus @default(ACTIVE)
-  optedOut  Boolean       @default(false)
-  tags      String[]      @default([])
-  metadata  Json          @default("{}")
-
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  organization  Organization   @relation(fields: [organizationId], references: [id])
-  conversations Conversation[]
-
-  @@unique([organizationId, channelType, externalId])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// CONVERSACIÓN
-// ─────────────────────────────────────────────
-
-model Conversation {
-  id               String             @id @default(cuid())
-  channelAccountId String
-  contactId        String
-
-  status          ConversationStatus @default(OPEN)
-  stage           ConversationStage  @default(INITIAL)
-  isAiActive      Boolean            @default(true)
-  assignedAgentId String?
-
-  detectedIntent    String?
-  extractedEntities Json    @default("{}")
-  summary           String?
-  tags              String[] @default([])
-
-  lastMessageAt DateTime?
-  resolvedAt    DateTime?
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-
-  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
-  contact        Contact        @relation(fields: [contactId], references: [id])
-  assignedAgent  Agent?         @relation(fields: [assignedAgentId], references: [id])
-  messages       Message[]
-  agentState     AgentState?
-  notifications  Notification[]
-
-  @@index([channelAccountId])
-  @@index([contactId])
-  @@index([status])
-}
-
-// ─────────────────────────────────────────────
-// MENSAJE
-// ─────────────────────────────────────────────
-
-model Message {
-  id             String           @id @default(cuid())
-  conversationId String
-
-  direction    MessageDirection
-  type         MessageType      @default(TEXT)
-  status       MessageStatus    @default(SENT)
-  content      String
-  mediaUrl     String?
-  mediaCaption String?
-
-  isAiGenerated Boolean @default(false)
-  tokensUsed    Int?
-  modelUsed     String?
-  externalId    String?
-  metadata      Json    @default("{}")
-
-  createdAt DateTime @default(now())
-
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-
-  @@unique([conversationId, externalId])
-  @@index([conversationId])
-}
-
-// ─────────────────────────────────────────────
-// ESTADO LANGGRAPH
-// ─────────────────────────────────────────────
-
-model AgentState {
-  id             String       @id @default(cuid())
-  conversationId String       @unique
-  currentNode    String       @default("classify")
-  context        Json         @default("{}")
-  updatedAt      DateTime     @updatedAt
-
-  conversation Conversation @relation(fields: [conversationId], references: [id])
-}
-
-// ─────────────────────────────────────────────
-// CONFIGURACIÓN DE IA (por canal)
-// ─────────────────────────────────────────────
-
-model AiConfig {
-  id               String @id @default(cuid())
-  channelAccountId String @unique
-
-  systemPrompt      String  @default("")
-  personaName       String  @default("Asistente")
-  groqModel         String  @default("llama-3.3-70b-versatile")
-  temperature       Float   @default(0.7)
-  maxTokens         Int     @default(1024)
-  contextWindowSize Int     @default(10)
-
-  humanTakeoverKeywords String[] @default([])
-  autoResolveAfterHours Int      @default(24)
-
-  welcomeMessage String?
-  offlineMessage String?
-  isEnabled      Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
-}
-
-// ─────────────────────────────────────────────
-// NOTIFICACIONES
-// ─────────────────────────────────────────────
-
-model Notification {
-  id             String           @id @default(cuid())
-  organizationId String
-  agentId        String
-  conversationId String?
-  type           NotificationType
-  title          String
-  body           String
-  isRead         Boolean          @default(false)
-  createdAt      DateTime         @default(now())
-
-  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
-
-  @@index([agentId])
-  @@index([organizationId])
-  @@index([isRead])
-}
-
-// ─────────────────────────────────────────────
-// ASISTENTE — configuración por proyecto
-// ─────────────────────────────────────────────
-
-model AssistantConfig {
-  id             String @id @default(cuid())
-  projectId      String @unique
-  organizationId String
-
-  personaName     String  @default("Asistente")
-  systemPrompt    String  @default("")
-  groqModel       String  @default("llama-3.3-70b-versatile")
-  temperature     Float   @default(0.7)
-  maxTokens       Int     @default(1024)
-  contextWindow   Int     @default(10)
-  welcomeMessage  String?
-  fallbackMessage String?
-  allowedOrigins  String[] @default([])
-
-  useFaqFallback Boolean @default(false)
-  faqKbId        String?
-
-  isEnabled Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project  Project            @relation(fields: [projectId], references: [id])
-  sessions AssistantSession[]
-
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// ASISTENTE — sesiones de usuario final
-// ─────────────────────────────────────────────
-
-model AssistantSession {
-  id                String @id @default(cuid())
-  assistantConfigId String
-  organizationId    String
-  externalUserId    String
-  channel           String @default("api")
-
-  history       Json      @default("[]")
-  metadata      Json      @default("{}")
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  lastMessageAt DateTime?
-
-  config AssistantConfig @relation(fields: [assistantConfigId], references: [id])
-
-  @@index([assistantConfigId])
-  @@index([organizationId, externalUserId])
-}
-
-// ─────────────────────────────────────────────
-// FAQ — base de conocimiento por proyecto
-// ─────────────────────────────────────────────
-
-model KnowledgeBase {
-  id             String  @id @default(cuid())
-  projectId      String
-  organizationId String
-  name           String
-  description    String?
-  isActive       Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  project   Project      @relation(fields: [projectId], references: [id])
-  documents KbDocument[]
-
-  @@index([projectId])
-  @@index([organizationId])
-}
-
-// ─────────────────────────────────────────────
-// FAQ — documentos indexables
-// ─────────────────────────────────────────────
-
-model KbDocument {
-  id              String           @id @default(cuid())
-  knowledgeBaseId String
-  organizationId  String
-
-  title        String
-  sourceType   KbSourceType     @default(TEXT)
-  sourceUrl    String?
-  rawContent   String?
-  status       KbDocumentStatus @default(PENDING)
-  errorMessage String?
-
-  tags       String[] @default([])
-  metadata   Json     @default("{}")
-  chunkCount Int      @default(0)
-
-  indexedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-
-  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
-  chunks        KbChunk[]
-
-  @@index([knowledgeBaseId])
-  @@index([status])
-}
-
-// ─────────────────────────────────────────────
-// FAQ — chunks con embeddings
-// MVP: JSON array de floats
-// Producción: migrar a Unsupported("vector(1536)") con pgvector
-// ─────────────────────────────────────────────
-
-model KbChunk {
-  id         String @id @default(cuid())
-  documentId String
-  content    String
-  chunkIndex Int
-
-  embedding Json?
-  metadata  Json     @default("{}")
-  createdAt DateTime @default(now())
-
-  document KbDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@index([documentId])
-}
-</file>
-
 <file path="chatia-backend/src/ai-config/ai-config.service.ts">
 // src/ai-config/ai-config.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -22450,6 +21799,249 @@ export class AiConfigService {
     if (!account) throw new NotFoundException('Cuenta no encontrada');
     return account;
   }
+}
+</file>
+
+<file path="chatia-backend/src/common/guards/tenant.guard.ts">
+// src/common/guards/tenant.guard.ts
+//
+// ADR-001 Sprint 2 — TenantGuard reescrito como plataforma independiente.
+//
+// Flujo:
+//   1. Extraer Bearer token
+//   2. Verificar con Firebase Admin SDK → decodedToken
+//   3. Extraer firebaseProjectId del token (campo 'aud')
+//   4. Resolver Ecosystem en DB por firebaseProjectId
+//   5. Validar custom claims con Zod (TenantClaimsSchema)
+//   6. Verificar claims.organizationId === header x-organization-id
+//   7. Verificar permissions.chat.canRead
+//   8. Upsert pasivo de Organization + Agent
+//   9. Poblar request.tenant con TenantContext completo
+//
+// Ya NO llama a DashboardAuthService ni a OrganizationsService.
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
+import { ConfigService }    from '@nestjs/config';
+import { FirebaseService }  from '../../firebase/firebase.service';
+import { EcosystemService } from '../../ecosystem/ecosystem.service';
+import { PrismaService }    from '../../prisma/prisma.service';
+import { TenantClaimsSchema } from '../schemas/tenant-claims.schema';
+import type { TenantContext }  from '../types/tenant-context';
+
+const PRODUCT_KEY = 'chat';
+
+@Injectable()
+export class TenantGuard implements CanActivate {
+  private readonly logger = new Logger(TenantGuard.name);
+
+  constructor(
+    private readonly firebase:   FirebaseService,
+    private readonly ecosystem:  EcosystemService,
+    private readonly prisma:     PrismaService,
+    private readonly config:     ConfigService,
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request   = context.switchToHttp().getRequest();
+    const authHeader = request.headers['authorization'] as string | undefined;
+    const orgHeader     = request.headers['x-organization-id'] as string | undefined;
+    const marketHeader  = request.headers['x-market-country'] as string | undefined;
+    const marketCountry = marketHeader ? marketHeader.toUpperCase() : undefined;
+    const isDev      = this.config.get('NODE_ENV') !== 'production';
+
+    // ── Modo desarrollo: Firebase no configurado ──────────────────────────────
+    if (!this.firebase.isInitialized) {
+      if (!isDev) {
+        throw new UnauthorizedException('Firebase no configurado en producción');
+      }
+      if (!orgHeader) {
+        throw new UnauthorizedException('x-organization-id requerido (modo dev)');
+      }
+      this.logger.warn(`[DEV] Sin Firebase — org: ${orgHeader}`);
+      request.tenant = {
+        ecosystemId:      'dev',
+        organizationId:   orgHeader,
+        organizationName: 'Dev Organization',
+        firebaseUid:      'dev-uid',
+        email:            'dev@localhost',
+        name:             'Dev User',
+        role:             'ADMIN',
+        canRead:          true,
+        canWrite:         true,
+        marketCountry,
+      } satisfies TenantContext;
+      return true;
+    }
+
+    // ── Sin Bearer token (fallback dev) ───────────────────────────────────────
+    if (!authHeader?.startsWith('Bearer ')) {
+      if (isDev && orgHeader) {
+        this.logger.warn('[DEV] Sin Bearer token — usando x-organization-id');
+        request.tenant = {
+          ecosystemId:      'dev',
+          organizationId:   orgHeader,
+          organizationName: 'Dev Organization',
+          firebaseUid:      'dev-uid',
+          email:            'dev@localhost',
+          name:             'Dev User',
+          role:             'ADMIN',
+          canRead:          true,
+          canWrite:         true,
+        marketCountry,
+      } satisfies TenantContext;
+        return true;
+      }
+      throw new UnauthorizedException('Authorization Bearer requerido');
+    }
+
+    const token = authHeader.slice(7);
+
+    // ── 1. Verificar token Firebase ───────────────────────────────────────────
+    let decoded: Awaited<ReturnType<typeof this.firebase.verifyIdToken>>;
+    try {
+      decoded = await this.firebase.verifyIdToken(token);
+    } catch {
+      throw new UnauthorizedException('Token Firebase inválido o expirado');
+    }
+
+    // ── 2. Resolver Ecosystem por firebaseProjectId ───────────────────────────
+    // El campo 'aud' del token es el firebaseProjectId del ecosistema emisor
+    const firebaseProjectId = Array.isArray(decoded.aud)
+      ? decoded.aud[0]
+      : decoded.aud;
+
+    const ecosystemRecord = await this.ecosystem.resolveByFirebaseProjectId(firebaseProjectId);
+
+    if (!ecosystemRecord) {
+      this.logger.warn(`Ecosistema no registrado: ${firebaseProjectId}`);
+      throw new ForbiddenException(
+        `Ecosistema no autorizado. Registralo en POST /api/v1/ecosystems.`,
+      );
+    }
+
+    if (!ecosystemRecord.isActive) {
+      throw new ForbiddenException('Ecosistema desactivado');
+    }
+
+    // ── 3. Validar custom claims con Zod ──────────────────────────────────────
+    const claimsResult = TenantClaimsSchema.safeParse(decoded);
+
+    if (!claimsResult.success) {
+      this.logger.warn(
+        `Claims inválidos para uid ${decoded.uid}: ${claimsResult.error.message}`,
+      );
+      throw new ForbiddenException(
+        'Token sin claims requeridos. El sass-back debe emitir organizationId, role y permissions.',
+      );
+    }
+
+    const claims = claimsResult.data;
+
+    // ── 4. Verificar organizationId del header ────────────────────────────────
+    if (!orgHeader) {
+      throw new UnauthorizedException('Header x-organization-id requerido');
+    }
+
+    if (claims.organizationId !== orgHeader) {
+      throw new ForbiddenException(
+        `organizationId del token (${claims.organizationId}) no coincide con el header (${orgHeader})`,
+      );
+    }
+
+    // ── 5. Verificar permissions.chat.canRead ─────────────────────────────────
+    const chatPerms = claims.permissions?.[PRODUCT_KEY];
+    if (!chatPerms?.canRead) {
+      throw new ForbiddenException(
+        `Sin acceso al módulo "${PRODUCT_KEY}" en esta organización`,
+      );
+    }
+
+    // ── 6. Upsert pasivo de Organization ──────────────────────────────────────
+    await this.ecosystem.ensureOrganization(
+      ecosystemRecord.id,
+      claims.organizationId,
+      claims.organizationName,
+      claims.organizationSlug,
+    );
+
+    // ── 7. Upsert pasivo de Agent ─────────────────────────────────────────────
+    const agent = await this.prisma.agent.upsert({
+      where:  { firebaseUid: decoded.uid },
+      update: {
+        name:  decoded.name  ?? decoded.email ?? decoded.uid,
+        email: decoded.email ?? `${decoded.uid}@unknown`,
+        role:  claims.role,
+      },
+      create: {
+        firebaseUid:    decoded.uid,
+        organizationId: claims.organizationId,
+        name:           decoded.name  ?? decoded.email ?? decoded.uid,
+        email:          decoded.email ?? `${decoded.uid}@unknown`,
+        role:           claims.role,
+      },
+    });
+
+    // ── 8. Poblar request.tenant ──────────────────────────────────────────────
+    request.tenant = {
+      ecosystemId:      ecosystemRecord.id,
+      organizationId:   claims.organizationId,
+      organizationName: claims.organizationName,
+      firebaseUid:      decoded.uid,
+      email:            decoded.email ?? '',
+      name:             decoded.name  ?? decoded.email ?? decoded.uid,
+      role:             claims.role,
+      canRead:          chatPerms.canRead,
+      canWrite:         chatPerms.canWrite ?? false,
+      agentId:          agent.id,
+      marketCountry,
+    } satisfies TenantContext;
+
+    return true;
+  }
+}
+</file>
+
+<file path="chatia-backend/src/common/types/tenant-context.ts">
+// src/common/types/tenant-context.ts
+//
+// Contexto del tenant resuelto por TenantGuard en cada request autenticado.
+// Disponible via @Tenant() decorator en todos los controllers.
+//
+// BREAKING CHANGE (ADR-001 Sprint 0):
+//   roles: string[]  →  role: TenantRole  (un solo rol por sesión, del claim Firebase)
+//   ecosystemId agregado (id del Ecosystem registrado en chat-ia-back)
+//
+// Migrar usos de tenant.roles:
+//   tenant.roles.includes('admin')  →  tenant.role === 'OWNER' || tenant.role === 'ADMIN'
+import type { TenantRole } from '../schemas/tenant-claims.schema';
+
+export interface TenantContext {
+  // ── Plataforma ──────────────────────────────────────────────────────────────
+  ecosystemId: string;          // id del Ecosystem local (Sprint 1)
+
+  // ── Organización ────────────────────────────────────────────────────────────
+  organizationId:   string;
+  organizationName: string;
+
+  // ── Usuario ─────────────────────────────────────────────────────────────────
+  firebaseUid: string;
+  email:       string;
+  name:        string;
+
+  // ── Autorización ─────────────────────────────────────────────────────────────
+  role:     TenantRole;
+  canRead:  boolean;
+  canWrite: boolean;
+
+  // agentId opcional — lo upsertea el TenantGuard reescrito en Sprint 2
+  agentId?: string;
+  marketCountry?: string;   // ISO 3166-1 alpha-2 — undefined si no aplica (ADR-014)
 }
 </file>
 
@@ -24306,6 +23898,27 @@ export class AppModule implements NestModule {
     "noFallthroughCasesInSwitch": false
   },
   "extends": "../tsconfig.base.json"
+}
+</file>
+
+<file path="packages/auth-server/src/types/tenant-context.ts">
+// TenantContext — contexto resuelto en cada request autenticado
+// Mismo contrato que welver/@real/auth-server para consistencia entre ecosistemas
+
+export type TenantRole = "OWNER" | "ADMIN" | "MEMBER" | "VIEWER";
+
+export interface TenantContext {
+  ecosystemId:      string;
+  organizationId:   string;
+  organizationName: string;
+  firebaseUid:      string;
+  email:            string;
+  name:             string;
+  role:             TenantRole;
+  canRead:          boolean;
+  canWrite:         boolean;
+  agentId?:         string;
+  marketCountry?:   string;   // ISO 3166-1 alpha-2 — undefined si no aplica (ADR-014)
 }
 </file>
 
@@ -27713,54 +27326,93 @@ El LLM nunca recibe un `mediaUrl` de WhatsApp CDN.
 **Referencia:** `.claude/modules/chatia-backend/multimodal-adapters.md`
 </file>
 
-<file path="analytics-backend/prisma/schema.prisma">
-// schema.prisma — analytics-backend
-// Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
-// CLI (migrate/generate): lee url del datasource + .env del directorio
+<file path=".claude/services/chatia-backend.md">
+# chatia-backend — Servicio de Chat IA
 
-generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
-}
+## Rol
+Chat IA, Knowledge Base (RAG + FAQ), Canales de comunicación, Agentes IA,
+Proyectos, Contactos, Conversaciones, Mensajes.
 
-datasource db {
-  provider = "postgresql"
-}
+## Puertos
+- HTTP público: 3000
+- gRPC interno: 5001
 
-/// Evento operacional raw — append-only, nunca se actualiza
+## Clasificación de carpetas
 
-          model AnalyticsEvent {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  eventType      String
-  payload        Json
-  occurredAt     DateTime
-  processedAt    DateTime @default(now())
+### 🔴 BLOQUEANTES — no modificar sin ADR
 
-  @@index([organizationId, eventType, occurredAt])
-  @@index([occurredAt])
-  @@index([organizationId, occurredAt])
-  @@index([organizationId, ecosystemId, eventType, occurredAt])
-  @@index([organizationId, ecosystemId, occurredAt])
-}
+| Carpeta | Razón |
+|---------|-------|
+| `src/prisma/` | Infraestructura core — un solo PrismaModule, no duplicar |
+| `src/common/` | Servicios compartidos (CacheService, CircuitBreakerService, EmbeddingService) — cambiar la interface rompe todos los módulos que la usan |
+| `src/firebase/` | Firebase Auth — reimplementar aquí es bypass de `@ecosistema-ms/auth-server` |
+| `src/queue/` | BullMQ queues + processors — la arquitectura de jobs está aquí |
+| `src/events/` | EventEmitter global — cambiar la forma de emitir eventos afecta todos los módulos |
+| `src/health/` | Railway healthcheck — no modificar el endpoint `/health` |
+| `src/core/strategies/` | Patrón Strategy de ecosistemas — la interface `ProjectStrategy` es el contrato que todos los módulos de ecosistema implementan |
+| `src/channels/channel.interface.ts` | Interface de canales — cambiarla rompe todos los adapters de canal |
+| `src/grpc/` | Entry point gRPC — contrato con el exterior |
+| `src/app.module.ts` | Raíz del módulo — no agregar lógica de negocio aquí |
 
-/// Proyeccion materializada — recalculada cada hora por ProjectionsService
-model DailyConversationSummary {
-  id             String   @id @default(cuid())
-  ecosystemId    String
-  organizationId String
-  date           DateTime @db.Date
-  channel        String
-  total          Int      @default(0)
-  resolved       Int      @default(0)
-  escalated      Int      @default(0)
-  avgResponseMin Float    @default(0)
-  calculatedAt   DateTime @default(now())
+### 🟡 DINÁMICA CONTROLADA — crecer siguiendo el molde
 
-  @@unique([organizationId, date, channel])
-  @@index([organizationId, date])
-}
+| Carpeta | Regla |
+|---------|-------|
+| `src/channels/` (implementaciones) | Nuevos canales siguen `channel.interface.ts`. No se modifica la interface sin ADR. |
+| `src/channels/adapters/` | Nuevos adapters multimodales siguen `IMultimodalAdapter`. Un adapter por tipo de media. CB obligatorio si toca proveedor externo. Fallback explícito siempre. |
+| `src/modules/` (manzana/mexus/welver) | Nuevos ecosistemas siguen el mismo molde (enrich-context). La interface `ProjectStrategy` es BLOQUEANTE. |
+| `src/faq/` (subcarpetas de documento/ingestion/rag) | La arquitectura de RAG es el molde. Nuevas funciones de FAQ siguen la misma estructura. |
+
+### 🟢 DINÁMICAS — crecen libremente siguiendo el patrón Domain/Repository
+
+| Carpeta | Estado actual | Molde a seguir |
+|---------|---------------|----------------|
+| `src/conversations/` | Service → Prisma directo | **MOLDE VIVO** — migrar primero |
+| `src/contacts/` | Service → Prisma directo | conversations/ (post-migración) |
+| `src/messages/` | Service → Prisma directo | conversations/ (post-migración) |
+| `src/projects/` | Service → Prisma directo | conversations/ (post-migración) |
+| `src/agents/` | Service → Prisma directo | conversations/ (post-migración) |
+| `src/webhooks/` | Service → Prisma directo | conversations/ (post-migración) |
+| `src/assistant/` | Lógica compleja de chat IA | conversations/ (post-migración) |
+| `src/analytics/` | Proxy a analytics-backend | Mantener como proxy — no agregar lógica |
+
+## Molde vivo de referencia
+
+`src/conversations/` — será el molde una vez migrado a Domain + Repository.
+Ver `modules/chatia-backend/conversations.md`.
+
+---
+
+## Adapters multimodales — implementados (sesión 2026-09-19)
+
+chatia-backend normaliza TODOS los tipos de mensaje de WhatsApp a texto
+antes de enviarlo al LLM. El canal ya soportaba todos los tipos en
+`channel.interface.ts` — los adapters son el puente.
+
+```
+IncomingMessage.type    →   Adapter                →  texto para LLM
+─────────────────────────────────────────────────────────────────────
+text                    →   (directo)               →  msg.content
+audio                   →   SpeechToTextAdapter     →  Groq Whisper
+image                   →   ImageToTextAdapter      →  Claude Vision
+document                →   DocumentToTextAdapter   →  extracción PDF
+location                →   LocationToTextAdapter   →  OSM Nominatim
+video                   →   VideoToTextAdapter      →  stub Fase 2
+sticker                 →   (directo)               →  '[sticker]'
+```
+
+**Invariante:** `MultimodalService.normalize()` siempre retorna texto.
+El LLM nunca recibe un `mediaUrl` de WhatsApp CDN.
+
+**Punto de inserción:** `IncomingMessageProcessor.process()` — antes de
+`ConversationsService.handleIncomingMessage()`.
+
+**Variables de entorno nuevas:**
+- `ANTHROPIC_API_KEY` — Claude Vision
+- `CARTESIA_API_KEY` — Cartesia TTS
+- `GROQ_API_KEY` — ya existía (Groq Whisper STT)
+
+**Referencia:** `.claude/modules/chatia-backend/multimodal-adapters.md`
 </file>
 
 <file path="analytics-backend/src/grpc/analytics-grpc.controller.ts">
@@ -27942,6 +27594,527 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap();
+</file>
+
+<file path="chatia-backend/prisma/schema.prisma">
+// =============================================================================
+// prisma/schema.prisma
+// Chat IA — Sistema hoja del ecosistema SaaS multi-tenant
+//
+// CAMBIOS vs versión anterior:
+//   • Organization: @id sin @default(cuid()) — el ID lo asigna el owner-dashboard
+//   • Organization: se agrega slug + isActive para referencia local
+//   • Agent: se agrega roles String[] y email unique para upsert SSO
+//   • Todo lo demás sin cambios
+//
+// MIGRACIÓN: pnpm prisma migrate dev --name sso_ecosystem_contract
+// =============================================================================
+
+generator client {
+  provider   = "prisma-client-js"
+  engineType = "client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum ChannelType {
+  WHATSAPP
+  INSTAGRAM
+  MESSENGER
+  TIKTOK
+}
+
+enum ConversationStatus {
+  OPEN
+  HUMAN_TAKEOVER
+  RESOLVED
+  EXPIRED
+}
+
+enum ConversationStage {
+  INITIAL
+  QUALIFYING
+  INFORMED
+  NEGOTIATING
+  CLOSING
+  FOLLOW_UP
+  HUMAN
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  AUDIO
+  VIDEO
+  DOCUMENT
+  STICKER
+  LOCATION
+  TEMPLATE
+  SYSTEM
+}
+
+enum ContactStatus {
+  ACTIVE
+  BLOCKED
+  UNSUBSCRIBED
+}
+
+enum KbDocumentStatus {
+  PENDING
+  PROCESSING
+  INDEXED
+  FAILED
+}
+
+enum KbSourceType {
+  TEXT
+  MARKDOWN
+  PDF
+  URL
+  JSON
+}
+
+enum NotificationType {
+  NEW_CONVERSATION
+  NEW_MESSAGE
+  ESCALATION
+}
+
+// ─────────────────────────────────────────────
+// ECOSYSTEM — plataforma multi-ecosistema (ADR-001)
+// ─────────────────────────────────────────────
+
+model Ecosystem {
+  id                String   @id @default(cuid())
+  firebaseProjectId String   @unique
+  name              String
+  isActive          Boolean  @default(true)
+  config            Json     @default("{}")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organizations Organization[]
+
+  @@index([firebaseProjectId])
+}
+
+// ─────────────────────────────────────────────
+// ORGANIZACIÓN
+// Referencia ligera — source of truth es el owner-dashboard.
+// El ID viene del dashboard (UUID externo), no se genera localmente.
+// Se crea/actualiza automáticamente en cada request via TenantGuard (upsert pasivo).
+// ─────────────────────────────────────────────
+
+model Organization {
+  id          String   @id
+  ecosystemId String                    // ← NUEVO
+  name        String
+  slug        String?  @unique
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  ecosystem       Ecosystem        @relation(fields: [ecosystemId], references: [id])  // ← NUEVO
+  channelAccounts ChannelAccount[]
+  contacts        Contact[]
+  agents          Agent[]
+  projects        Project[]
+
+  @@index([ecosystemId])  // ← NUEVO
+  @@index([slug])
+}
+
+// ─────────────────────────────────────────────
+// AGENTE (usuario del dashboard con acceso a Chat IA)
+// Se crea/actualiza via upsert en TenantGuard en cada login.
+// Los roles se cachean desde productPermissions del owner-dashboard.
+// ─────────────────────────────────────────────
+
+model Agent {
+  id             String   @id @default(cuid())
+  organizationId String
+  firebaseUid    String   @unique
+  name           String
+  email          String   @unique  // agregado para upsert por email
+  avatarUrl      String?
+  role   String   @default("MEMBER")  // cacheado desde owner-dashboard
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  conversations  Conversation[]
+  notifications  Notification[]
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// PROYECTO (agrupa configuraciones de IA)
+// ─────────────────────────────────────────────
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String
+  slug           String
+  name           String
+  description    String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  assistantConfigs AssistantConfig[]
+  knowledgeBases   KnowledgeBase[]
+  channelAccounts  ChannelAccount[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CANAL (multi-canal: WhatsApp, IG, Messenger, TikTok)
+// ─────────────────────────────────────────────
+
+model ChannelAccount {
+  id             String      @id @default(cuid())
+  organizationId String
+  channelType    ChannelType
+  name           String
+
+  externalId         String
+  accessToken        String
+  extraConfig        Json    @default("{}")
+  webhookVerifyToken String  @default(cuid())
+  isActive           Boolean @default(true)
+
+  projectId String?
+  project   Project? @relation(fields: [projectId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  conversations Conversation[]
+  aiConfig      AiConfig?
+
+  @@unique([channelType, externalId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CONTACTO
+// ─────────────────────────────────────────────
+
+model Contact {
+  id             String        @id @default(cuid())
+  organizationId String
+  channelType    ChannelType
+  externalId     String
+
+  name       String?
+  avatarUrl  String?
+  email      String?
+  phone      String?
+  username   String?
+
+  status    ContactStatus @default(ACTIVE)
+  optedOut  Boolean       @default(false)
+  tags      String[]      @default([])
+  metadata  Json          @default("{}")
+
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id])
+  conversations Conversation[]
+
+  @@unique([organizationId, channelType, externalId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// CONVERSACIÓN
+// ─────────────────────────────────────────────
+
+model Conversation {
+  id               String             @id @default(cuid())
+  channelAccountId String
+  contactId        String
+
+  status          ConversationStatus @default(OPEN)
+  stage           ConversationStage  @default(INITIAL)
+  isAiActive      Boolean            @default(true)
+  assignedAgentId String?
+
+  detectedIntent    String?
+  extractedEntities Json    @default("{}")
+  summary           String?
+  tags              String[] @default([])
+
+  marketCountry  String?  @map("market_country")  // ADR-014 — ISO 3166-1 alpha-2
+  lastMessageAt DateTime?
+  resolvedAt    DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
+  contact        Contact        @relation(fields: [contactId], references: [id])
+  assignedAgent  Agent?         @relation(fields: [assignedAgentId], references: [id])
+  messages       Message[]
+  agentState     AgentState?
+  notifications  Notification[]
+
+  @@index([channelAccountId])
+  @@index([contactId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// MENSAJE
+// ─────────────────────────────────────────────
+
+model Message {
+  id             String           @id @default(cuid())
+  conversationId String
+
+  direction    MessageDirection
+  type         MessageType      @default(TEXT)
+  status       MessageStatus    @default(SENT)
+  content      String
+  mediaUrl     String?
+  mediaCaption String?
+
+  isAiGenerated Boolean @default(false)
+  tokensUsed    Int?
+  modelUsed     String?
+  externalId    String?
+  metadata      Json    @default("{}")
+
+  createdAt DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+
+  @@unique([conversationId, externalId])
+  @@index([conversationId])
+}
+
+// ─────────────────────────────────────────────
+// ESTADO LANGGRAPH
+// ─────────────────────────────────────────────
+
+model AgentState {
+  id             String       @id @default(cuid())
+  conversationId String       @unique
+  currentNode    String       @default("classify")
+  context        Json         @default("{}")
+  updatedAt      DateTime     @updatedAt
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// CONFIGURACIÓN DE IA (por canal)
+// ─────────────────────────────────────────────
+
+model AiConfig {
+  id               String @id @default(cuid())
+  channelAccountId String @unique
+
+  systemPrompt      String  @default("")
+  personaName       String  @default("Asistente")
+  groqModel         String  @default("llama-3.3-70b-versatile")
+  temperature       Float   @default(0.7)
+  maxTokens         Int     @default(1024)
+  contextWindowSize Int     @default(10)
+
+  humanTakeoverKeywords String[] @default([])
+  autoResolveAfterHours Int      @default(24)
+
+  welcomeMessage String?
+  offlineMessage String?
+  isEnabled      Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channelAccount ChannelAccount @relation(fields: [channelAccountId], references: [id])
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICACIONES
+// ─────────────────────────────────────────────
+
+model Notification {
+  id             String           @id @default(cuid())
+  organizationId String
+  agentId        String
+  conversationId String?
+  type           NotificationType
+  title          String
+  body           String
+  isRead         Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+
+  agent        Agent         @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([agentId])
+  @@index([organizationId])
+  @@index([isRead])
+}
+
+// ─────────────────────────────────────────────
+// ASISTENTE — configuración por proyecto
+// ─────────────────────────────────────────────
+
+model AssistantConfig {
+  id             String @id @default(cuid())
+  projectId      String @unique
+  organizationId String
+
+  personaName     String  @default("Asistente")
+  systemPrompt    String  @default("")
+  groqModel       String  @default("llama-3.3-70b-versatile")
+  temperature     Float   @default(0.7)
+  maxTokens       Int     @default(1024)
+  contextWindow   Int     @default(10)
+  welcomeMessage  String?
+  fallbackMessage String?
+  allowedOrigins  String[] @default([])
+
+  useFaqFallback Boolean @default(false)
+  faqKbId        String?
+
+  isEnabled Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project  Project            @relation(fields: [projectId], references: [id])
+  sessions AssistantSession[]
+
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// ASISTENTE — sesiones de usuario final
+// ─────────────────────────────────────────────
+
+model AssistantSession {
+  id                String @id @default(cuid())
+  assistantConfigId String
+  organizationId    String
+  externalUserId    String
+  channel           String @default("api")
+
+  history       Json      @default("[]")
+  metadata      Json      @default("{}")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastMessageAt DateTime?
+
+  config AssistantConfig @relation(fields: [assistantConfigId], references: [id])
+
+  @@index([assistantConfigId])
+  @@index([organizationId, externalUserId])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — base de conocimiento por proyecto
+// ─────────────────────────────────────────────
+
+model KnowledgeBase {
+  id             String  @id @default(cuid())
+  projectId      String
+  organizationId String
+  name           String
+  description    String?
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project   Project      @relation(fields: [projectId], references: [id])
+  documents KbDocument[]
+
+  @@index([projectId])
+  @@index([organizationId])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — documentos indexables
+// ─────────────────────────────────────────────
+
+model KbDocument {
+  id              String           @id @default(cuid())
+  knowledgeBaseId String
+  organizationId  String
+
+  title        String
+  sourceType   KbSourceType     @default(TEXT)
+  sourceUrl    String?
+  rawContent   String?
+  status       KbDocumentStatus @default(PENDING)
+  errorMessage String?
+
+  tags       String[] @default([])
+  metadata   Json     @default("{}")
+  chunkCount Int      @default(0)
+
+  indexedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  knowledgeBase KnowledgeBase @relation(fields: [knowledgeBaseId], references: [id])
+  chunks        KbChunk[]
+
+  @@index([knowledgeBaseId])
+  @@index([status])
+}
+
+// ─────────────────────────────────────────────
+// FAQ — chunks con embeddings
+// MVP: JSON array de floats
+// Producción: migrar a Unsupported("vector(1536)") con pgvector
+// ─────────────────────────────────────────────
+
+model KbChunk {
+  id         String @id @default(cuid())
+  documentId String
+  content    String
+  chunkIndex Int
+
+  embedding Json?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  document KbDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
 </file>
 
 <file path="chatia-backend/src/agents/agents.controller.ts">
@@ -29238,6 +29411,114 @@ export const ANALYTICS_CLIENT_TOKEN = 'ANALYTICS_GRPC_CLIENT';
 export class AnalyticsGrpcModule {}
 </file>
 
+<file path="pasarelapagos-backend/src/app.module.ts">
+// src/app.module.ts
+import { Module, type NestModule, type MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { RequestIdMiddleware } from './common/middleware/request-id.middleware.js';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { LoggerModule } from 'nestjs-pino';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
+import { envSchema } from './config/env.validation';
+
+// Core
+import { InternalModule } from './internal/internal.module.js';
+import { PrismaModule }   from './modules/prisma/prisma.module';
+import { FirebaseModule }    from './modules/firebase/firebase.module';
+import { SharedGuardsModule } from './common/shared-guards.module';
+import { RedisModule }    from './modules/redis/redis.module';
+import { QueueModule }    from './modules/queue/queue.module';
+import { AuditModule }    from './modules/audit/audit.module';
+import { MetricsModule }  from './modules/metrics/metrics.module';
+
+// Business
+import { AuthModule }      from './modules/auth/auth.module';
+import { PaymentsModule }  from './modules/payments/payments.module';
+import { WebhooksModule }  from './modules/webhooks/webhooks.module';
+import { TenantsModule }   from './modules/tenants/tenants.module';
+import { ProvidersModule } from './modules/providers/providers.module';
+import { HealthModule }    from './modules/health/health.module';
+
+// Guards globales
+import { TenantThrottlerGuard } from './common/guards/tenant-throttler.guard';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      validate: (config) => {
+        const result = envSchema.safeParse(config);
+        if (!result.success) {
+          throw new Error(
+            `Variables de entorno inválidas:\n${result.error.toString()}`,
+          );
+        }
+        return result.data;
+      },
+    }),
+
+    LoggerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        pinoHttp: {
+          level:     config.get<string>('LOG_LEVEL') ?? 'info',
+          transport: config.get<string>('NODE_ENV') !== 'production'
+            ? { target: 'pino-pretty', options: { colorize: true } }
+            : undefined,
+          redact: ['req.headers.authorization', 'req.headers["x-api-key"]'],
+        },
+      }),
+    }),
+
+    ThrottlerModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (config: ConfigService) => ({
+        throttlers: [{
+          ttl:   config.get<number>('THROTTLE_TTL')   ?? 60,
+          limit: config.get<number>('THROTTLE_LIMIT') ?? 200,
+        }],
+      }),
+    }),
+
+    ScheduleModule.forRoot(),
+    EventEmitterModule.forRoot(),
+
+    // Core
+    InternalModule,
+    PrismaModule,
+    FirebaseModule,
+    SharedGuardsModule,
+    RedisModule,
+    QueueModule,
+    AuditModule,
+    MetricsModule,
+
+    // Business
+    AuthModule,
+    PaymentsModule,
+    WebhooksModule,
+    TenantsModule,
+    ProvidersModule,
+    HealthModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: TenantThrottlerGuard,
+    },
+  ],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
+  }
+}
+</file>
+
 <file path="workers-backend/prisma/schema.prisma">
 // schema.prisma — workers-backend
 // Runtime: PrismaPg adapter en prisma.service.ts (Pool + connectionString)
@@ -30221,9 +30502,9 @@ Ver: `.claude/checklists/observabilidad.md`
 - Parche DT-023 documentado en .claude/patches/
 
 ### Pendiente manual post-ejecución
-- [ ] Importar createLoggerModule() en app.module.ts de cada servicio
-- [ ] Importar createMetricsModule() en app.module.ts de cada servicio
-- [ ] Importar RequestIdMiddleware en app.module.ts de cada servicio
+- [x] Importar createLoggerModule() en app.module.ts de cada servicio
+- [x] Importar createMetricsModule() en app.module.ts de cada servicio
+- [x] Importar RequestIdMiddleware en app.module.ts de cada servicio
 - [ ] Agregar packages/logger y packages/metrics a pnpm-workspace.yaml
 - [ ] Agregar pino, nestjs-pino, @willsoto/nestjs-prometheus al catalog raíz
 - [ ] Aplicar parche DT-023 en analytics-backend manualmente
@@ -31419,96 +31700,55 @@ catalog:
   uuid: "^11.1.0"
   axios: "^1.9.0"
 
-  # ── Types ─────────────────────────────────────────────
-  "@types/node": "^22.15.31"
-  "@types/express": "^5.0.3"
-  "@types/bcryptjs": "^2.4.6"
-  "@types/uuid": "^10.0.0"
-  "@types/multer": "^1.4.12"
-  "@types/jest": "^30.0.0"
-  "@types/supertest": "^6.0.3"
+async function bootstrap(): Promise<void> {
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
 
-  # ── NestJS ────────────────────────────────────────────
-  "@nestjs/common": "^11.1.3"
-  "@nestjs/core": "^11.1.3"
-  "@nestjs/platform-express": "^11.1.3"
-  "@nestjs/config": "^4.0.3"
-  "@nestjs/microservices": "^11.1.3"
-  "@nestjs/event-emitter": "^3.1.0"
-  "@nestjs/bullmq": "^11.0.2"
-  "@nestjs/throttler": "^6.5.0"
-  "@nestjs/swagger": "^11.2.0"
-  "@nestjs/terminus": "^11.0.0"
-  "@nestjs/mapped-types": "^2.0.6"
-  "@nestjs/schedule": "^5.0.1"
-  "@nestjs/cache-manager": "^3.0.1"
-  "@nestjs/cli": "^11.0.0"
-  "@nestjs/schematics": "^11.0.0"
-  "@nestjs/testing": "^11.0.1"
+  // ── Pino structured logger ─────────────────────────────────────────────
+  app.useLogger(app.get(Logger));
 
-  # ── Prisma ────────────────────────────────────────────
-  "@prisma/client": "^7.8.0"
-  "@prisma/adapter-pg": "^7.8.0"
-  prisma: "^7.8.0"
+  // ── gRPC microservice ──────────────────────────────────────────────────
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package:   'workers',
+      protoPath:  join(process.cwd(), 'proto', 'workers.proto'),
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5005'}`,
+      channelOptions: {
+        'grpc.keepalive_time_ms':             10_000,
+        'grpc.keepalive_timeout_ms':           5_000,
+        'grpc.keepalive_permit_without_calls':     1,
+        'grpc.http2.max_pings_without_data':       0,
+      },
+    },
+  });
 
-  # ── DB / Cache ────────────────────────────────────────
-  pg: "^8.16.3"
-  ioredis: "^5.6.1"
-  bullmq: "^5.56.0"
-  cache-manager: "^6.4.0"
+  // ── Filtros globales — ZodExceptionFilter PRIMERO (ADR-009 / DT-027) ──
+  app.useGlobalFilters(new ZodExceptionFilter());
+  app.useGlobalPipes(new ValidationPipe({
+    whitelist:            true,
+    forbidNonWhitelisted: true,
+    transform:            true,
+  }));
 
-  # ── Auth / Security ───────────────────────────────────
-  bcryptjs: "^3.0.2"
-  firebase-admin: "^13.4.0"
-  helmet: "^8.1.0"
+  // ── Swagger ────────────────────────────────────────────────────────────
+  const swaggerCfg = new DocumentBuilder()
+    .setTitle('workers-backend')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+  SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
 
-  # ── Validation / Transform ────────────────────────────
-  class-validator: "^0.15.1"
-  class-transformer: "^0.5.1"
+  // ── Arranque ───────────────────────────────────────────────────────────
+  await app.startAllMicroservices();
+  const port = process.env['PORT'] ?? '3004';
+  await app.listen(port);
+  app.get(Logger).log(
+    `HTTP:${port}  gRPC:5005`,
+    'workers-backend',
+  );
+}
 
-  # ── HTTP / Runtime ────────────────────────────────────
-  reflect-metadata: "^0.2.2"
-  rxjs: "^7.8.2"
-  dotenv: "^17.2.0"
-  swagger-ui-express: "^5.0.1"
-
-  # ── Logging ───────────────────────────────────────────
-  nestjs-pino: "^4.4.0"
-  pino: "^9.7.0"
-  pino-http: "^10.5.0"
-
-  # ── gRPC ──────────────────────────────────────────────
-  "@grpc/grpc-js": "^1.13.3"
-  "@grpc/proto-loader": "^0.7.15"
-  protobufjs: "^7.5.3"
-
-  # ── Payment providers ─────────────────────────────────
-  stripe: "^18.2.0"
-  mercadopago: "^2.3.0"
-
-  # ── OpenTelemetry ─────────────────────────────────────
-  "@opentelemetry/sdk-node": "^0.57.2"
-  "@opentelemetry/auto-instrumentations-node": "^0.58.0"
-  "@opentelemetry/exporter-prometheus": "^0.57.2"
-
-  "@willsoto/nestjs-prometheus": "^6.0.0"
-  "prom-client": "^15.0.0"
-  # ── Dev / Build ───────────────────────────────────────
-  "@eslint/js": "^9.18.0"
-  "@eslint/eslintrc": "^3.2.0"
-  eslint: "^9.18.0"
-  eslint-config-prettier: "^10.0.1"
-  eslint-plugin-prettier: "^5.2.2"
-  globals: "^16.0.0"
-  prettier: "^3.4.2"
-  typescript-eslint: "^8.20.0"
-  jest: "^29.7.0"
-  supertest: "^7.1.0"
-  ts-node: "^10.9.2"
-  ts-jest: "^29.4.0"
-  ts-loader: "^9.5.2"
-  tsconfig-paths: "^4.2.0"
-  source-map-support: "^0.5.21"
+void bootstrap();
 </file>
 
 <file path="chatia-backend/src/conversations/conversations.service.ts">

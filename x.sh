@@ -1,632 +1,380 @@
 #!/usr/bin/env bash
-# adr-018-ecosistema-ms.sh — ADR-018 · Política de dependencias para ecosistema-ms
-#
-# Qué hace (solo toca .claude/):
-#   · crea   .claude/decisions/ADR-018-politica-dependencias.md
-#   · crea   .claude/architecture/11-dependencias-norte.md
-#   · anexa  sección "Dependencias (post ADR-018)" a .claude/architecture/03-reglas-duras.md
-#   · anexa  sección "Dependencias — política única (ADR-018)" a .claude/CLAUDE.md
-#
-# Uso (desde la raíz de ecosistema-ms, o pasando la ruta):
-#   bash adr-018-ecosistema-ms.sh [ruta-repo] [--dry-run] [--force]
-#
-#   --dry-run   muestra qué haría sin escribir nada
-#   --force     sobrescribe ADR y norte si ya existen (las secciones anexadas nunca se duplican)
-#
-# Idempotente: ejecutarlo dos veces no duplica contenido. No usa Python.
-# Requiere: bash, grep, sed, cmp, mktemp, tail (incluidos en Git Bash para Windows).
+# =============================================================================
+# x-markets-ecosistema-ms.sh
+# Escribe la documentación de Markets en el monorepo ecosistema-ms/
+# Ejecutar desde la raíz de ecosistema-ms/
+# Git Bash (Windows): bash x-markets-ecosistema-ms.sh
+# =============================================================================
+set -e
 
-set -euo pipefail
+echo "▶ [ecosistema-ms] Escribiendo documentación de Markets..."
 
-REPO_LABEL="ecosistema-ms"
-REPO_MARKER="chatia-backend"   # entrada esperada en pnpm-workspace.yaml (evita correr el script en el repo equivocado)
+# -----------------------------------------------------------------------------
+# 1. ADR-014 — Markets en ecosistema-ms
+# -----------------------------------------------------------------------------
+mkdir -p .claude/decisions
 
-emit_adr() {
-cat <<'__ADR018_EOF__'
-# ADR-018: Política de dependencias — una versión, declarada donde se usa, con dueño
+cat > .claude/decisions/ADR-014-markets-context.md << 'EOF'
+# ADR-014 — Markets: contexto global en microservicios
 
-**Fecha:** 2026-09-22
-**Estado:** Propuesto
-**Alcance:** Transversal — mismo número en welver, ecosistema-ms y grupojl-control
-**Complementa:** restricción de catalog único documentada en `pnpm-workspace.yaml` (welver ADR-002)
-**Guía operativa:** `architecture/11-dependencias-norte.md`
+**Fecha:** 2026-09-19
+**Estado:** Aceptado
+**Referencia:** welver/ADR-014-markets-global.md (fuente de verdad del modelo)
+
+---
 
 ## Contexto
 
-Auditoría del 2026-09-22 sobre los 10 workspaces de ecosistema-ms (`package.json`
-resueltos contra el catalog + imports reales de `src/`):
+Los microservicios de ecosistema-ms operan en contexto multi-tenant.
+Cada tenant es una Organization de welver que tiene un `ecosystemId`.
+Con la introducción de Markets, cada request puede tener además un `marketId`
+que indica el contexto geográfico de la operación.
 
-- **Install roto:** `analytics`, `chatia`, `notificaciones` y `pasarelapagos` declaran
-  `"/nestjs-prometheus"` y `"-ms/auth-server"` — nombres sin scope, muy probablemente
-  producto de un reemplazo masivo mal escapado. Un solo `package.json` inválido rompe
-  `pnpm install` del workspace completo, y con él el build de los 5 servicios en Railway.
-- **Catalog irresoluble:** `workers-backend` declara `@nestjs-modules/nestjs-prometheus:
-  catalog:` y `packages/logger` declara `pino-pretty: catalog:`; ninguno de los dos
-  existe en el catalog.
-- **Imports que ningún workspace declara:** `chatia-backend` usa `@nestjs/websockets`
-  (`src/events/events.gateway.ts`) y `redis` (`src/common/services/cache.service.ts`);
-  `workers-backend` usa `@nestjs-modules/ioredis` (`src/campaigns/campaigns.service.ts`)
-  y `mammoth` / `pdf-parse` por import dinámico (compila, falla en runtime).
-- **Phantom deps enmascaradas por `shamefully-hoist=true`:** `opossum` (chatia,
-  notificaciones — solo lo declara pasarelapagos), `@opentelemetry/*` (pasarelapagos,
-  notificaciones, workers), `zod` (analytics, notificaciones, workers), `nestjs-pino`
-  (chatia), `@nestjs/config` (`packages/grpc-client`).
-- **Fuera del catalog:** `socket.io` y `@types/multer` (chatia); `compression`,
-  `cookie-parser`, `nanoid`, `opossum`, `@types/compression` y `@types/cookie-parser`
-  (pasarelapagos — estos `@types` en `dependencies` llegan a la imagen de producción).
-- **Claves duplicadas en `scripts`:** `test:cov` (analytics, chatia, pasarelapagos) y
-  `typecheck` (analytics). Gana la última, en silencio.
-- **Abstracciones sin consumidor:** `packages/logger` y `packages/metrics`; cada servicio
-  redeclara pino y prom-client por su cuenta.
-- **Dos clientes Redis:** `ioredis` (catalog) y `redis` (chatia).
-- **Deriva entre repos:** Prisma 7.8 aquí, 7.4 en welver y 6.x en grupojl-control.
-- `marketing-backend` figura en `pnpm-workspace.yaml`, pero su `package.json` no se auditó.
-
-El patrón común es la ausencia de una política explícita y de verificación automática:
-cada PR decide por su cuenta y `shamefully-hoist` esconde el resultado hasta que el
-install entero se rompe.
+---
 
 ## Decisión
 
-Adoptamos una política única de dependencias para los tres monorepos, definida en
-`architecture/11-dependencias-norte.md`:
+### Markets NO se modelan en ecosistema-ms
 
-1. **Una sola versión:** el `catalog:` es la única fuente de versiones (R1).
-2. **Declarado donde se usa:** cero phantom deps; objetivo `shamefully-hoist=false` (R2).
-3. **Libs internas con peers:** frameworks nunca en `dependencies` de `packages/*` (R3).
-4. **Toda dependencia nueva pasa un checklist y tiene dueño** (R4).
-5. **Upgrades continuos** con Renovate agrupado y semanal (R5).
-6. **Cadena de suministro verificada:** lockfile congelado, `minimumReleaseAge`,
-   OSV-Scanner (R6).
+El modelo `Market` vive en `welver/realsass-sass-back`.
+Los microservicios de este repo son **consumidores del contexto** — no dueños del modelo.
 
-Adopción progresiva: **F0** bloqueantes → **F1** reporte sin bloquear → **F2** enforcement
-en CI → **F3** alineación del núcleo entre repos.
+### Cómo llega el contexto de Market a cada MS
 
-## Alternativas descartadas
+El contexto de Market se propaga como header HTTP desde el caller:
 
-- **Mantener el status quo con `shamefully-hoist=true`** — enmascara phantom deps que
-  explotan al cambiar de builder, al usar `pnpm deploy` o al borrar una dependencia en
-  otro workspace. El costo aparece en producción, no en el PR.
-- **Modelo Google literal (vendoring de `third_party/` + Bazel)** — resuelve todo, pero
-  exige infraestructura y un equipo de build desproporcionados para nuestra escala.
-- **Una política distinta por repo** — es exactamente lo que produjo la deriva actual
-  (Prisma 6 / 7.4 / 7.8 entre los tres repos).
-- **Pinning exacto de todo, sin `^`** — la reproducibilidad ya la da el lockfile; pinear
-  sin un bot de upgrades congela también los parches de seguridad.
-- **Dependabot en lugar de Renovate** — menos control sobre agrupamiento y aprobación
-  de majors. Se reevalúa si cambia.
+```
+X-Tenant-ID:       <organizationId>     (ya existe — TenantGuard)
+X-Ecosystem-ID:    <ecosystemId>        (ya existe — TenantGuard)
+X-Market-Country:  CO                  (nuevo — ISO 3166-1 alpha-2)
+X-Market-ID:       <marketId>          (nuevo — resuelto por ecommerce-back)
+```
+
+### Microservicio por microservicio
+
+| MS | Uso de Market | Detalle |
+|----|--------------|---------|
+| `chatia-backend` | Contexto de respuesta | El agente responde con contexto del país del cliente |
+| `pasarelapagos-backend` | País de la transacción | Registro de país para auditoría y reconciliación |
+| `notificaciones-backend` | Localización de mensajes | Template de notificación según país |
+| `analytics-backend` | Dimensión de análisis | Métricas segmentadas por Market/país |
+| `workers-backend` | Contexto de jobs | Jobs de fulfillment con contexto del Market |
+
+---
 
 ## Consecuencias
 
-**Se gana:** builds reproducibles; errores de dependencias detectados en el PR y no en
-Railway; upgrades chicos y frecuentes en vez de migraciones grandes; superficie de ataque
-conocida y con dueño.
+- Cada MS lee `X-Market-Country` del header — nunca lo resuelve ni lo valida
+- La validación del Market ocurre upstream (ecommerce-back o sass-back)
+- Si el header no llega → los MS operan sin contexto de país (comportamiento actual)
+- Backward compatible — los MS existentes no rompen
+EOF
 
-**Se sacrifica:** agregar una dependencia deja de ser un `pnpm add` de 5 segundos (requiere
-checklist y aprobación); F0 y F2 consumen tiempo de sprint; `shamefully-hoist=false` puede
-exigir `public-hoist-pattern` para tooling (Next, Nest CLI, Jest) — cada excepción se
-documenta en el norte.
+echo "  ✓ ADR-014-markets-context.md"
 
-**Deuda consciente:** la alineación del núcleo entre repos (F3) y el mecanismo para
-sincronizarlo quedan para un ADR aparte.
+# -----------------------------------------------------------------------------
+# 2. chatia-backend — cómo usa Market
+# -----------------------------------------------------------------------------
+mkdir -p .claude/modules/chatia-backend
 
-## Referencias
+cat > .claude/modules/chatia-backend/markets.md << 'EOF'
+# Markets en chatia-backend
 
-- `architecture/11-dependencias-norte.md` — reglas R1–R6, métricas, excepciones y plan
-- `architecture/03-reglas-duras.md` — sección "Dependencias (post ADR-018)"
-- `pnpm-workspace.yaml`, `.npmrc`, `*/package.json`, `packages/*/package.json`
-- Titus Winters et al., *Software Engineering at Google*, cap. 21 "Dependency Management"
-- Documentación de Rush: "Phantom dependencies" y "NPM doppelgangers"
-- OpenSSF Scorecard · SLSA · OSV-Scanner
-__ADR018_EOF__
-}
+## Rol
 
-emit_norte() {
-cat <<'__ADR018_EOF__'
-# 11 — Norte de dependencias: qué entra al monorepo y cómo se mantiene
+El agente de chat IA recibe el contexto de país del cliente para:
+- Adaptar las respuestas al contexto local (ej: "enviamos desde Bogotá" en CO)
+- Registrar el país en cada conversación para analytics
+- Seleccionar templates de respuesta localizados (si existen)
 
-> Referentes: **Google** (*Software Engineering at Google*, cap. 21 — One Version Rule,
-> ownership, strict deps) · **Microsoft Rush** (phantom dependencies y doppelgangers en
-> monorepos JS) · **OpenSSF / SLSA** (cadena de suministro verificable).
->
-> Decisión formal: `decisions/ADR-018-politica-dependencias.md`
+## Cómo llega el contexto
 
----
+Header `X-Market-Country: CO` en cada request de conversación.
+Extraído en el TenantGuard extendido o en el ConversationController.
 
-## El principio
+## Cambios necesarios
 
-> "Toda dependencia es código ajeno que corre con nuestros permisos:
-> entra con dueño, con una sola versión y declarada donde se usa."
+### En TenantContext (packages/auth-server)
 
-No copiamos el modelo de Google literalmente (vendoring de todo `third_party/` + Bazel
-hermético): el costo de infraestructura es desproporcionado para nuestra escala.
-Trasladamos los principios y los ejecutamos con pnpm, Renovate y CI.
-
----
-
-## De principio a regla
-
-| Principio (referente) | Qué significa | Regla aquí |
-|---|---|---|
-| One Version Rule (Google) | Una sola versión de cada paquete en todo el repo | R1 |
-| Strict deps (Google / Bazel) | Solo usás lo que declaraste | R2 |
-| Doppelgangers (Rush) | Dos copias del mismo paquete rompen singletons | R3 |
-| Agregar tiene costo (Google) | Cada dependencia es deuda de mantenimiento | R4 |
-| Live at head (Google) | Upgrades chicos y continuos; quien sube, migra | R5 |
-| Supply chain (SLSA / OSV) | Origen verificable, vulnerabilidades visibles | R6 |
-| Ley de Hyrum (Google) | Todo comportamiento observable se vuelve contrato | R3 |
-
----
-
-## R1 — Una sola versión (catalog)
-
-- Todo `package.json` usa `catalog:` o `workspace:*`. Nada más.
-- Una dependencia nueva se agrega **primero** al `catalog:` de `pnpm-workspace.yaml`
-  y después se referencia.
-- Named catalogs (`catalog:algo`) prohibidos — restricción de entorno Windows + Git Bash
-  (welver ADR-002).
-- Una sola librería por responsabilidad: un cliente Redis, un validador, un logger.
-  Dos librerías para lo mismo es la One Version Rule violada a nivel de concepto.
-- Excepción automática: rangos en `peerDependencies` de `packages/*` (ej: `"react": ">=19.0.0"`).
-- Cualquier otra excepción se registra en **Excepciones vigentes** (abajo), con motivo
-  y fase de revisión.
-
-```bash
-# versiones hardcodeadas → 0 salvo excepciones registradas
-grep -rnE '^\s*"[^"]+":\s*"(\^|~|[0-9])' --include=package.json . \
-  --exclude-dir=node_modules | grep -vE '"version"'
-
-# claves de paquete inválidas (scope perdido por un reemplazo mal escapado) → 0
-grep -rnE '^\s*"[/-][^"]*":' --include=package.json . --exclude-dir=node_modules
-```
-
----
-
-## R2 — Declarado donde se usa (strict deps)
-
-- Si un archivo de `X/src` importa `pkg`, entonces `pkg` está en `X/package.json`,
-  aunque "funcione" porque otro workspace lo trae.
-- `shamefully-hoist=true` **enmascara** este error: el build pasa hasta que cambia el
-  builder de Railway, se usa `pnpm deploy --filter`, o el workspace que traía el paquete
-  lo elimina.
-- Los tipos cuentan: si importás `Request` de `express`, declarás `@types/express` (dev).
-- Los imports dinámicos (`await import('pkg')`) también se declaran: compilan sin el
-  paquete y fallan en runtime.
-
-```bash
-pnpm dlx knip --dependencies                        # todo el monorepo
-pnpm dlx knip --dependencies --workspace <nombre>   # un workspace
-```
-
-Meta de F2: `shamefully-hoist=false`, con `public-hoist-pattern` solo para lo que la
-tooling exija, documentado en Excepciones.
-
----
-
-## R3 — Librerías internas (`packages/*`)
-
-- Frameworks y singletons (`react`, `react-dom`, `@nestjs/*`, `firebase-admin`,
-  `@prisma/client`) van en `peerDependencies` + `devDependencies`, **nunca** en `dependencies`.
-- Motivo: si la lib los trae en `dependencies`, pnpm puede resolver una segunda copia →
-  "Invalid hook call" en React, metadata de DI rota en Nest, dos instancias de Firebase Admin.
-- Las dependencias propias de la lib (ej: `superjson` en el package de tRPC) sí van en
-  `dependencies`.
-- Los consumidores importan solo el entrypoint de la lib — nunca `@scope/lib/src/interno`.
-
----
-
-## R4 — Agregar una dependencia
-
-Checklist obligatorio en la descripción del PR:
-
-```
-[ ] ¿Lo resuelve Node/Web estándar o una dependencia que ya tenemos?
-[ ] ¿Ya existe otra librería para lo mismo en el catalog? (un cliente, un validador, un logger)
-[ ] Mantenimiento: release en los últimos 12 meses, issues con respuesta
-[ ] Licencia: MIT / Apache-2.0 / BSD / ISC → OK · GPL / AGPL / SSPL → bloqueado · otra → consultar
-[ ] OpenSSF Scorecard ≥ 6 (deps.dev) — o justificación explícita
-[ ] Costo: dependencias transitivas; en front, peso en el bundle
-[ ] Tipos: trae los suyos o hay @types mantenido
-[ ] Dueño interno: quién responde por upgrades y CVEs
-[ ] Agregada al catalog y referenciada con catalog:
-```
-
-Quitar una dependencia no requiere checklist. Ante la duda, preferimos borrar.
-
----
-
-## R5 — Upgrades continuos (Renovate)
-
-- Renovate actualiza el `catalog:` de `pnpm-workspace.yaml`: un PR mueve a todos los
-  consumidores a la vez.
-- Un grupo = un PR: NestJS, Prisma, OpenTelemetry, React/Next, tRPC, Radix.
-- Cadencia semanal. Los majors requieren aprobación manual en el Dependency Dashboard.
-- Quien mergea un upgrade arregla a todos los consumidores en el mismo PR ("live at head").
-- PR de Renovate abierto más de 14 días = deuda con ticket.
-
-```json
-{
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", ":dependencyDashboard"],
-  "timezone": "America/Argentina/Buenos_Aires",
-  "schedule": ["before 6am on monday"],
-  "minimumReleaseAge": "3 days",
-  "packageRules": [
-    { "groupName": "nestjs",        "matchPackageNames": ["@nestjs/**"] },
-    { "groupName": "prisma",        "matchPackageNames": ["prisma", "@prisma/**"] },
-    { "groupName": "opentelemetry", "matchPackageNames": ["@opentelemetry/**"] },
-    { "groupName": "react-next",    "matchPackageNames": ["react", "react-dom", "next", "@types/react", "@types/react-dom"] },
-    { "groupName": "trpc",          "matchPackageNames": ["@trpc/**"] },
-    { "groupName": "radix",         "matchPackageNames": ["@radix-ui/**"] },
-    { "matchUpdateTypes": ["major"], "dependencyDashboardApproval": true }
-  ]
+```typescript
+// types/tenant-context.ts — agregar campo opcional
+export interface TenantContext {
+  organizationId: string
+  ecosystemId:    string
+  userId:         string
+  role:           Role
+  marketCountry?: string   // NUEVO — ISO 3166-1 alpha-2, opcional
 }
 ```
 
----
+### En ConversationService
 
-## R6 — Cadena de suministro
-
-- `pnpm install --frozen-lockfile` en CI y en el build de Railway. Si el lockfile no
-  coincide, el build falla — es lo correcto.
-- `minimumReleaseAge`: no instalar versiones publicadas hace menos de 3 días (ventana
-  típica de detección de paquetes comprometidos).
-- Lifecycle scripts: reemplazar `ignore-scripts=true` global por la allowlist
-  `onlyBuiltDependencies`. El flag global también apaga scripts que sí necesitamos y
-  obliga a pasos manuales en el build.
-- Vulnerabilidades: OSV-Scanner en CI; high/critical abiertas más de 7 días = bloqueante.
-- Licencias: `pnpm licenses list --prod` en CI contra la lista de R4.
-
-```yaml
-# pnpm-workspace.yaml — F2, validar en un deploy de Railway antes de activar
-minimumReleaseAge: 4320   # minutos = 3 días
-onlyBuiltDependencies:
-  - prisma
-  - "@prisma/engines"
-  - esbuild
+```typescript
+// Al crear/actualizar conversación
+await this.repo.saveConversation({
+  ...existingFields,
+  marketCountry: tenantContext.marketCountry ?? null,
+})
 ```
 
----
+### En el agente IA
 
-## Métricas de 10/10
+Incluir `marketCountry` en el system prompt cuando esté disponible:
 
-| Métrica | Objetivo | Cómo se mide |
-|---|---|---|
-| Versiones fuera del catalog | 0 (salvo Excepciones) | grep de R1 |
-| Phantom deps / deps sin uso | 0 | `knip --dependencies` |
-| Versiones por paquete en el lockfile | 1 | `pnpm dedupe --check` |
-| Vulnerabilidades high/critical | 0 con más de 7 días | OSV-Scanner |
-| Install reproducible | 100% de los builds | `--frozen-lockfile` en CI y Railway |
-| Deps nuevas con Scorecard ≥ 6 | 100% o justificadas | checklist R4 |
-| PRs de Renovate | mergeados en < 14 días | Dependency Dashboard |
-| Núcleo alineado entre repos | misma major/minor de Node, TS, Nest, Prisma, React, Next | comparación de catalogs (F3) |
-
----
-
-## Estado al 2026-09-22 (baseline ecosistema-ms)
-
-| Métrica | Hoy | Objetivo |
-|---|---|---|
-| Claves de paquete inválidas | 8 (2 por servicio × 4 servicios) | 0 |
-| Entradas `catalog:` sin resolver | 2 (`@nestjs-modules/nestjs-prometheus`, `pino-pretty`) | 0 |
-| Imports sin declarar en ningún workspace | 5 (`@nestjs/websockets`, `redis`, `@nestjs-modules/ioredis`, `mammoth`, `pdf-parse`) | 0 |
-| Phantom deps enmascaradas por hoisting | ≥ 12 ocurrencias (opossum, OTel, zod, nestjs-pino, @nestjs/config, express) | 0 |
-| Versiones fuera del catalog | 8 (2 en chatia, 6 en pasarelapagos) | 0 |
-| package.json con claves duplicadas | 3 | 0 |
-| Clientes Redis distintos | 2 (`ioredis`, `redis`) | 1 |
-| Prisma | ^7.8.0 | núcleo alineado (F3) |
-
-## Excepciones vigentes
-
-| Paquete | Workspace | Motivo | Revisión |
-|---|---|---|---|
-| `prisma` (CLI) en `dependencies` | analytics, notificaciones, workers | `start:migrate` corre `prisma migrate deploy` en runtime | F2: mover las migraciones al pre-deploy de Railway y devolver `prisma` a dev |
-
-Los rangos de `peerDependencies` en `packages/*` son la excepción automática.
-
----
-
-## Plan de adopción
-
-### F0 — Bloqueantes (hoy impiden cualquier deploy)
-
-- [ ] `analytics`, `chatia`, `notificaciones`, `pasarelapagos`: `"/nestjs-prometheus"` →
-      `"@willsoto/nestjs-prometheus"` y eliminar `"-ms/auth-server"` (la entrada correcta
-      `@ecosistema-ms/auth-server` ya existe o se agrega).
-- [ ] `workers-backend`: `@nestjs-modules/nestjs-prometheus` → `@willsoto/nestjs-prometheus`.
-- [ ] Agregar `pino-pretty` al catalog (welver usa `^13.0.0`).
-- [ ] `chatia-backend`: declarar `@nestjs/websockets` y `@nestjs/platform-socket.io`;
-      migrar `cache.service.ts` de `redis` a `ioredis` (una sola librería por
-      responsabilidad) o declarar `redis` con excepción registrada.
-- [ ] `workers-backend`: declarar `@nestjs-modules/ioredis`, `mammoth` y `pdf-parse`.
-- [ ] Eliminar las claves duplicadas de `scripts` (analytics, chatia, pasarelapagos).
-- [ ] Validar: `pnpm install --frozen-lockfile && pnpm -r typecheck`.
-
-### F0.5 — Deuda inmediata
-
-- [ ] Declarar las phantom deps de la tabla de baseline en cada workspace que las importa.
-- [ ] `pasarelapagos-backend`: mover `@types/*` a dev y llevar los hardcodeados al catalog.
-- [ ] `packages/logger` / `packages/metrics`: adoptarlos en los 5 servicios o eliminarlos (ADR corto).
-- [ ] Auditar `marketing-backend/package.json` con los mismos criterios.
-
-### F1 — Visibilidad (1 sprint, nada bloquea)
-
-- [ ] CI: paso `deps:check` con los grep de R1 + `knip --dependencies` en modo reporte
-- [ ] Renovate activado con el `renovate.json` de R5
-- [ ] OSV-Scanner en CI en modo reporte
-- [ ] Template de PR con el checklist de R4
-
-### F2 — Enforcement
-
-- [ ] Reglas de "Dependencias (post ADR-018)" en `03-reglas-duras.md` bloquean en CI
-- [ ] `shamefully-hoist=false` + `public-hoist-pattern` mínimo, documentado en Excepciones
-- [ ] `minimumReleaseAge` + `onlyBuiltDependencies`, validados en un deploy de Railway
-- [ ] `--frozen-lockfile` verificado en el Dockerfile / nixpacks de cada servicio
-
-### F3 — Un núcleo, tres repos
-
-- [ ] Alinear Node, TypeScript, NestJS, Prisma, React y Next entre welver,
-      ecosistema-ms y grupojl-control
-- [ ] ADR aparte: mecanismo de sincronización del núcleo (preset compartido de
-      Renovate vs catalog publicado como paquete)
-__ADR018_EOF__
-}
-
-emit_reglas() {
-cat <<'__ADR018_EOF__'
-
-<!-- ADR-018 -->
----
-
-## Dependencias (post ADR-018)
-
-Detalle, excepciones y estado actual en `architecture/11-dependencias-norte.md`.
-
-### 🔴 Cero versiones fuera del catalog
-Todo `package.json` usa `catalog:` o `workspace:*`. Única excepción automática: rangos en
-`peerDependencies` de `packages/*`. Cualquier otra se registra en el norte.
-```bash
-grep -rnE '^\s*"[^"]+":\s*"(\^|~|[0-9])' --include=package.json . \
-  --exclude-dir=node_modules | grep -vE '"version"'
-# → 0 resultados salvo excepciones registradas
-```
-→ Enforcement objetivo: paso `deps:check` en CI
-→ Estado: manual — ver baseline en el norte
-
-### 🔴 Todo import externo está declarado en su workspace
-"Funciona porque otro workspace lo trae" es un bug latente, no una excepción.
-Incluye tipos (`@types/express`) e imports dinámicos (`await import('pkg')`).
-```bash
-pnpm dlx knip --dependencies   # → 0 unlisted, 0 unused
-```
-→ Enforcement objetivo: `knip` en CI + `shamefully-hoist=false` (F2)
-→ Estado: manual
-
-### 🔴 Nombres de paquete válidos y catalog resoluble
-Una clave como `"/nestjs-prometheus"` o un `catalog:` sin entrada rompe el install del
-workspace completo — y con él el build de todos los servicios en Railway.
-```bash
-grep -rnE '^\s*"[/-][^"]*":' --include=package.json . --exclude-dir=node_modules  # → 0
-pnpm install --frozen-lockfile                                                     # → pasa
-```
-→ Enforcement objetivo: `pnpm install --frozen-lockfile` como primer paso del CI
-→ Estado: manual
-
-### 🟡 Libs de packages/* sin frameworks en dependencies
-`react`, `react-dom`, `@nestjs/*`, `firebase-admin`, `@prisma/client` →
-`peerDependencies` + `devDependencies`.
-→ Enforcement: code review de todo PR que toque `packages/*/package.json`
-→ Estado: manual
-
-### 🟡 Dependencia nueva con checklist R4 en el PR
-Sin checklist (licencia, Scorecard, mantenimiento, dueño) → se mergea solo con ticket de deuda.
-→ Enforcement objetivo: template de PR (F1)
-→ Estado: manual
-
-### 🟡 @types/* y tooling solo en devDependencies
-Un `@types/*` en `dependencies` termina en la imagen de producción.
-→ Enforcement: code review
-→ Estado: manual
-__ADR018_EOF__
-}
-
-emit_claude() {
-cat <<'__ADR018_EOF__'
-
-<!-- ADR-018 -->
----
-
-## Dependencias — política única (ADR-018)
-
-### El norte
-
-**Google** (una versión, dueño, strict deps) · **Microsoft Rush** (cero phantom deps) ·
-**OpenSSF / SLSA** (cadena de suministro)
-
-*Toda dependencia es código ajeno que corre con nuestros permisos: entra con dueño,
-con una sola versión y declarada donde se usa.*
-
-### Reglas no negociables
-
-```
-Versión    solo catalog: o workspace:*  — nada hardcodeado
-Declarar   todo import externo está en el package.json del workspace que lo usa
-Libs       packages/* → frameworks en peerDependencies, nunca en dependencies
-Nueva dep  checklist R4 del norte en el PR + dueño asignado
-Lockfile   --frozen-lockfile en CI y en Railway
+```typescript
+const systemPrompt = marketCountry
+  ? `${basePrompt}\n\nContexto geográfico del cliente: ${marketCountry}.
+     Adapta las respuestas de logística y envíos a este país.`
+  : basePrompt
 ```
 
-Ver `architecture/11-dependencias-norte.md` y `decisions/ADR-018-politica-dependencias.md`.
-__ADR018_EOF__
+## Checklist
+
+- [ ] MKT-CH-01: Agregar `marketCountry?` a `TenantContext`
+- [ ] MKT-CH-02: Extraer `X-Market-Country` en el guard/middleware
+- [ ] MKT-CH-03: Guardar `marketCountry` en Conversation model (Prisma migration)
+- [ ] MKT-CH-04: Inyectar en system prompt del agente
+- [ ] MKT-CH-05: Dimensión `market_country` en eventos de analytics
+EOF
+
+echo "  ✓ modules/chatia-backend/markets.md"
+
+# -----------------------------------------------------------------------------
+# 3. pasarelapagos-backend — cómo usa Market
+# -----------------------------------------------------------------------------
+mkdir -p .claude/modules/pasarelapagos-backend
+
+cat > .claude/modules/pasarelapagos-backend/markets.md << 'EOF'
+# Markets en pasarelapagos-backend
+
+## Rol
+
+Pagos ya usa Stripe que maneja multi-moneda y multi-país de forma nativa.
+El rol de Market aquí es de **auditoría y trazabilidad**, no de lógica de pago.
+
+## Lo que se registra
+
+En cada transacción se guarda el país del comprador para:
+- Reconciliación contable por mercado
+- Reportes de revenue por país en el superadmin
+- Cumplimiento fiscal (saber en qué país ocurrió la transacción)
+
+## Cambios en el modelo de Transaction
+
+```prisma
+model Transaction {
+  // ... campos existentes ...
+  marketCountry  String?  @map("market_country")  // NUEVO — ISO 3166-1 alpha-2
+  // Stripe ya registra country en el PaymentIntent — esto lo espeja en nuestra DB
 }
+```
 
-# ── Utilidades ────────────────────────────────────────────────────────────────
-if [ -t 1 ]; then
-  C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_DIM=$'\033[2m'; C_RST=$'\033[0m'
-else
-  C_OK=''; C_WARN=''; C_ERR=''; C_DIM=''; C_RST=''
-fi
-log()  { printf '%s\n' "  $*"; }
-ok()   { printf '%s\n' "${C_OK}  ✔ $*${C_RST}"; }
-warn() { printf '%s\n' "${C_WARN}  ⚠ $*${C_RST}"; }
-die()  { printf '%s\n' "${C_ERR}  ✖ $*${C_RST}" >&2; exit 1; }
-# GNU grep no detecta un CR aislado de forma fiable → se cuenta con tr
-has_crlf() { [ -n "$(tr -cd '\r' < "$1" | head -c1)" ]; }
-usage() { sed -n '2,/^$/{s/^# \{0,1\}//;p}' "$0"; }
+## Checklist
 
-# ── Argumentos ────────────────────────────────────────────────────────────────
-DRY_RUN=0
-FORCE=0
-REPO_DIR="."
-while [ $# -gt 0 ]; do
-  case "$1" in
-    --dry-run) DRY_RUN=1 ;;
-    --force)   FORCE=1 ;;
-    -h|--help) usage; exit 0 ;;
-    -*)        die "Opción desconocida: $1 (usá --help)" ;;
-    *)         REPO_DIR="$1" ;;
-  esac
-  shift
-done
-cd "$REPO_DIR" 2>/dev/null || die "No existe el directorio: $REPO_DIR"
+- [ ] MKT-PP-01: Migración Prisma — `marketCountry` en Transaction
+- [ ] MKT-PP-02: Extraer de header `X-Market-Country` en PaymentController
+- [ ] MKT-PP-03: Pasar a TransactionService al registrar pago
+- [ ] MKT-PP-04: Incluir en listado interno de transacciones (para superadmin)
+EOF
 
-ADR_FILE=".claude/decisions/ADR-018-politica-dependencias.md"
-NORTE_FILE=".claude/architecture/11-dependencias-norte.md"
-REGLAS_FILE=".claude/architecture/03-reglas-duras.md"
-CLAUDE_FILE=".claude/CLAUDE.md"
-MARKER="<!-- ADR-018 -->"
+echo "  ✓ modules/pasarelapagos-backend/markets.md"
 
-CHANGED=()
-SKIPPED=0
-IN_GIT=0
-TMP_DIR="$(mktemp -d)"
-trap 'rm -rf "$TMP_DIR"' EXIT
+# -----------------------------------------------------------------------------
+# 4. analytics-backend — Markets como dimensión de análisis
+# -----------------------------------------------------------------------------
+mkdir -p .claude/modules/analytics-backend
 
-# ── Preflight: repo correcto, numeración libre, estado de git ────────────────
-preflight() {
-  [ -f pnpm-workspace.yaml ] \
-    || die "No hay pnpm-workspace.yaml en $(pwd). Ejecutá el script desde la raíz de $REPO_LABEL."
-  grep -q "$REPO_MARKER" pnpm-workspace.yaml \
-    || die "Este no parece ser $REPO_LABEL: pnpm-workspace.yaml no contiene \"$REPO_MARKER\". ¿Script equivocado?"
-  [ -d .claude/decisions ]    || die "Falta .claude/decisions/"
-  [ -d .claude/architecture ] || die "Falta .claude/architecture/"
+cat > .claude/modules/analytics-backend/markets.md << 'EOF'
+# Markets en analytics-backend
 
-  local f
-  for f in .claude/decisions/ADR-018-*.md; do
-    [ -e "$f" ] || continue
-    [ "$f" = "$ADR_FILE" ] || die "El número ADR-018 ya está ocupado por $f. Renumerá antes de continuar."
-  done
-  for f in .claude/architecture/11-*.md; do
-    [ -e "$f" ] || continue
-    [ "$f" = "$NORTE_FILE" ] || warn "Ya existe $f con prefijo 11 — el norte se crea igual; revisá la numeración."
-  done
+## Rol
 
-  if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-    IN_GIT=1
-    if ! git diff --quiet -- .claude 2>/dev/null; then
-      warn "Hay cambios sin commitear en .claude/: el diff final los va a mezclar con estos."
-    fi
-  else
-    warn "No es un repositorio git: no vas a poder revertir con git restore."
-  fi
+`marketCountry` es una **dimensión de segmentación** en todos los eventos de analytics.
+Permite responder: "¿cuántas ventas tuve en CO este mes?" sin joins complejos.
+
+## Cambios en el schema de eventos
+
+```prisma
+model AnalyticsEvent {
+  // ... campos existentes ...
+  marketCountry  String?  @map("market_country")  // NUEVO — dimensión de análisis
 }
+```
 
-# ── Crear archivo nuevo (idempotente) ────────────────────────────────────────
-write_new() {  # $1 destino · $2 archivo temporal con el contenido
-  local dest="$1" src="$2"
-  if [ -e "$dest" ] && cmp -s "$src" "$dest"; then
-    ok "$dest ya está al día"
-    SKIPPED=$((SKIPPED + 1))
-    return 0
-  fi
-  if [ -e "$dest" ] && [ "$FORCE" -ne 1 ]; then
-    warn "$dest ya existe y difiere — no se toca (usá --force para sobrescribir)"
-    SKIPPED=$((SKIPPED + 1))
-    return 0
-  fi
-  if [ "$DRY_RUN" -eq 1 ]; then
-    log "${C_DIM}[dry-run] escribiría $dest ($(wc -l < "$src" | tr -d ' ') líneas)${C_RST}"
-    return 0
-  fi
-  mkdir -p "$(dirname "$dest")"
-  cp "$src" "$dest"
-  ok "escrito $dest"
-  CHANGED+=("$dest")
+## Proyecciones afectadas
+
+Las proyecciones de `ProjectionsService` deben incluir `marketCountry`
+como dimensión de agrupación cuando esté disponible:
+
+```typescript
+// projections.service.ts — agregar agrupación por market
+async getRevenueByMarket(organizationId: string, from: Date, to: Date) {
+  return this.prisma.analyticsEvent.groupBy({
+    by: ['marketCountry'],
+    where: { organizationId, eventType: 'ORDER_COMPLETED', createdAt: { gte: from, lte: to } },
+    _sum: { amountCents: true },
+  })
 }
+```
 
-# ── Anexar sección una sola vez, respetando CRLF/LF del destino ─────────────
-append_once() {  # $1 destino · $2 archivo temporal con el bloque
-  local dest="$1" src="$2" block="$TMP_DIR/append.block" eol=$'\n'
-  if [ ! -f "$dest" ]; then
-    warn "$dest no existe — se omite"
-    SKIPPED=$((SKIPPED + 1))
-    return 0
-  fi
-  if grep -qF "$MARKER" "$dest"; then
-    ok "$dest ya contiene la sección ADR-018"
-    SKIPPED=$((SKIPPED + 1))
-    return 0
-  fi
-  if has_crlf "$dest"; then
-    eol=$'\r\n'
-    sed 's/$/\r/' "$src" > "$block"
-  else
-    cp "$src" "$block"
-  fi
-  if [ "$DRY_RUN" -eq 1 ]; then
-    log "${C_DIM}[dry-run] anexaría $(wc -l < "$src" | tr -d ' ') líneas al final de $dest${C_RST}"
-    return 0
-  fi
-  # el archivo puede no terminar en salto de línea
-  if [ -s "$dest" ] && [ -n "$(tail -c1 "$dest")" ]; then
-    printf '%s' "$eol" >> "$dest"
-  fi
-  cat "$block" >> "$dest"
-  ok "anexada sección ADR-018 en $dest"
-  CHANGED+=("$dest")
+## Checklist
+
+- [ ] MKT-AN-01: Migración Prisma — `marketCountry` en AnalyticsEvent
+- [ ] MKT-AN-02: Extraer de payload o header en AnalyticsController
+- [ ] MKT-AN-03: `getRevenueByMarket()` en ProjectionsService
+- [ ] MKT-AN-04: Endpoint gRPC para que superadmin consulte revenue por Market
+EOF
+
+echo "  ✓ modules/analytics-backend/markets.md"
+
+# -----------------------------------------------------------------------------
+# 5. packages/auth-server — TenantContext extendido
+# -----------------------------------------------------------------------------
+mkdir -p .claude/modules/packages
+
+cat > .claude/modules/packages/markets-tenant-context.md << 'EOF'
+# TenantContext extendido con Market
+
+## Cambio en @ecosistema-ms/auth-server
+
+El `TenantContext` es el contrato central que fluye por todos los microservicios.
+Agregar `marketCountry` como campo opcional mantiene backward compatibility total.
+
+```typescript
+// packages/auth-server/src/types/tenant-context.ts
+
+export interface TenantContext {
+  organizationId: string    // existente
+  ecosystemId:    string    // existente
+  userId:         string    // existente
+  role:           Role      // existente
+  marketCountry?: string    // NUEVO — ISO 3166-1 alpha-2, undefined si no aplica
 }
+```
 
-# ── Verificación posterior ───────────────────────────────────────────────────
-verify() {
-  if [ "$DRY_RUN" -eq 1 ]; then return 0; fi
-  local f n
-  for f in "$ADR_FILE" "$NORTE_FILE"; do
-    [ -s "$f" ] || die "Verificación: $f vacío o inexistente"
-  done
-  for f in "$REGLAS_FILE" "$CLAUDE_FILE"; do
-    [ -f "$f" ] || continue
-    n="$(grep -cF "$MARKER" "$f" || true)"
-    [ "$n" -le 1 ] || die "Verificación: $f tiene $n marcadores ADR-018 (se esperaba 1)"
-  done
-  ok "verificación OK"
-}
+## Dónde se extrae
 
-summary() {
-  echo
-  log "Resumen $REPO_LABEL: ${#CHANGED[@]} archivo(s) escrito(s), $SKIPPED sin cambios."
-  if [ "${#CHANGED[@]}" -gt 0 ] && [ "$IN_GIT" -eq 1 ]; then
-    log "Revisar:  git diff -- .claude && git status --short .claude"
-    log "Commit:   git add ${CHANGED[*]} \\"
-    log "            && git commit -m \"docs(.claude): ADR-018 política de dependencias\""
-  fi
-  if [ "$DRY_RUN" -eq 1 ]; then
-    log "Modo --dry-run: no se escribió nada."
-  fi
-}
+En el `TenantGuard` o en un middleware previo al guard:
 
-main() {
-  echo "ADR-018 · política de dependencias → $REPO_LABEL ($(pwd))"
-  preflight
-  emit_adr    > "$TMP_DIR/adr.md"
-  emit_norte  > "$TMP_DIR/norte.md"
-  emit_reglas > "$TMP_DIR/reglas.md"
-  emit_claude > "$TMP_DIR/claude.md"
-  write_new   "$ADR_FILE"    "$TMP_DIR/adr.md"
-  write_new   "$NORTE_FILE"  "$TMP_DIR/norte.md"
-  append_once "$REGLAS_FILE" "$TMP_DIR/reglas.md"
-  append_once "$CLAUDE_FILE" "$TMP_DIR/claude.md"
-  verify
-  summary
-}
+```typescript
+// guards/tenant.guard.ts — agregar extracción de header
+const marketCountry = request.headers['x-market-country'] as string | undefined
 
-main
+context.set<TenantContext>('tenant', {
+  ...existingFields,
+  marketCountry: marketCountry?.toUpperCase() ?? undefined,
+})
+```
+
+## Headers estándar
+
+```
+X-Tenant-ID:       <organizationId>   // existente
+X-Ecosystem-ID:    <ecosystemId>      // existente
+X-Market-Country:  CO                 // NUEVO — opcional
+X-Market-ID:       <marketId>         // NUEVO — opcional, UUID del Market resuelto
+```
+
+## Checklist
+
+- [ ] MKT-PKG-01: Agregar `marketCountry?` a TenantContext interface
+- [ ] MKT-PKG-02: Extraer `X-Market-Country` en TenantGuard
+- [ ] MKT-PKG-03: Bump de versión del package (minor — cambio backward compatible)
+- [ ] MKT-PKG-04: Actualizar tipos en todos los MS que importan TenantContext
+EOF
+
+echo "  ✓ modules/packages/markets-tenant-context.md"
+
+# -----------------------------------------------------------------------------
+# 6. Norte en CLAUDE.md
+# -----------------------------------------------------------------------------
+
+cat >> .claude/CLAUDE.md << 'EOF'
+
+---
+
+## Markets — contexto global en microservicios (ADR-014)
+
+### Principio en este repo
+
+Los MS de ecosistema-ms son **consumidores del contexto de Market**, no dueños del modelo.
+El modelo Market vive en welver/realsass-sass-back.
+
+### Cómo llega el contexto
+
+```
+X-Market-Country: CO    →  header HTTP desde el caller
+X-Market-ID: <uuid>     →  header HTTP desde el caller (resuelto upstream)
+```
+
+Nunca se resuelve ni valida aquí. Si llega → se usa. Si no → comportamiento actual.
+
+### Impacto por MS
+
+| MS | Campo nuevo | Uso |
+|----|------------|-----|
+| chatia-backend | `marketCountry` en Conversation | System prompt contextualizado |
+| pasarelapagos-backend | `marketCountry` en Transaction | Auditoría y reconciliación |
+| analytics-backend | `marketCountry` en AnalyticsEvent | Dimensión de segmentación |
+| notificaciones-backend | `marketCountry` en contexto | Templates localizados |
+| workers-backend | `marketCountry` en job payload | Contexto de fulfillment |
+
+### Cambio en packages/auth-server (TenantContext)
+
+`marketCountry?: string` — campo opcional, backward compatible.
+Ver `.claude/modules/packages/markets-tenant-context.md`
+EOF
+
+echo "  ✓ CLAUDE.md actualizado"
+
+# -----------------------------------------------------------------------------
+# 7. lifecycle/tasks.md
+# -----------------------------------------------------------------------------
+mkdir -p .claude/lifecycle
+
+cat >> .claude/lifecycle/tasks.md << 'EOF'
+
+---
+
+## Sprint Markets — ADR-014 (ecosistema-ms)
+
+### packages/auth-server (bloqueante para todos los MS)
+
+- [ ] MKT-PKG-01: `marketCountry?` en TenantContext
+- [ ] MKT-PKG-02: Extraer X-Market-Country en TenantGuard
+- [ ] MKT-PKG-03: Bump minor del package
+- [ ] MKT-PKG-04: Actualizar imports en cada MS
+
+### chatia-backend
+
+- [ ] MKT-CH-01..05 (ver modules/chatia-backend/markets.md)
+
+### pasarelapagos-backend
+
+- [ ] MKT-PP-01..04 (ver modules/pasarelapagos-backend/markets.md)
+
+### analytics-backend
+
+- [ ] MKT-AN-01..04 (ver modules/analytics-backend/markets.md)
+
+### notificaciones-backend / workers-backend
+
+- [ ] Agregar marketCountry al payload de notificaciones
+- [ ] Agregar marketCountry al contexto de jobs BullMQ
+EOF
+
+echo "  ✓ lifecycle/tasks.md actualizado"
+
+echo ""
+echo "✅ [ecosistema-ms] Markets documentado en .claude/"
+echo ""
+echo "Archivos creados/modificados:"
+echo "  .claude/decisions/ADR-014-markets-context.md"
+echo "  .claude/modules/chatia-backend/markets.md"
+echo "  .claude/modules/pasarelapagos-backend/markets.md"
+echo "  .claude/modules/analytics-backend/markets.md"
+echo "  .claude/modules/packages/markets-tenant-context.md"
+echo "  .claude/CLAUDE.md  (append)"
+echo "  .claude/lifecycle/tasks.md  (append)"
+echo ""
+echo "Siguiente paso: bash x-markets-superadmin.sh (en grupojl-control/)"

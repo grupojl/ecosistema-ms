@@ -45,7 +45,9 @@ export class TenantGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request   = context.switchToHttp().getRequest();
     const authHeader = request.headers['authorization'] as string | undefined;
-    const orgHeader  = request.headers['x-organization-id'] as string | undefined;
+    const orgHeader     = request.headers['x-organization-id'] as string | undefined;
+    const marketHeader  = request.headers['x-market-country'] as string | undefined;
+    const marketCountry = marketHeader ? marketHeader.toUpperCase() : undefined;
     const isDev      = this.config.get('NODE_ENV') !== 'production';
 
     // ── Modo desarrollo: Firebase no configurado ──────────────────────────────
@@ -67,6 +69,7 @@ export class TenantGuard implements CanActivate {
         role:             'ADMIN',
         canRead:          true,
         canWrite:         true,
+        marketCountry,
       } satisfies TenantContext;
       return true;
     }
@@ -85,7 +88,8 @@ export class TenantGuard implements CanActivate {
           role:             'ADMIN',
           canRead:          true,
           canWrite:         true,
-        } satisfies TenantContext;
+        marketCountry,
+      } satisfies TenantContext;
         return true;
       }
       throw new UnauthorizedException('Authorization Bearer requerido');
@@ -190,6 +194,7 @@ export class TenantGuard implements CanActivate {
       canRead:          chatPerms.canRead,
       canWrite:         chatPerms.canWrite ?? false,
       agentId:          agent.id,
+      marketCountry,
     } satisfies TenantContext;
 
     return true;
