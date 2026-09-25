@@ -1,5 +1,4 @@
 // chatia-backend/src/agents/agents.controller.ts
-// Migrado de class-validator → Zod inline (ADR-001)
 import { randomUUID } from 'crypto';
 import {
   Controller, Post, Get, Patch, Body, Param,

@@ -1,44 +1,21 @@
+// @ecosistema-ms/zod-migrated
 // src/ai-config/ai-config.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { UpdateAiConfigInput } from '@/ai-config/schemas.js';
 import type { UpdateAiConfigInput } from '@/ai-config/schemas';
 import { PrismaService } from '@/prisma/prisma.service';
 import {
-  IsString, IsOptional, IsBoolean, IsNumber, IsInt,
-  IsArray, Min, Max, MaxLength, MinLength,
 
-export class UpdateAiConfigInput {
-  @IsString() @IsOptional() @MinLength(1) @MaxLength(4000)
-  systemPrompt?: string;
 
-  @IsString() @IsOptional() @MaxLength(50)
-  personaName?: string;
 
-  @IsString() @IsOptional()
-  groqModel?: string;
 
-  @IsNumber() @IsOptional() @Min(0) @Max(2)
-  temperature?: number;
 
-  @IsInt() @IsOptional() @Min(256) @Max(4096)
-  maxTokens?: number;
 
-  @IsInt() @IsOptional() @Min(1) @Max(50)
-  contextWindowSize?: number;
 
-  @IsArray() @IsOptional()
-  humanTakeoverKeywords?: string[];
 
-  @IsInt() @IsOptional() @Min(1) @Max(168)
-  autoResolveAfterHours?: number;
 
-  @IsString() @IsOptional() @MaxLength(500)
-  welcomeMessage?: string;
 
-  @IsString() @IsOptional() @MaxLength(500)
-  offlineMessage?: string;
 
-  @IsBoolean() @IsOptional()
-  isEnabled?: boolean;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `Sos un asistente virtual. Tu objetivo es atender consultas de forma amigable y profesional.

@@ -70,7 +70,7 @@ export class GroqService {
       throw new Error(`Groq API error: ${res.status}`);
     }
 
-    const data = await res.json() as any;
+    const data = await res.json() as any // @ecosistema-ms/jsonb-cast;
     const choice = data.choices?.[0];
 
     return {
@@ -87,7 +87,7 @@ export class GroqService {
   ): Promise<T> {
     const response = await this.chat(messages, { ...options, jsonMode: true });
     try {
-      return JSON.parse(response.content) as T;
+      try { return JSON.parse(response.content) as T; } catch (e: unknown) { throw new Error('Groq JSON invalido: ' + String(e)); } // @ecosistema-ms/jsonb-cast
     } catch {
       throw new Error(`Groq devolvió JSON inválido: ${response.content}`);
     }

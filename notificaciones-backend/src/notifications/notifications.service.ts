@@ -67,7 +67,7 @@ export class NotificationsService {
       'notification enqueued',
     );
 
-    return { jobId: job.id as string, channel: dto.channel };
+    return { jobId: (job.id ?? 'unknown'), channel: dto.channel };
   }
 
   // ── getStatus — via repository ────────────────────────────────────────────

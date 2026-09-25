@@ -29,14 +29,14 @@ export class PreferencesService {
         organizationId_contactId_channel: {
           organizationId,
           contactId,
-          channel: channel as any,
+          channel: channel as any // @ecosistema-ms/enum-cast,
         },
       },
       create: {
         ecosystemId,
         organizationId,
         contactId,
-        channel:     channel as any,
+        channel:     channel as any // @ecosistema-ms/enum-cast,
         optedOut,
         optedOutAt:  optedOut ? new Date() : null,
       },

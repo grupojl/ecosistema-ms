@@ -516,3 +516,22 @@ model KbChunk {
 
   @@index([documentId])
 }
+// ─── OrganizationConfig — ADR-019 v2: ProjectStrategy org-aware ──────────────
+// Configuración de features y límites por organización dentro de cada ecosistema.
+// Cache Redis TTL 5 min — ver OrganizationConfigService.
+model OrganizationConfig {
+  id              String   @id @default(cuid())
+  organizationId  String
+  ecosystemId     String
+  plan            String   @default("starter")  // starter | growth | enterprise | custom
+  featureFlags    Json     @default("{}")        // ChatFeatureFlags — @grupojl/jsonb
+  limits          Json     @default("{}")        // ChatLimits — @grupojl/jsonb
+  timezone        String   @default("America/Buenos_Aires")
+  locale          String   @default("es")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([ecosystemId, organizationId])
+  @@index([ecosystemId])
+  @@map("organization_configs")
+}

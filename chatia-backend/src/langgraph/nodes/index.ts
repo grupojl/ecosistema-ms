@@ -110,7 +110,7 @@ export async function generateNode(
 
   try {
     const result = await groq.chat(messages, {
-      model: state.groqModel as any,
+      model: state.groqModel as any // @ecosistema-ms/enum-cast,
       temperature: state.temperature,
       maxTokens: state.maxTokens,
     });

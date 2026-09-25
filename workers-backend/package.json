@@ -47,7 +47,7 @@
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "swagger-ui-express": "catalog:",
-    "@nestjs-modules/nestjs-prometheus": "catalog:"
+    "@willsoto/nestjs-prometheus": "catalog:"
   },
   "devDependencies": {
     "@nestjs/cli": "catalog:",

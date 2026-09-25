@@ -61,3 +61,22 @@ model ContactPreference {
   @@unique([organizationId, contactId, channel])
   @@index([organizationId, contactId])
 }
+
+// ─── OrganizationConfig — ADR-019 v2: ProjectStrategy org-aware ──────────────
+// Configuración de canales habilitados y templates por organización.
+model OrganizationConfig {
+  id              String   @id @default(cuid())
+  organizationId  String
+  ecosystemId     String
+  plan            String   @default("starter")
+  featureFlags    Json     @default("{}")   // NotifFeatureFlags — @grupojl/jsonb
+  limits          Json     @default("{}")   // NotifLimits — @grupojl/jsonb
+  timezone        String   @default("America/Buenos_Aires")
+  locale          String   @default("es")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([ecosystemId, organizationId])
+  @@index([ecosystemId])
+  @@map("organization_configs")
+}

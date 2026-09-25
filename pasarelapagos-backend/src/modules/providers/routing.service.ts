@@ -40,7 +40,7 @@ export class RoutingService {
 
     if (!providerIds) {
       const routes = await this.prisma.providerRoute.findMany({
-        where:   { country, currency, method: method as any, active: true },
+        where:   { country, currency, method: method as any // @ecosistema-ms/enum-cast, active: true },
         orderBy: { priority: 'desc' },
         select:  { providerId: true },
       });

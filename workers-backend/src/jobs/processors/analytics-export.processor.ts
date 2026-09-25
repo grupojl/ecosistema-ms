@@ -1,3 +1,4 @@
+import { requireJobId } from '../services/job-id.helper.js';
 // workers-backend/src/jobs/processors/analytics-export.processor.ts
 //
 // A-3.2: Genera exportaciones de analytics en background.
@@ -57,7 +58,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
 
     this.logger.log(`[${job.id}] Export ${reportType} ${format} para org:${organizationId}`);
 
-    await this.jobs.updateJobLog(job.id as string, {
+    await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
       status:    'PROCESSING',
       startedAt: new Date(startedAt),
       attempts:  job.attemptsMade + 1,
@@ -97,11 +98,11 @@ export class AnalyticsExportProcessor extends WorkerHost {
       const rowCount   = Array.isArray(data) ? data.length : Object.keys(data).length;
       const durationMs = Date.now() - startedAt;
 
-      await this.jobs.updateJobLog(job.id as string, {
+      await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      { url, format, sizeBytes, rowCount } as unknown as Record<string, unknown>,
+        result:      { url, format, sizeBytes, rowCount } as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
       });
 
       this.logger.log(
@@ -111,7 +112,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
       const message    = error instanceof Error ? error.message : String(error);
       const durationMs = Date.now() - startedAt;
 
-      await this.jobs.updateJobLog(job.id as string, {
+      await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
         status:      'FAILED',
         completedAt: new Date(),
         durationMs,

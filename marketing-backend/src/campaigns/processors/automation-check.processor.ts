@@ -10,6 +10,21 @@ import { MARKETING_QUEUES }                     from '../../marketing.constants.
 import { AD_PLATFORM_TOKENS }                   from '../../ad-accounts/adapters/ad-platform.interface.js';
 import type { AdPlatformInterface }             from '../../ad-accounts/adapters/ad-platform.interface.js';
 import type { AutomationRule, AdPlatform }      from '@prisma/client';
+/** Tipos para AutomationRule.condition y .action (campos Json en Prisma schema) */
+interface AutomationRuleCondition {
+  metric:     string;  // 'roas' | 'ctr' | 'cpc' | 'spend'
+  operator:   string;  // 'lt' | 'gt' | 'lte' | 'gte' | 'eq'
+  value:      number;
+  windowDays: number;
+}
+interface AutomationRuleAction {
+  type:    string;  // 'pause' | 'scale_budget'
+  factor?: number;  // para scale_budget
+}
+interface AutomationRulePayload {
+  condition: AutomationRuleCondition;
+  action:    AutomationRuleAction;
+}
 
 type RuleCondition = { metric: 'roas'|'ctr'|'cpc'|'spend'|'conversions'; operator: 'lt'|'gt'|'lte'|'gte'; value: number; windowDays: number };
 type RuleAction    = { type: 'pause'|'scale_budget'|'notify'; factor?: number };
@@ -30,7 +45,7 @@ export class AutomationCheckProcessor extends WorkerHost {
       include: { campaign: { include: { adAccount: true } } },
     });
     for (const rule of rules) {
-      try { await this.evaluateRule(rule as any, job.id as string); }
+      try { await this.evaluateRule(rule as AutomationRulePayload // @ecosistema-ms/jsonb-cast, job.id ?? ''); }
       catch (err: unknown) { this.logger.warn(`Rule ${rule.id} failed: ${err instanceof Error ? err.message : err}`); }
     }
   }

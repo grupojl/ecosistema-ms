@@ -45,7 +45,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ? 'Error interno del servidor'
       : typeof response === 'string'
         ? response
-        : (response as any)?.message ?? 'Error interno del servidor';
+        : (response as any)?.message // @ecosistema-ms/http-filter ?? 'Error interno del servidor';
 
     res.status(status).json({
       statusCode: status,

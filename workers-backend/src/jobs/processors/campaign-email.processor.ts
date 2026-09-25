@@ -1,3 +1,4 @@
+import { requireJobId } from '../services/job-id.helper.js';
 // workers-backend/src/jobs/processors/campaign-email.processor.ts
 //
 // W-2.2: Procesa campañas masivas de email.
@@ -67,7 +68,7 @@ export class CampaignEmailProcessor extends WorkerHost {
       `[${job.id}] CampaignEmail — campaignId:${campaignId} recipients:${recipientIds.length} cursor:${cursor}`,
     );
 
-    await this.jobs.updateJobLog(job.id as string, {
+    await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
       status:    'PROCESSING',
       startedAt: new Date(startedAt),
       attempts:  job.attemptsMade + 1,
@@ -135,8 +136,8 @@ export class CampaignEmailProcessor extends WorkerHost {
 
         // Actualizar cursor en JobLog después de cada batch
         cursor += batch.length;
-        await this.jobs.updateJobLog(job.id as string, {
-          result: { cursor, totalSent, totalFailed } as unknown as Record<string, unknown>,
+        await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
+          result: { cursor, totalSent, totalFailed } as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
         });
 
         this.logger.debug(`[${job.id}] Batch procesado: ${cursor}/${recipientIds.length}`);
@@ -145,11 +146,11 @@ export class CampaignEmailProcessor extends WorkerHost {
       const durationMs = Date.now() - startedAt;
       const output: CampaignEmailJobResult = { campaignId, totalSent, totalFailed, durationMs };
 
-      await this.jobs.updateJobLog(job.id as string, {
+      await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      output as unknown as Record<string, unknown>,
+        result:      output as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
       });
 
       this.logger.log(
@@ -161,12 +162,12 @@ export class CampaignEmailProcessor extends WorkerHost {
       const durationMs = Date.now() - startedAt;
 
       // Guardar cursor para que el retry retome desde donde quedó
-      await this.jobs.updateJobLog(job.id as string, {
+      await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
         status:      'FAILED',
         completedAt: new Date(),
         durationMs,
         error:       message,
-        result:      { cursor, totalSent, totalFailed } as unknown as Record<string, unknown>,
+        result:      { cursor, totalSent, totalFailed } as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
       });
 
       throw error;

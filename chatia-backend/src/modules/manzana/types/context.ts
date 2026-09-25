@@ -1,12 +1,9 @@
-// =============================================================================
-// modules/manzana/types/context.ts
-// Definición del contexto de negocio específico de MANZANA.
-// TODO: completar businessData con los campos reales cuando se integre el proyecto.
-// =============================================================================
-
+// chatia-backend/src/modules/manzana/types/context.ts
+// TODO: completar campos cuando se integre el proyecto MANZANA.
 export interface MANZANABusinessData {
-  // TODO: agregar campos específicos de MANZANA cuando se integre
-  // Ejemplo para ecommerce: products, cart, order
-  // Ejemplo para saas: plan, flags, quotas
+  plan:              'free' | 'pro' | 'enterprise';
+  organizationName:  string;
+  hasProductCatalog: boolean;
+  activeMarkets:     string[];
   [key: string]: unknown;
 }

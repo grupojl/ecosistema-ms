@@ -119,3 +119,60 @@ con el filtro `ecosystemId` + `organizationId` estándar del ecosistema-ms.
 - `chatia-backend/src/core/strategies/` — implementación de referencia
 - `roadmap/deuda-tecnica.md` — sección "ProjectStrategy — tipado pendiente"
 - `lifecycle/tasks.md` — tasks ejecutables de esta iniciativa
+
+---
+
+## Extensión v2 — org-aware (2026-09-24)
+
+### Problema detectado
+
+La v1 resolvía variación de **comportamiento por ecosistema** pero no por **organización
+dentro del ecosistema**. Una org enterprise de Welver tiene los mismos feature flags
+que una org starter, lo cual es incorrecto.
+
+### Solución adoptada
+
+Agregar `OrganizationProfile` al `ProjectContext`. Cada strategy resuelve el perfil
+de la org via `OrganizationConfigService` (cache Redis TTL 5min → DB → defaults).
+
+```
+ecosystemId (ProjectType) → ProjectStrategy
+  └─ enrichXContext()
+       └─ OrganizationConfigService.resolve(ecosystemId, organizationId)
+            ├─ Redis cache TTL 5min
+            ├─ DB: OrganizationConfig model (nuevo)
+            └─ DEFAULT_ORG_PROFILE (fallback garantizado)
+```
+
+### Nuevos archivos por MS
+
+```
+{ms}/src/
+  core/strategies/
+    project-context.interface.ts   ← OrganizationProfile + context tipado por dominio
+    project-strategy.interface.ts  ← resolveOrgProfile() nuevo método
+    project-strategy.registry.ts   ← sin cambios
+    generic.strategy.ts            ← implementa resolveOrgProfile con DEFAULT
+    project-strategy.module.ts     ← sin cambios
+  organization-config/
+    organization-config.repository.interface.ts
+    prisma-organization-config.repository.ts
+    organization-config.service.ts   ← cache-aside + degradación elegante
+    organization-config.module.ts    ← @Global()
+  modules/{eco}/
+    types/context.ts               ← BusinessData tipado por ecosistema
+    {eco}.strategy.ts              ← resolveOrgProfile() delegado a OrgConfigService
+    {eco}.module.ts                ← auto-registro en onModuleInit
+```
+
+### Invariantes que NO cambian
+
+- Los hooks NUNCA lanzan — degradación elegante garantizada
+- GenericStrategy sigue siendo el fallback del registry
+- Un bug en welver.strategy.ts no afecta manzana ni mexus
+
+### `businessData` tipado (deuda cerrada parcialmente)
+
+Con esta extensión, cada `modules/{eco}/types/context.ts` define el tipo concreto.
+La deuda de `businessData: unknown` → `WELVERBusinessData` está implementada en welver.
+Manzana y mexus quedan como placeholder tipado con `[key: string]: unknown` hasta integración.

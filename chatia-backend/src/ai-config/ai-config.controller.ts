@@ -1,5 +1,4 @@
 // chatia-backend/src/ai-config/ai-config.controller.ts
-// Migrado de class-validator → Zod inline (ADR-001)
 import {
   Controller, Get, Put, Patch, Body,
   Param, HttpCode, HttpStatus, UseGuards,
@@ -31,7 +30,7 @@ export class AiConfigController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(UpdateAiConfigSchema)) dto: UpdateAiConfigInput,
   ) {
-    return this.aiConfigService.update(accountId, tenant.organizationId, dto as never);
+    return this.aiConfigService.update(accountId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
   }
 
   @Patch('toggle')

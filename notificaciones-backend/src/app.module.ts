@@ -1,3 +1,7 @@
+import { NotifProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
+import { WelverNotifModule }  from '@/modules/welver/welver.module.js';
+import { ManzanaNotifModule } from '@/modules/manzana/manzana.module.js';
+import { MexusNotifModule }   from '@/modules/mexus/mexus.module.js';
 // notificaciones-backend/src/app.module.ts
 import { Module }               from '@nestjs/common';
 import { ConfigModule }         from '@nestjs/config';
@@ -26,6 +30,11 @@ import { MetricsModule }        from '@/metrics/metrics.module.js';
       }),
     }),
     PrismaModule,
+    // ProjectStrategy org-aware — ADR-019 v2
+    NotifProjectStrategyModule,
+    WelverNotifModule,
+    ManzanaNotifModule,
+    MexusNotifModule,
     MetricsModule,
     HealthModule,
     NotificationsModule,

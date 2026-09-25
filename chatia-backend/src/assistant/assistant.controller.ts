@@ -50,6 +50,6 @@ export class AssistantController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(UpdateAssistantConfigSchema)) dto: UpdateAssistantConfigInput,
   ) {
-    return this.config.update(projectId, tenant.organizationId, dto as never);
+    return this.config.update(projectId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
   }
 }

@@ -1,36 +1,22 @@
+// @ecosistema-ms/zod-migrated
 // src/channel-accounts/channel-accounts.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { CreateChannelAccountInput, UpdateChannelAccountInput } from '@/channel-accounts/schemas.js';
 import type { CreateChannelAccountInput, UpdateChannelAccountInput } from '@/channel-accounts/schemas';
 import { PrismaService } from '@/prisma/prisma.service';
 import { ChannelType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
-export class CreateChannelAccountInput {
-  @IsEnum(ChannelType)
-  channelType!: ChannelType;
 
-  @IsString()
-  name!: string;
 
-  @IsString()
-  externalId!: string;
 
-  @IsString()
-  accessToken!: string;
 
-  @IsOptional()
-  extraConfig?: Record<string, unknown>;
 }
 
-export class UpdateChannelAccountInput {
-  @IsString() @IsOptional()
   name?: string;
 
-  @IsString() @IsOptional()
   accessToken?: string;
 
-  @IsOptional()
-  extraConfig?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -47,7 +33,7 @@ export class ChannelAccountsService {
         name: dto.name,
         externalId: dto.externalId,
         accessToken: dto.accessToken,
-        extraConfig: (dto.extraConfig ?? {}) as Prisma.InputJsonValue,
+        extraConfig: (dto.extraConfig ?? {}) as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
         webhookVerifyToken: randomUUID(),
       },
     });
@@ -97,7 +83,7 @@ export class ChannelAccountsService {
         ...(dto.name        !== undefined && { name: dto.name }),
         ...(dto.accessToken !== undefined && { accessToken: dto.accessToken }),
         ...(dto.extraConfig !== undefined && {
-          extraConfig: dto.extraConfig as Prisma.InputJsonValue,
+          extraConfig: dto.extraConfig as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
         }),
       },
     });

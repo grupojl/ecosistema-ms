@@ -50,9 +50,9 @@ export class AuditService {
         action:         entry.action,
         resourceId:     entry.resourceId,
         resourceType:   entry.resourceType,
-        before:         entry.before   as Prisma.InputJsonValue | undefined,
-        after:          entry.after    as Prisma.InputJsonValue | undefined,
-        metadata:       entry.metadata as Prisma.InputJsonValue | undefined,
+        before:         entry.before   as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast | undefined,
+        after:          entry.after    as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast | undefined,
+        metadata:       entry.metadata as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast | undefined,
         ip:             entry.ip,
       } as Prisma.AuditLogCreateInput;
 

@@ -38,7 +38,7 @@ export class FaqController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(CreateKnowledgeBaseSchema)) dto: CreateKnowledgeBaseInput,
   ) {
-    return this.kb.create(dto.projectId, tenant.organizationId, dto as never);
+    return this.kb.create(dto.projectId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
   }
 
   @Get('knowledge-bases')
@@ -65,7 +65,7 @@ export class FaqController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(CreateKbDocumentSchema)) dto: CreateKbDocumentInput,
   ) {
-    return this.doc.create(kbId, tenant.organizationId, dto as never);
+    return this.doc.create(kbId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
   }
 
   @Get('knowledge-bases/:kbId/documents')

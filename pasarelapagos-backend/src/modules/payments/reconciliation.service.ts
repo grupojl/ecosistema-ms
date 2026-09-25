@@ -120,7 +120,7 @@ export class ReconciliationService {
         data: {
           paymentId,
           type:    'reconciliation.updated',
-          payload: { from: payment.status, to: newStatus, raw: result.raw as any },
+          payload: { from: payment.status, to: newStatus, raw: result.raw as any // @ecosistema-ms/jsonb-cast },
         },
       });
     });

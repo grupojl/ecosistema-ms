@@ -1,5 +1,4 @@
 // chatia-backend/src/agents/schemas.ts
-// Reemplaza class-validator DTOs de agents.controller.ts
 // Los schemas viven junto al módulo que los usa — no en una carpeta dto/ separada.
 import { z } from 'zod';
 

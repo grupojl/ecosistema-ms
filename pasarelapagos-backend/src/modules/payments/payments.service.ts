@@ -127,7 +127,7 @@ export class PaymentsService {
           status:         PaymentStatus.PENDING,
           providerId:     provider.id,
           description:    dto.description,
-          metadata:       dto.metadata as Prisma.InputJsonValue,
+          metadata:       dto.metadata as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
           ...(customerId ? { customerId } : {}),
         } satisfies Prisma.PaymentUncheckedCreateInput,
       });
@@ -168,7 +168,7 @@ export class PaymentsService {
           data: {
             paymentId: payment.id,
             type:      `provider.${result.status}`,
-            payload:   result.raw as Prisma.InputJsonValue,
+            payload:   result.raw as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
           },
         });
         return p;
@@ -303,7 +303,7 @@ export class PaymentsService {
             refundId: result.externalRefundId,
             amount:   body.amountMinor ?? payment.amountMinor.toString(),
             reason:   body.reason,
-          } as Prisma.InputJsonValue,
+          } as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
         },
       });
 

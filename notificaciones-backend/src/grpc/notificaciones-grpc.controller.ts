@@ -42,7 +42,7 @@ export class NotificacionesGrpcController {
       return { notificationId: '', status: 0, message: `Canal desconocido: ${req.channel}` };
     }
     try {
-      const payload = JSON.parse(req.payloadJson) as Record<string, unknown>;
+      let payload: Record<string, unknown>; try { payload = JSON.parse(req.payloadJson) as Record<string, unknown>; } catch { throw new Error('payloadJson invalido'); } // @ecosistema-ms/jsonb-cast
       // enqueue retorna { jobId, channel } — mapeamos al contrato gRPC
       const result  = await this.notifSvc.enqueue({
         ecosystemId:    req.ecosystemId,

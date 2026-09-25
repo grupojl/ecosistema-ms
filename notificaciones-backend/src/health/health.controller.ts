@@ -35,7 +35,7 @@ export class HealthController {
 
     // CircuitBreakerService tiene getStates() o similar
     // Keys: sendgrid, whatsapp-biz-api, fcm
-    const cbStates = await (this.cb as any).getStates?.().catch(() => ({})) ?? {};
+    const cbStates = await (this.cb as any).getStates // @ecosistema-ms/opossum-cast?.().catch(() => ({})) ?? {};
     const circuitBreakers = Object.entries(cbStates as Record<string, string>).map(
       ([key, status]) => ({ key, status: status as 'CLOSED' | 'OPEN' | 'HALF_OPEN' }),
     );

@@ -238,3 +238,22 @@ model AuditLog {
   @@index([organizationId, createdAt])  // SSO: filtro principal
   @@index([resourceId])
 }
+
+// ─── OrganizationConfig — ADR-019 v2: ProjectStrategy org-aware ──────────────
+// Configuración de providers habilitados y límites por organización.
+model OrganizationConfig {
+  id              String   @id @default(cuid())
+  organizationId  String
+  ecosystemId     String
+  plan            String   @default("starter")
+  featureFlags    Json     @default("{}")   // PaymentFeatureFlags — @grupojl/jsonb
+  limits          Json     @default("{}")   // PaymentLimits — @grupojl/jsonb
+  timezone        String   @default("America/Buenos_Aires")
+  locale          String   @default("es")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([ecosystemId, organizationId])
+  @@index([ecosystemId])
+  @@map("organization_configs")
+}

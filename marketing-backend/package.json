@@ -49,7 +49,7 @@
     "swagger-ui-express": "catalog:",
     "zod": "catalog:",
     "axios": "catalog:",
-    "@nestjs-modules/nestjs-prometheus": "catalog:"
+    "@willsoto/nestjs-prometheus": "catalog:"
   },
   "devDependencies": {
     "@nestjs/cli": "catalog:",

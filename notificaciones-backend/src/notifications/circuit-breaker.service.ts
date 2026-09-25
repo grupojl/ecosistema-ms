@@ -73,8 +73,8 @@ export class CircuitBreakerService implements OnModuleDestroy {
     if (this.breakers.has(key)) {
       const existing = this.breakers.get(key)!;
       // Actualizar la accion si el fn cambio
-      (existing as unknown as { action: () => Promise<T> }).action = fn;
-      return existing as unknown as CircuitBreaker<unknown[], T>;
+      (existing as unknown as { action: () => Promise<T> } // @ecosistema-ms/opossum-cast).action = fn;
+      return existing as unknown as CircuitBreaker<unknown[], T> // @ecosistema-ms/opossum-cast;
     }
 
     const breaker = new CircuitBreaker(fn, {
@@ -88,7 +88,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     breaker.on('halfOpen', () => this.logger.log(`CB half-open: ${key}`));
     breaker.on('close',    () => this.logger.log(`CB closed: ${key}`));
 
-    this.breakers.set(key, breaker as unknown as CircuitBreaker<unknown[], unknown>);
+    this.breakers.set(key, breaker as unknown as CircuitBreaker<unknown[], unknown> // @ecosistema-ms/opossum-cast);
     return breaker;
   }
 }

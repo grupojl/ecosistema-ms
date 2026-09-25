@@ -78,4 +78,4 @@ WORKDIR /app/workers-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD ["dumb-init", "/app/workers-backend/entrypoint.sh"]
+CMD exec dumb-init "/app/workers-backend/entrypoint.sh"]

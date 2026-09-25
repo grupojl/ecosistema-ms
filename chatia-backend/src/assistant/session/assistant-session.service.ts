@@ -39,7 +39,7 @@ export class AssistantSessionService {
     const session = await this.prisma.assistantSession.findUniqueOrThrow({
       where: { id: sessionId },
     });
-    const history = (session.history as unknown as SessionMessage[]) ?? [];
+    const history = (session.history as unknown as SessionMessage[] // @ecosistema-ms/jsonb-cast) ?? [];
     const newMsg: SessionMessage = { role, content, createdAt: new Date().toISOString() };
 
     await this.prisma.assistantSession.update({
@@ -53,7 +53,7 @@ export class AssistantSessionService {
     const session = await this.prisma.assistantSession.findUniqueOrThrow({
       where: { id: sessionId },
     });
-    const history = (session.history as unknown as SessionMessage[]) ?? [];
+    const history = (session.history as unknown as SessionMessage[] // @ecosistema-ms/jsonb-cast) ?? [];
     return history.slice(-limit);
   }
 

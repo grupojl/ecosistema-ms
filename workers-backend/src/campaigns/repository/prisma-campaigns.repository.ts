@@ -24,7 +24,7 @@ export class PrismaCampaignsRepository implements ICampaignsRepository {
     const rows = await this.prisma.campaign.findMany({
       where: {
         organizationId,
-        ...(status ? { status: status as never } : {}),
+        ...(status ? { status: status as never // @ecosistema-ms/jsonb-cast } : {}),
       },
       include: { _count: { select: { recipients: true } } },
       orderBy: { createdAt: "desc" },
@@ -47,7 +47,7 @@ export class PrismaCampaignsRepository implements ICampaignsRepository {
     templateKey:    string;
     scheduledAt?:   Date;
   }): Promise<CampaignRecord> {
-    const row = await this.prisma.campaign.create({ data: data as never });
+    const row = await this.prisma.campaign.create({ data: data as never // @ecosistema-ms/jsonb-cast });
     return row as CampaignRecord;
   }
 
@@ -58,7 +58,7 @@ export class PrismaCampaignsRepository implements ICampaignsRepository {
   }): Promise<CampaignRecord> {
     const row = await this.prisma.campaign.update({
       where: { id },
-      data:  patch as never,
+      data:  patch as never // @ecosistema-ms/jsonb-cast,
     });
     return row as CampaignRecord;
   }

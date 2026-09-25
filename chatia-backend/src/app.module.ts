@@ -1,3 +1,9 @@
+import { ProjectStrategyModule }   from '@/core/strategies/project-strategy.module.js';
+import { OrganizationConfigModule } from '@/organization-config/organization-config.module.js';
+import { WelverModule }             from '@/modules/welver/welver.module.js';
+import { ManzanaModule }            from '@/modules/manzana/manzana.module.js';
+import { MexusModule }             from '@/modules/mexus/mexus.module.js';
+
 // chatia-backend/src/app.module.ts
 import { Module }           from '@nestjs/common';
 import { ConfigModule }     from '@nestjs/config';

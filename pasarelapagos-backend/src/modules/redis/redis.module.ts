@@ -36,7 +36,7 @@ class RedisNoopClient {
       useFactory: (config: ConfigService): Redis | RedisNoopClient => {
         if (!REDIS_ENABLED) {
           console.warn('[RedisModule] Redis deshabilitado (REDIS_ENABLED != true) — modo no-op');
-          return new RedisNoopClient() as unknown as Redis;
+          return new RedisNoopClient() as unknown as Redis // @ecosistema-ms/jsonb-cast;
         }
         const url   = config.getOrThrow<string>('REDIS_URL');
         const redis = new Redis(url, {

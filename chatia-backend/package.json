@@ -19,9 +19,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "/nestjs-prometheus": "catalog:",
+    "@willsoto/nestjs-prometheus": "catalog:",
     "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",
@@ -49,7 +48,7 @@
     "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
-    "socket.io": "^4.8.3",
+    "socket.io": "catalog:",
     "swagger-ui-express": "catalog:",
     "uuid": "catalog:",
     "zod": "catalog:"
@@ -63,7 +62,7 @@
     "@types/bcryptjs": "catalog:",
     "@types/express": "catalog:",
     "@types/jest": "catalog:",
-    "@types/multer": "^1.4.12",
+    "@types/multer": "catalog:",
     "@types/node": "catalog:",
     "@types/supertest": "catalog:",
     "@types/uuid": "catalog:",

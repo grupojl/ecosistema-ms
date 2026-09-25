@@ -43,7 +43,7 @@ export class DlqService {
       for (const job of failed) {
         results.push({
           queue:        queueName,
-          jobId:        job.id as string,
+          jobId:        (job.id ?? 'unknown'),
           failedReason: job.failedReason ?? 'unknown',
           attempts:     job.attemptsMade,
           failedAt:     job.finishedOn ?? 0,

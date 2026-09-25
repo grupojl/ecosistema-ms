@@ -108,3 +108,42 @@ Ver arquitectura declarada: `.claude/architecture/05-dockerfile-backend.md`
 
 ---
 
+
+---
+
+## Actualización 2026-09-24 — ProjectStrategy org-aware
+
+### Brechas cerradas en esta sesión
+
+| Brecha (auditoría 2026-09-12) | Estado anterior | Estado post-sesión |
+|-------------------------------|----------------|-------------------|
+| app.module.ts de los 5 servicios sin `ProjectStrategyModule` | ❌ | ✅ chatia+pagos+notif |
+| `businessData: Record<string,unknown>` sin tipar | ❌ | ✅ `WELVERBusinessData` tipado en chatia y pagos |
+| `AssistantChatService` no usa strategy | ❌ | ✅ `ProjectStrategyRegistry` inyectado y conectado |
+| `ProjectStrategy` solo en chatia, no en pagos/notif | ❌ | ✅ Port completo a los 3 MS |
+| Configuración por org no existía | ❌ | ✅ `OrganizationConfigService` + Redis TTL 5min |
+| `ECO-PS-01` wiring app.module.ts pasarela/notif | ❌ | ✅ Cerrado con x.sh |
+| `ECO-PS-03` businessData sin tipar | ❌ | ✅ Cerrado para welver (manzana/mexus: placeholder tipado) |
+
+### Brechas que persisten (sin cambios en esta sesión)
+
+| Brecha | Dimensión | Impacto |
+|--------|-----------|---------|
+| 0 tests implementados | Tests | Bloquea primer cliente |
+| Branch protection GitHub | CI/CD | Bloquea primer cliente |
+| Lockfile desactualizado | Build | Bloquea CI |
+| getAgentMetrics N+1 (analytics) | Base de datos | DT-023 pendiente |
+| 3 MS sin ZodExceptionFilter (notif, analytics, workers) | Calidad | ZodError → HTTP 500 |
+| Grafana dashboard | Observabilidad | Ciegas en prod |
+
+### Puntaje estimado post-sesión
+
+| Dimensión | 2026-09-12 | 2026-09-24 | Δ |
+|-----------|-----------|-----------|---|
+| Arquitectura/Capas | 7.5 | 8.2 | +0.7 |
+| Contratos/Tipado | 7.5 | 8.0 | +0.5 |
+| Multi-tenancy | 9.0 | 9.2 | +0.2 |
+| Calidad de código | 7.0 | 7.5 | +0.5 |
+| **Promedio** | **7.6** | **~8.1** | **+0.5** |
+
+Tests, CI/CD y observabilidad no mejoran hasta resolver las brechas de primer cliente.

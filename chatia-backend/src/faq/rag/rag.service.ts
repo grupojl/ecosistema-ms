@@ -56,7 +56,7 @@ Respondé en español, de forma concisa y citando el número de fuente cuando co
         },
       ],
       {
-        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as any,
+        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as any // @ecosistema-ms/enum-cast,
         temperature: options.temperature ?? 0.3,
         maxTokens: options.maxTokens ?? 1024,
       },

@@ -1,88 +1,66 @@
-// =============================================================================
-// modules/manzana/manzana.strategy.ts
-// Estrategia de MANZANA — implementa ProjectStrategy.
-//
-// enrichContext → TODO: llamar a la API de MANZANA para traer contexto
-// afterResponse → TODO: implementar side-effects específicos del proyecto
-//
-// IMPORTANTE: enrichContext nunca debe romper el flujo. Si falla, loguea y
-// devuelve contexto vacío para que el core responda de todas formas.
-// =============================================================================
-
-import { Injectable, Logger }    from '@nestjs/common';
-import type { AssistantSession } from '@prisma/client';
-
-import type { ProjectStrategy }           from '@/core/strategies/project-strategy.interface';
-import { ProjectContext, ProjectType }    from '@/core/strategies/project-context.interface';
-import { MANZANA_CONFIG }        from '@/modules/manzana/manzana.config';
+// chatia-backend/src/modules/manzana/manzana.strategy.ts
+// Placeholder org-aware. Sigue el molde de WelverStrategy.
+import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
+import { OrganizationConfigService } from '../../organization-config/organization-config.service.js';
+import { ProjectStrategyRegistry }   from '../../core/strategies/project-strategy.registry.js';
+import {
+  ProjectType, type ProjectStrategy,
+  type ConversationEnrichInput, type ConversationResult,
+} from '../../core/strategies/project-strategy.interface.js';
+import {
+  DEFAULT_ORG_PROFILE, type ProjectContext, type OrganizationProfile,
+} from '../../core/strategies/project-context.interface.js';
+import type { MANZANABusinessData } from './types/context.js';
 
 @Injectable()
-export class MANZANAStrategy implements ProjectStrategy {
-  private readonly logger = new Logger(MANZANAStrategy.name);
+export class ManzanaStrategy implements ProjectStrategy, OnModuleInit {
+  private readonly logger = new Logger(ManzanaStrategy.name);
 
-  getProjectType(): ProjectType {
-    return ProjectType.MANZANA;
+  constructor(
+    private readonly registry:  ProjectStrategyRegistry,
+    private readonly orgConfig: OrganizationConfigService,
+  ) {}
+
+  onModuleInit(): void {
+    this.registry.register(this);
+    this.logger.log('ManzanaStrategy registrada');
   }
 
-  async enrichContext(
-    message: string,
-    projectId: string,
-    organizationId: string,
-  ): Promise<ProjectContext> {
-    try {
-      // TODO: llamar a la API de MANZANA para enriquecer el contexto
-      // Ejemplo:
-      // const data = await this.manzanaClient.getContextForMessage(message, projectId);
+  getProjectType(): ProjectType { return ProjectType.MANZANA; }
 
-      return {
-        businessData: {
-          // TODO: mapear datos de MANZANA aquí
-        },
-        systemPromptAddons: MANZANA_CONFIG.systemPrompt,
-        meta: {
-          projectType: ProjectType.MANZANA,
-          projectId,
-          organizationId,
-          enrichedAt: new Date(),
-        },
+  async enrichConversationContext(input: ConversationEnrichInput): Promise<ProjectContext> {
+    try {
+      const orgProfile = await this.orgConfig.resolve(input.ecosystemId, input.organizationId);
+      const bizData: MANZANABusinessData = {
+        plan:              'pro',
+        organizationName:  input.organizationId,
+        hasProductCatalog: orgProfile.featureFlags.faqEnabled,
+        activeMarkets:     [],
       };
-    } catch (error) {
-      // enrichContext nunca rompe el flujo — devuelve contexto vacío
-      this.logger.error(
-        `Error enriqueciendo contexto MANZANA: ${(error as Error).message}`,
-      );
       return {
+        systemPrompt:   'Eres un asistente de MANZANA. TODO: completar con instrucciones específicas.',
+        defaultStage:   'INITIAL',
+        preferredModel: 'llama-3.3-70b-versatile',
+        useFaqFallback: orgProfile.featureFlags.faqEnabled,
+        orgProfile,
+        businessData:   bizData,
+      };
+    } catch (err: unknown) {
+      this.logger.error(`ManzanaStrategy.enrich falló: ${err instanceof Error ? err.message : String(err)}`);
+      return {
+        systemPrompt: 'Eres un asistente amable.', defaultStage: 'INITIAL',
+        preferredModel: 'llama-3.3-70b-versatile', useFaqFallback: false,
+        orgProfile: { ...DEFAULT_ORG_PROFILE, organizationId: input.organizationId, ecosystemId: input.ecosystemId },
         businessData: {},
-        systemPromptAddons: '',
-        meta: {
-          projectType: ProjectType.MANZANA,
-          projectId,
-          organizationId,
-          enrichedAt: new Date(),
-        },
       };
     }
   }
 
-  async afterResponse(
-    response: string,
-    context: ProjectContext,
-    _session: AssistantSession,
-  ): Promise<void> {
-    try {
-      // TODO: implementar side-effects específicos de MANZANA
-      // Ejemplo:
-      // - actualizar estado de orden
-      // - registrar métricas de negocio
-      // - disparar webhooks del proyecto
-      this.logger.debug(
-        `afterResponse MANZANA — projectId: ${context.meta.projectId}`,
-      );
-    } catch (error) {
-      // afterResponse nunca rompe el flujo — solo loguea
-      this.logger.error(
-        `Error en afterResponse MANZANA: ${(error as Error).message}`,
-      );
-    }
+  async afterConversationResult(_r: ConversationResult, _c: ProjectContext): Promise<void> {
+    // TODO: side-effects específicos de Manzana
+  }
+
+  async resolveOrgProfile(ecosystemId: string, organizationId: string): Promise<OrganizationProfile> {
+    return this.orgConfig.resolve(ecosystemId, organizationId);
   }
 }

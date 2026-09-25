@@ -154,3 +154,78 @@ técnica aceptar el redeploy hasta que haya una necesidad real.
    no es un copy-paste literal de chatia?
 5. ¿`businessData` tiene un tipo definido en `types/context.ts`, o sigue
    como `unknown` a sabiendas de que es deuda?
+
+---
+
+## Extensión v2 — org-aware (2026-09-24)
+
+### El problema que resuelve
+
+La v1 resolvía variación de **comportamiento por ecosistema**.
+La v2 resuelve variación de **capacidades por organización dentro del ecosistema**.
+
+Una org `enterprise` de Welver tiene `stripeEnabled: true` y `faqEnabled: true`.
+Una org `starter` tiene `mercadopagoEnabled: true` y `faqEnabled: false`.
+El core del microservicio no sabe esto — lo sabe la strategy via `OrganizationProfile`.
+
+### Flujo completo v2
+
+```
+Request HTTP
+  → TenantGuard → { ecosystemId, organizationId }
+  → ProjectStrategyRegistry.get(ecosystemId)   → WelverStrategy
+  → strategy.enrichXContext({ ecosystemId, organizationId, ... })
+      → OrganizationConfigService.resolve(ecosystemId, organizationId)
+           → Redis cache TTL 5min
+           → DB: OrganizationConfig
+           → DEFAULT_ORG_PROFILE (fallback garantizado)
+      → [lógica de la strategy: systemPrompt, provider, canal...]
+      → ProjectContext { orgProfile, businessData, ... }
+  → Core del microservicio usa ProjectContext
+  → strategy.afterXResult(result, context)  ← side-effects, NUNCA lanza
+```
+
+### `OrganizationProfile` por dominio
+
+Cada MS define su propio shape en `core/strategies/project-context.interface.ts`:
+
+| MS | FeatureFlags | Limits |
+|----|-------------|--------|
+| chatia-backend | `aiAssistantEnabled`, `faqEnabled`, `voiceEnabled`, `humanEscalationEnabled` | `maxActiveConversations`, `inactivityTimeoutSeconds` |
+| pasarelapagos-backend | `stripeEnabled`, `mercadopagoEnabled`, `dlocalEnabled`, `installmentsEnabled` | `maxTransactionAmountCents`, `maxAutoRetries` |
+| notificaciones-backend | `emailEnabled`, `whatsappEnabled`, `smsEnabled`, `respectBusinessHours` | `maxPerUserPerDay`, `dedupWindowSeconds` |
+
+### `OrganizationConfigService` — cache-aside
+
+```
+resolve(ecosystemId, organizationId)
+  1. Redis.get("orgcfg:{eco}:{org}")  → hit: return
+  2. DB: OrganizationConfig.findUnique({ ecosystemId, organizationId })
+  3. Si no existe → DEFAULT_ORG_PROFILE (fallback)
+  4. Redis.setex("orgcfg:{eco}:{org}", 300, profile)
+  5. return profile
+```
+
+TTL: 5 minutos. Invalidación: `OrganizationConfigService.upsert()` hace `del()`.
+NUNCA lanza — cualquier fallo retorna `DEFAULT_ORG_PROFILE`.
+
+### Tabla de implementación por MS
+
+| MS | core/strategies/ | organization-config/ | modules/ | app.module.ts |
+|----|-----------------|---------------------|----------|--------------|
+| chatia-backend | ✅ v2 | ✅ completo (Prisma + Redis) | ✅ welver tipado, manzana/mexus placeholder | ✅ |
+| pasarelapagos-backend | ✅ v2 | ✅ cache Redis only (v1) | ✅ welver con routing real | ✅ |
+| notificaciones-backend | ✅ v2 | ❌ (usa DEFAULT en v1) | ✅ welver con canal | ✅ |
+
+### Cuándo completar `organization-config/` en pasarela y notif
+
+Cuando la primera org de producción necesite featureFlags distintos al default.
+Hoy con 0 clientes, `DEFAULT_ORG_PROFILE` es correcto para todos.
+
+### Punto de conexión en cada MS
+
+| MS | Dónde se llama `enrichXContext` |
+|----|--------------------------------|
+| chatia-backend | `AssistantChatService.chat()` — antes del LLM |
+| pasarelapagos-backend | `PaymentsService.createPayment()` — pendiente [ECO-PS-02] |
+| notificaciones-backend | `NotificationsService.send()` — pendiente [ECO-PS-04] |

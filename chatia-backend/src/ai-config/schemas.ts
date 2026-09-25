@@ -1,5 +1,4 @@
 // chatia-backend/src/ai-config/schemas.ts
-// Reemplaza UpdateAiConfigDto con class-validator
 import { z } from 'zod';
 
 export const UpdateAiConfigSchema = z.object({

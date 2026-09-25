@@ -64,6 +64,14 @@ r:
 	npx repomix --config repomix.config.json
 	@echo "[+] XMLs copiados a Downloads"
 
+# -----------------------------------------------------------------
+# a — ejecuta bash a.sh (el script audit en la raíz)
+# -----------------------------------------------------------------
+a:
+	@[ -f a.sh ] || (echo "[✗] No existe a.sh en la raíz"; exit 1)
+	@echo "=== Ejecutando a.sh ==="
+	@bash a.sh ecosistema
+
 # ─────────────────────────────────────────────────────────────────────────────
 # X — ejecuta bash x.sh (el script activo en la raíz)
 # ─────────────────────────────────────────────────────────────────────────────

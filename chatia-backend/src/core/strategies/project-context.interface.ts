@@ -1,38 +1,60 @@
-// =============================================================================
-// core/strategies/project-context.interface.ts
-// Contexto enriquecido que cada estrategia de proyecto inyecta al core IA.
-// El core usa este contexto para construir el prompt y personalizar la respuesta.
-// Cada proyecto implementa ProjectStrategy y rellena los campos relevantes.
-// =============================================================================
+// chatia-backend/src/core/strategies/project-context.interface.ts
+// ADR-019 v2 — ProjectStrategy org-aware
+// REGLA: solo tipos. Sin lógica de negocio.
+
+export interface ChatFeatureFlags {
+  aiAssistantEnabled:      boolean;
+  faqEnabled:              boolean;
+  multiChannelEnabled:     boolean;
+  humanEscalationEnabled:  boolean;
+  voiceEnabled:            boolean;
+}
+
+export interface ChatLimits {
+  maxActiveConversations:      number;
+  maxMessagesPerConversation:  number;
+  inactivityTimeoutSeconds:    number;
+  escalationAlertMinutes:      number;
+}
+
+export interface OrganizationProfile {
+  organizationId:  string;
+  ecosystemId:     string;
+  plan:            'starter' | 'growth' | 'enterprise' | 'custom';
+  featureFlags:    ChatFeatureFlags;
+  limits:          ChatLimits;
+  timezone:        string;
+  locale:          string;
+  updatedAt:       Date;
+}
 
 export interface ProjectContext {
-  /**
-   * Datos de negocio específicos del proyecto.
-   * Cada estrategia define su propia forma aquí.
-   * El core los serializa como contexto adicional al LLM.
-   */
-  businessData: Record<string, unknown>;
-
-  /**
-   * Instrucciones adicionales al system prompt base.
-   * La estrategia puede agregar reglas específicas del proyecto.
-   */
-  systemPromptAddons: string;
-
-  /**
-   * Metadatos de la sesión para logging y observabilidad.
-   */
-  meta: {
-    projectType: ProjectType;
-    projectId: string;
-    organizationId: string;
-    enrichedAt: Date;
-  };
+  systemPrompt:   string;
+  defaultStage:   string;
+  preferredModel: string;
+  useFaqFallback: boolean;
+  orgProfile:     OrganizationProfile;
+  businessData:   unknown;
 }
 
-export enum ProjectType {
-  WELVER   = 'WELVER',
-  MANZANA  = 'MANZANA',
-  MEXUS    = 'MEXUS',
-  GENERIC  = 'GENERIC', // fallback cuando no hay estrategia específica
-}
+export const DEFAULT_ORG_PROFILE: OrganizationProfile = {
+  organizationId:  'unknown',
+  ecosystemId:     'unknown',
+  plan:            'starter',
+  featureFlags: {
+    aiAssistantEnabled:      true,
+    faqEnabled:              false,
+    multiChannelEnabled:     false,
+    humanEscalationEnabled:  true,
+    voiceEnabled:            false,
+  },
+  limits: {
+    maxActiveConversations:      100,
+    maxMessagesPerConversation:  200,
+    inactivityTimeoutSeconds:    1800,
+    escalationAlertMinutes:      60,
+  },
+  timezone:  'America/Buenos_Aires',
+  locale:    'es',
+  updatedAt: new Date(0),
+};

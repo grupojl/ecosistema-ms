@@ -27,7 +27,7 @@ export class PrismaContactsRepository implements IContactsRepository {
       ];
     }
     const rows = await this.prisma.contact.findMany({
-      where:   where as never,
+      where:   where as never // @ecosistema-ms/jsonb-cast,
       include: { _count: { select: { conversations: true } } },
       orderBy: { lastSeenAt: "desc" },
     });
@@ -61,7 +61,7 @@ export class PrismaContactsRepository implements IContactsRepository {
       data: {
         ...(patch.name     !== undefined && { name:     patch.name }),
         ...(patch.email    !== undefined && { email:    patch.email }),
-        ...(patch.status   !== undefined && { status:   patch.status as never }),
+        ...(patch.status   !== undefined && { status:   patch.status as never // @ecosistema-ms/jsonb-cast }),
         ...(patch.tags     !== undefined && { tags:     patch.tags }),
         ...(patch.optedOut !== undefined && { optedOut: patch.optedOut }),
       },

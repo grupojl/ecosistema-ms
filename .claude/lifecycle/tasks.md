@@ -162,3 +162,61 @@ grep -n "InternalModule" \
 - [ ] **[PS-06]** Tipar `businessData` por ecosistema en
       `modules/{eco}/types/context.ts` de ambos servicios, reemplazando
       `Record<string, unknown>` — solo cuando PS-03/04 tengan contenido real
+
+---
+
+## COMPLETADO ✅ — Sesión 2026-09-24
+
+### ProjectStrategy org-aware (ADR-019 v2)
+
+- [x] `OrganizationProfile` con `ChatFeatureFlags` + `ChatLimits` en `project-context.interface.ts`
+- [x] `resolveOrgProfile()` como método obligatorio de `ProjectStrategy`
+- [x] `OrganizationConfigService` — cache-aside Redis TTL 5min, NUNCA lanza
+- [x] `PrismaOrganizationConfigRepository` — adaptador Prisma, único lugar con Prisma en el módulo
+- [x] `OrganizationConfigModule` — `@Global()` disponible para todas las strategies
+- [x] `WELVERBusinessData` tipado en chatia-backend (merchantPlan, storeName, activeMarkets, humanAgentsOnline)
+- [x] `WelverStrategy.enrichConversationContext()` — OrgProfile + bizData + systemPrompt personalizado
+- [x] `WelverStrategy.afterConversationResult()` — actualiza stage + log escalación
+- [x] `AssistantChatService` conectado a `ProjectStrategyRegistry` — verifica featureFlags antes del LLM
+- [x] `ChatInput.ecosystemId` — campo nuevo requerido para resolver la strategy
+- [x] `OrganizationConfig` model en Prisma (chatia, pasarela, notif)
+- [x] `PaymentProjectStrategy` en pasarelapagos — `enrichPaymentContext` / `afterChargeResult`
+- [x] `WelverPaymentStrategy` — routing real de provider por país + featureFlags
+- [x] `NotifProjectStrategy` en notificaciones — `enrichNotifContext` / `afterNotifSent`
+- [x] `WelverNotifStrategy` — canal preferido whatsapp > email
+- [x] `app.module.ts` de chatia + pasarela + notif — módulos importados en `imports[]`
+- [x] ADR-019 — extensión v2 documentada (org-aware)
+- [x] `ECO-PS-01`: wiring app.module.ts — CERRADO
+- [x] `ECO-PS-03`: businessData tipado en welver — CERRADO
+
+---
+
+## PENDIENTE — Bloqueantes para primer cliente (en orden)
+
+### P0 — Bloquea deploy con primer cliente
+
+- [ ] **[LOCK-01]** `pnpm install` + commit `pnpm-lock.yaml` — lockfile desactualizado tras deps de esta sesión
+- [ ] **[MIG-01]** `pnpm --filter chatia-backend prisma migrate dev --name add-organization-config`
+- [ ] **[MIG-02]** `pnpm --filter pasarelapagos-backend prisma migrate dev --name add-organization-config`
+- [ ] **[MIG-03]** `pnpm --filter notificaciones-backend prisma migrate dev --name add-organization-config`
+- [ ] **[CI-01]** Branch protection en GitHub (main no mergeable sin CI verde)
+
+### P1 — Tests (bloquea primer cliente por riesgo de data leak entre orgs)
+
+- [ ] **[TEST-01]** Test cross-tenant chatia: request con `ecosystemId=A` no retorna datos de `ecosystemId=B`
+- [ ] **[TEST-02]** Test cross-tenant pasarelapagos: ídem para pagos
+- [ ] **[TEST-03]** Integration test `TenantGuard` — 401 sin token, 403 con org incorrecta
+- [ ] **[TEST-04]** Unit test `WelverStrategy.enrichConversationContext` — mock `OrganizationConfigService`
+- [ ] **[TEST-05]** Unit test `WelverPaymentStrategy.enrichPaymentContext` — routing por país
+
+### P2 — Observabilidad (importante antes de escalar)
+
+- [ ] **[OBS-01]** Dashboard Grafana Cloud — métricas base: request_duration, error_rate por servicio
+- [ ] **[OBS-02]** Adoptar `grpcMetadata()` en callers concretos (propagación X-Request-Id en gRPC)
+
+### P3 — Deuda técnica existente (no bloquea día 1)
+
+- [ ] **[DT-023]** `getAgentMetrics` analytics: reemplazar `take: 50_000 × 2` por SQL GROUP BY (parche documentado en `.claude/patches/`)
+- [ ] **[DT-024]** ZodExceptionFilter en notificaciones, analytics, workers (hoy ZodError → HTTP 500)
+- [ ] **[ECO-PS-02]** Completar `welver.strategy.ts` pasarela con routing real cuando haya reqs concretos
+- [ ] **[ECO-PS-04]** Evaluar marketing-backend para Strategy (fuera de scope por ahora)

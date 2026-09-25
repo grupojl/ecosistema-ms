@@ -61,7 +61,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     opts: CircuitBreakerOptions,
   ): CircuitBreaker<unknown[], T> {
     if (this.breakers.has(key)) {
-      return this.breakers.get(key) as unknown as CircuitBreaker<unknown[], T>;
+      return this.breakers.get(key) as unknown as CircuitBreaker<unknown[], T> // @ecosistema-ms/opossum-cast;
     }
     const breaker = new CircuitBreaker(fn, {
       timeout:                  opts.timeout        ?? 10_000,
@@ -72,7 +72,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     breaker.on('open',     () => this.logger.warn(`CB open: ${key}`));
     breaker.on('halfOpen', () => this.logger.log(`CB half-open: ${key}`));
     breaker.on('close',    () => this.logger.log(`CB closed: ${key}`));
-    this.breakers.set(key, breaker as unknown as CircuitBreaker<unknown[], unknown>);
+    this.breakers.set(key, breaker as unknown as CircuitBreaker<unknown[], unknown> // @ecosistema-ms/opossum-cast);
     return breaker;
   }
 }

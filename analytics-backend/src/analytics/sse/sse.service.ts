@@ -56,7 +56,7 @@ export class SseService implements OnModuleDestroy {
 
     this.subscriber.on('message', (_channel: string, message: string) => {
       try {
-        const event = JSON.parse(message) as LiveEvent;
+        let event: LiveEvent; try { event = JSON.parse(message) as LiveEvent; } catch { return; } // @ecosistema-ms/jsonb-cast
         this.broadcast(event);
       } catch {
         // mensaje mal formado — ignorar

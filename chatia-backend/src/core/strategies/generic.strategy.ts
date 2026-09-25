@@ -1,42 +1,38 @@
-// =============================================================================
-// core/strategies/generic.strategy.ts
-// Estrategia fallback cuando el proyecto no tiene módulo específico.
-// No enriquece contexto ni ejecuta side-effects — pasa el mensaje directo al LLM.
-// =============================================================================
-
-import { Injectable }                                        from '@nestjs/common';
-import type { ProjectStrategy }                              from '@/core/strategies/project-strategy.interface';
-import { ProjectContext, ProjectType }                       from '@/core/strategies/project-context.interface';
-import type { AssistantSession }                             from '@prisma/client';
+// chatia-backend/src/core/strategies/generic.strategy.ts
+// Fallback garantizado. NUNCA crece con lógica de negocio real.
+import { Injectable, Logger } from '@nestjs/common';
+import {
+  ProjectType, type ProjectStrategy,
+  type ConversationEnrichInput, type ConversationResult,
+} from './project-strategy.interface.js';
+import {
+  DEFAULT_ORG_PROFILE,
+  type ProjectContext, type OrganizationProfile,
+} from './project-context.interface.js';
 
 @Injectable()
 export class GenericStrategy implements ProjectStrategy {
-  getProjectType(): ProjectType {
-    return ProjectType.GENERIC;
-  }
+  private readonly logger = new Logger(GenericStrategy.name);
 
-  async enrichContext(
-    _message: string,
-    projectId: string,
-    organizationId: string,
-  ): Promise<ProjectContext> {
+  getProjectType(): ProjectType { return ProjectType.GENERIC; }
+
+  async enrichConversationContext(input: ConversationEnrichInput): Promise<ProjectContext> {
+    this.logger.debug(`GenericStrategy — ecosystemId=${input.ecosystemId} org=${input.organizationId}`);
     return {
-      businessData: {},
-      systemPromptAddons: '',
-      meta: {
-        projectType: ProjectType.GENERIC,
-        projectId,
-        organizationId,
-        enrichedAt: new Date(),
-      },
+      systemPrompt:   'Eres un asistente útil y amable.',
+      defaultStage:   'INITIAL',
+      preferredModel: 'llama-3.3-70b-versatile',
+      useFaqFallback: false,
+      orgProfile:     { ...DEFAULT_ORG_PROFILE, organizationId: input.organizationId, ecosystemId: input.ecosystemId },
+      businessData:   {},
     };
   }
 
-  async afterResponse(
-    _response: string,
-    _context: ProjectContext,
-    _session: AssistantSession,
-  ): Promise<void> {
-    // generic no ejecuta side-effects
+  async afterConversationResult(_r: ConversationResult, _c: ProjectContext): Promise<void> {
+    // no-op
+  }
+
+  async resolveOrgProfile(ecosystemId: string, organizationId: string): Promise<OrganizationProfile> {
+    return { ...DEFAULT_ORG_PROFILE, organizationId, ecosystemId };
   }
 }

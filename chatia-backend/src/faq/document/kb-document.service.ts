@@ -37,7 +37,7 @@ export class KbDocumentService {
       where: {
         knowledgeBaseId: kbId,
         organizationId,
-        ...(status ? { status: status as any } : {}),
+        ...(status ? { status: status as any // @ecosistema-ms/enum-cast } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

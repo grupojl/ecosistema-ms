@@ -1,12 +1,9 @@
-// =============================================================================
-// modules/mexus/types/context.ts
-// Definición del contexto de negocio específico de MEXUS.
-// TODO: completar businessData con los campos reales cuando se integre el proyecto.
-// =============================================================================
-
+// chatia-backend/src/modules/mexus/types/context.ts
+// TODO: completar campos cuando se integre el proyecto MEXUS.
 export interface MEXUSBusinessData {
-  // TODO: agregar campos específicos de MEXUS cuando se integre
-  // Ejemplo para ecommerce: products, cart, order
-  // Ejemplo para saas: plan, flags, quotas
+  plan:              'free' | 'pro' | 'enterprise';
+  organizationName:  string;
+  hasProductCatalog: boolean;
+  activeMarkets:     string[];
   [key: string]: unknown;
 }

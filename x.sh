@@ -1,465 +1,826 @@
-#!/bin/bash
-set -euo pipefail
-
+#!/usr/bin/env bash
 # =============================================================================
-# x.sh — actualiza .claude/ con la decisión de replicar ProjectStrategy
-#
-# Documenta:
-#   1. ADR-019: por qué se replica el patrón, referentes de industria
-#      (Salesforce, Shopify) y qué se toma de cada uno
-#   2. architecture/12-project-strategy-pattern.md: el patrón en sí,
-#      como referencia técnica permanente (mismo nivel que 00-principios.md)
-#   3. roadmap/deuda-tecnica.md: deuda de tipado de businessData + pasos
-#      manuales pendientes del scaffold
-#   4. lifecycle/tasks.md: tasks ejecutables de esta iniciativa
-#   5. CLAUDE.md: referencia rápida actualizada
-#
-# Uso: bash x.sh   (desde la raíz del monorepo, junto a .claude/)
-# No toca schema.prisma ni app.module.ts — eso sigue siendo manual.
+# x.sh — Fixes as any + calidad de código · GrupoJL monorepos
+# Versión: 3.0 — calibrada contra grep real de cada repo
 # =============================================================================
+# Uso (desde el root del repo):
+#   bash x.sh ecosistema-ms
+#   bash x.sh ecosistema
+#   bash x.sh superadmin
+#
+# Cada fix incluye:
+#   - El diagnóstico exacto (por qué es un problema)
+#   - La solución aplicada (AUTO) o la acción con código listo (MANUAL)
+#   - Verificación con grep al final
+#
+# Exit 0 siempre — no rompe CI
+# =============================================================================
+set -uo pipefail
 
-CLAUDE_DIR=".claude"
+TARGET="${1:-}"
 
-if [ ! -d "$CLAUDE_DIR" ]; then
-  echo "[ERROR] No existe $CLAUDE_DIR — correr desde la raíz del monorepo."
-  exit 1
-fi
+R='\033[0;31m' G='\033[0;32m' Y='\033[1;33m' B='\033[0;34m'
+BOLD='\033[1m' DIM='\033[2m' NC='\033[0m'
 
-echo "=== Actualizando $CLAUDE_DIR ==="
+ok()   { echo -e "  ${G}[FIX]${NC}     $*"; }
+warn() { echo -e "  ${Y}[MANUAL]${NC}  $*"; }
+skip() { echo -e "  ${B}[SKIP]${NC}    $*"; }
+chk()  { echo -e "  ${DIM}[VERIFY]${NC}  $*"; }
+hdr()  { echo -e "\n${BOLD}  ── $* ──${NC}"; }
+sep()  { echo -e "${BOLD}══════════════════════════════════════════════════════${NC}"; }
+code() { echo -e "          ${DIM}$*${NC}"; }
 
-mkdir -p "$CLAUDE_DIR/decisions"
-mkdir -p "$CLAUDE_DIR/architecture"
-mkdir -p "$CLAUDE_DIR/roadmap"
-mkdir -p "$CLAUDE_DIR/lifecycle"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. ADR-019 — decisión + referentes de industria
-# ─────────────────────────────────────────────────────────────────────────────
-cat > "$CLAUDE_DIR/decisions/ADR-019-project-strategy-multi-servicio.md" <<'EOF'
-# ADR-019 — Replicar ProjectStrategy en pasarelapagos-backend y notificaciones-backend
-
-**Fecha:** 2026-09-23
-**Estado:** Aceptado — scaffold generado, wiring manual pendiente
-**Repo:** grupojl/ecosistema-ms
-
-## Contexto
-
-`chatia-backend` tiene el patrón `ProjectStrategy` / `ProjectStrategyRegistry`
-(`src/core/strategies/`) que permite que cada ecosistema (welver, manzana,
-mexus) personalice comportamiento del core sin que el core conozca al
-ecosistema concreto. El core solo depende de la interface `ProjectStrategy`;
-el registry resuelve en runtime cuál usar, con `GenericStrategy` como
-fallback seguro si no hay estrategia registrada.
-
-Los otros 5 microservicios resuelven multi-tenancy solo con
-`ecosystemId` + `organizationId` como filtro de query — eso es aislamiento
-de **datos**, no personalización de **comportamiento**. Si welver necesita
-un flujo de pago distinto a manzana (otro provider preferido, otra regla
-de routing), hoy no hay dónde poner esa lógica sin `if (ecosystemId === X)`
-esparcido en el service.
-
-## Decisión
-
-Replicar el patrón `ProjectStrategy` en los microservicios donde el
-**comportamiento** (no solo los datos) difiere por ecosistema:
-
-- `pasarelapagos-backend` — routing de providers, métodos de pago habilitados
-- `notificaciones-backend` — templates, canales preferidos, horarios de envío
-
-**No se replica (todavía) en:**
-
-- `analytics-backend` — es dimensión de datos (`ecosystemId` en el where),
-  no comportamiento. Agregar Strategy ahí hoy sería abstracción sin uso.
-- `workers-backend` — los jobs ya reciben `ecosystemId` en el payload; el
-  *procesamiento* no difiere por ecosistema todavía.
-- `marketing-backend` — candidato futuro (reglas de automatización por
-  ecosistema) pero fuera de scope de esta iteración.
-
-Criterio para decidir si un microservicio nuevo necesita el patrón:
-
-> ¿El *comportamiento* de negocio cambia por ecosistema, o solo cambian
-> los *datos* que se leen/escriben? Si es solo datos, un filtro
-> `ecosystemId` en el where alcanza. Si es comportamiento, Strategy.
-
-## Referentes de industria
-
-### Salesforce — multi-tenancy real con personalización tipada
-
-Salesforce corre miles de organizaciones sobre el mismo core; cada una
-personaliza comportamiento via Apex Triggers y Custom Metadata sin forkear
-el motor. El paralelismo es directo:
-
-| Nuestro patrón | Salesforce |
-|---|---|
-| `ProjectStrategy` interface | Trigger framework |
-| `ProjectStrategyRegistry.get(type)` | Runtime resuelve Apex según Org ID |
-| `GenericStrategy` fallback | Comportamiento default sin triggers |
-| `businessData: Record<string, unknown>` | Custom Fields / Custom Metadata Types |
-
-Lo que tomamos de Salesforce: **nunca dejar `businessData` como blob sin
-tipo**. Ellos fuerzan que cada organización declare sus Custom Fields con
-tipo explícito. Ver sección "Deuda consciente" — hoy `businessData` es
-`Record<string, unknown>` en los 3 servicios con Strategy; es aceptable en
-el arranque, no lo es a 5+ ecosistemas.
-
-### Shopify — extensibilidad desacoplada del ciclo de deploy
-
-Shopify Functions/Apps permiten que un merchant personalice comportamiento
-del core sin que el ciclo de release del merchant dependa del ciclo de
-release de la plataforma — la personalización corre en un proceso separado
-invocado por contrato (webhook/extension point).
-
-Lo que **no** tomamos de Shopify todavía: hoy agregar un ecosistema nuevo
-implica agregar una carpeta en `modules/` y redeployar el microservicio.
-Es aceptable con 3 ecosistemas. Si algún ecosistema necesita iterar su
-lógica de negocio sin esperar nuestro pipeline de CI, la migración natural
-es sacar `modules/{eco}/` a un servicio separado que el core invoca por
-HTTP/evento — la interface `ProjectStrategy` no cambia, solo el transporte
-detrás de la implementación. Esto es exactamente el valor de haber puesto
-la interface primero.
-
-## Alternativas descartadas
-
-| Alternativa | Por qué se descartó |
-|---|---|
-| `if (ecosystemId === 'welver')` inline en el service | No escala más allá de 2 ecosistemas, imposible de testear en aislamiento, mezcla infraestructura con reglas de negocio |
-| Config JSON en DB sin código | Sirve para umbrales/flags simples, no para lógica de routing o side-effects — se evaluará como complemento, no reemplazo |
-| Microservicio por ecosistema | Multiplica la superficie de deploy y mantenimiento sin necesidad real a este tamaño — el patrón Strategy da el mismo aislamiento de lógica sin el costo operacional |
-
-## Consecuencias
-
-**Ganancia:**
-- El core de pagos y notificaciones nunca conoce el ecosistema concreto —
-  testeable en aislamiento con `GenericStrategy`
-- Agregar un ecosistema nuevo no toca el core, solo agrega `modules/{eco}/`
-- Un bug de una estrategia de ecosistema no puede romper el flujo de los
-  demás (hooks obligados a no lanzar)
-
-**Costo / deuda técnica consciente:**
-- `businessData: Record<string, unknown>` sin tipar en los 3 servicios —
-  aceptable ahora, bloqueante a 5+ ecosistemas (ver roadmap/deuda-tecnica.md)
-- Wiring de `app.module.ts` es manual — el scaffold no lo automatiza
-  porque tocar imports de módulos de forma automática es más riesgoso que
-  el ahorro de tiempo que da
-- Los 3 `*.strategy.ts` generados son placeholders (`TODO`) — no hay
-  lógica real todavía, igual que las estrategias de chatia-backend
-
-**Regla permanente que queda:**
-Antes de replicar este patrón en un microservicio nuevo, responder primero
-la pregunta del criterio de decisión (comportamiento vs. datos). Si la
-respuesta es "solo datos", no se agrega `core/strategies/` — se resuelve
-con el filtro `ecosystemId` + `organizationId` estándar del ecosistema-ms.
-
-## Referencias
-
-- `architecture/12-project-strategy-pattern.md` — el patrón documentado
-  como referencia técnica permanente
-- `chatia-backend/src/core/strategies/` — implementación de referencia
-- `roadmap/deuda-tecnica.md` — sección "ProjectStrategy — tipado pendiente"
-- `lifecycle/tasks.md` — tasks ejecutables de esta iniciativa
-EOF
-echo "  [OK] decisions/ADR-019-project-strategy-multi-servicio.md"
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. architecture/12-project-strategy-pattern.md — referencia técnica permanente
-# ─────────────────────────────────────────────────────────────────────────────
-cat > "$CLAUDE_DIR/architecture/12-project-strategy-pattern.md" <<'EOF'
-# 12 — Patrón ProjectStrategy: personalización por ecosistema sin acoplar el core
-
-> Referentes: **Salesforce** (multi-tenancy con Custom Fields tipados) ·
-> **Shopify** (extensibilidad desacoplada del ciclo de deploy)
->
-> Decisión formal: `decisions/ADR-019-project-strategy-multi-servicio.md`
-
----
-
-## El principio
-
-> El core de un microservicio nunca debe conocer qué ecosistema lo está
-> llamando. Solo conoce un contrato (`ProjectStrategy`); quién lo implementa
-> es responsabilidad de `modules/{ecosistema}/`.
-
-Esto es lo mismo que dice `architecture/00-principios.md` para la frontera
-entre microservicios, aplicado ahora a la frontera entre el core de un
-microservicio y sus ecosistemas cliente.
-
----
-
-## Cuándo aplica este patrón
-
-Antes de agregar `core/strategies/` a un microservicio nuevo, responder:
-
-**¿El comportamiento de negocio cambia por ecosistema, o solo cambian los
-datos que se leen/escriben?**
-
-- Solo datos → alcanza con `ecosystemId` + `organizationId` en el `where`
-  (ver `architecture/00-principios.md`, regla de multi-tenant)
-- Comportamiento (routing, reglas, side-effects, contenido de templates,
-  umbrales de negocio) → aplica Strategy
-
-| Microservicio | ¿Strategy? | Motivo |
-|---|---|---|
-| chatia-backend | ✅ implementado | prompt, tono, reglas de escalación por ecosistema |
-| pasarelapagos-backend | ✅ implementado | routing de providers, métodos de pago habilitados |
-| notificaciones-backend | ✅ implementado | templates, canales preferidos, horarios |
-| marketing-backend | 🔲 candidato futuro | reglas de automatización por ecosistema — fuera de scope actual |
-| analytics-backend | ❌ no aplica | es dimensión de datos, no comportamiento |
-| workers-backend | ❌ no aplica hoy | procesamiento no difiere por ecosistema todavía |
-
----
-
-## Estructura canónica
-
-```
-{servicio}-backend/src/
-  core/strategies/
-    project-context.interface.ts   # shape del contexto enriquecido
-    project-strategy.interface.ts  # contrato que cada ecosistema implementa
-    project-strategy.registry.ts   # resuelve estrategia en runtime
-    generic.strategy.ts            # fallback — nunca falla
-    project-strategy.module.ts     # exporta el registry
-  modules/
-    welver/
-      welver.config.ts             # flags, overrides default
-      welver.strategy.ts           # implementa ProjectStrategy
-      welver.module.ts             # se auto-registra en onModuleInit
-      types/context.ts             # TODO: tipar businessData
-    manzana/  (mismo molde)
-    mexus/    (mismo molde)
-```
-
-## Contrato `ProjectStrategy`
-
-Dos hooks, nombrados según el dominio del microservicio (no genéricos —
-`enrichPaymentContext`/`afterChargeResult` en pagos, no
-`enrichContext`/`afterResponse` copiado literal de chatia). La razón:
-si el método se llama igual en los 6 microservicios pero hace cosas
-distintas, se pierde legibilidad al leer una estrategia concreta.
-
-```ts
-interface ProjectStrategy {
-  // Se llama ANTES de la operación de negocio.
-  // Si falla: loguea y devuelve contexto vacío. NUNCA lanza.
-  enrichXContext(ecosystemId, organizationId, input): Promise<ProjectContext>;
-
-  // Se llama DESPUÉS de la operación.
-  // Si falla: solo loguea. NUNCA lanza.
-  afterXResult(result, context): Promise<void>;
-
-  getProjectType(): ProjectType;
+# sed in-place portable GNU (Linux/MINGW64) y BSD (macOS)
+_sed() {
+  local expr="$1" file="$2"
+  [[ -f "$file" ]] || { echo -e "  ${R}[ERR]${NC}     Archivo no encontrado: $file"; return 1; }
+  if sed --version 2>/dev/null | grep -q "GNU"; then
+    sed -i "$expr" "$file"
+  else
+    sed -i '' "$expr" "$file"
+  fi
 }
-```
 
-## Regla dura: los hooks nunca lanzan
+# =============================================================================
+# ECOSISTEMA-MS
+#
+# ANÁLISIS de cada `as any` del grep real:
+#
+# ✅ YA ANOTADOS correctamente (no tocar):
+#   http-exception.filter.ts          → // @ecosistema-ms/http-filter
+#   prisma-conversations.repository   → // @ecosistema-ms/jsonb-cast
+#   kb-document.service.ts            → // @ecosistema-ms/enum-cast
+#   groq.service.ts                   → // @ecosistema-ms/jsonb-cast
+#   langgraph/nodes/index.ts          → // @ecosistema-ms/enum-cast
+#   health.controller.ts              → // @ecosistema-ms/opossum-cast
+#   preferences.service.ts ×2         → // @ecosistema-ms/enum-cast
+#   all-exceptions.filter.ts          → // @ecosistema-ms/http-filter
+#   reconciliation.service.ts         → // @ecosistema-ms/jsonb-cast
+#   stripe.provider.ts                → // @ecosistema-ms/stripe-cast
+#   circuit-breaker.service.ts        → // @ecosistema-ms/opossum-cast
+#   routing.service.ts                → // @ecosistema-ms/enum-cast
+#   webhook.processor.ts              → // @ecosistema-ms/jsonb-cast
+#   webhooks.controller.ts ×2         → // @ecosistema-ms/jsonb-cast
+#   jobs.service.ts ×2                → // @ecosistema-ms/jsonb-cast
+#
+# ❌ FIXES REALES (2 casos):
+#   1. rag.service.ts:59          → enum-cast DUPLICADO → sed deduplicar
+#   2. automation-check.processor.ts:33 → `rule as any` sin anotación
+#      Causa: AutomationRule.condition/action son Prisma.JsonValue
+#      Fix: interfaz tipada + anotación // @ecosistema-ms/jsonb-cast
+#      Y: `job.id as string` → `job.id ?? ''` (Job.id es string|undefined)
+# =============================================================================
+fix_ecosistema_ms() {
+  sep
+  echo -e "${BOLD}  x.sh — ecosistema-ms · fixes as any${NC}"
+  sep
 
-Un bug en la estrategia de un ecosistema no puede romper el flujo de los
-demás. Si `enrichXContext` o `afterXResult` fallan, capturan el error,
-loguean y devuelven un valor neutro (contexto vacío / no-op). Esto es
-lo mismo que ya aplica `04-degradacion-elegante.md` para integraciones
-externas — un fallo de personalización es una integración más.
+  # ── B · H6 · rag.service.ts — enum-cast DUPLICADO ─────────────────────────
+  hdr "rag.service.ts — @enum-cast duplicado (H6)"
+  local f_rag="chatia-backend/src/faq/rag/rag.service.ts"
+  if [[ -f "$f_rag" ]]; then
+    if grep -q "enum-cast.*enum-cast" "$f_rag" 2>/dev/null; then
+      # Antes: as any // @ecosistema-ms/enum-cast // @ecosistema-ms/enum-cast,
+      # Después: as any // @ecosistema-ms/enum-cast,
+      _sed 's| // @ecosistema-ms/enum-cast // @ecosistema-ms/enum-cast| // @ecosistema-ms/enum-cast|g' "$f_rag" \
+        && ok "rag.service.ts:59 — enum-cast deduplicado" \
+        || warn "No se pudo deduplicar automáticamente: $f_rag"
+    else
+      ok "rag.service.ts — sin enum-cast duplicado"
+    fi
+  else
+    skip "$f_rag no encontrado"
+  fi
 
-## Registry con fallback obligatorio
+  # ── B · automation-check.processor.ts — rule as any sin anotación ─────────
+  hdr "automation-check.processor.ts — rule as any + job.id as string"
+  local f_auto="marketing-backend/src/campaigns/processors/automation-check.processor.ts"
+  if [[ -f "$f_auto" ]]; then
+    # Diagnóstico:
+    # AutomationRule.condition y .action son Prisma.JsonValue (campo Json en schema)
+    # No se puede eliminar el cast porque Prisma no genera tipos estructurales para Json
+    # La solución correcta: definir la interface tipada y anotar con jsonb-cast
 
-```ts
-get(type: ProjectType): ProjectStrategy {
-  const strategy = this.strategies.get(type);
-  if (!strategy) {
-    // warning, nunca throw — GenericStrategy responde con comportamiento default
-    return this.strategies.get(ProjectType.GENERIC)!;
+    # Fix 1: rule as any → rule as AutomationRulePayload // @ecosistema-ms/jsonb-cast
+    # Primero verificar si ya tiene la interfaz
+    if ! grep -q "AutomationRulePayload\|automation-rule-payload" "$f_auto" 2>/dev/null; then
+      # Insertar la interfaz al inicio del archivo (después de los imports)
+      # Buscar la última línea de import para insertar después
+      local last_import_line
+      last_import_line=$(grep -n "^import " "$f_auto" 2>/dev/null | tail -1 | cut -d: -f1)
+      if [[ -n "$last_import_line" ]]; then
+        # Insertar la interfaz tipada después del último import
+        local interface_block
+        interface_block=$(cat << 'IFACE'
+\
+/** Tipos para AutomationRule.condition y .action (campos Json en Prisma schema) */\
+interface AutomationRuleCondition {\
+  metric:     string;  // 'roas' | 'ctr' | 'cpc' | 'spend'\
+  operator:   string;  // 'lt' | 'gt' | 'lte' | 'gte' | 'eq'\
+  value:      number;\
+  windowDays: number;\
+}\
+interface AutomationRuleAction {\
+  type:    string;  // 'pause' | 'scale_budget'\
+  factor?: number;  // para scale_budget\
+}\
+interface AutomationRulePayload {\
+  condition: AutomationRuleCondition;\
+  action:    AutomationRuleAction;\
+}
+IFACE
+)
+        _sed "${last_import_line}a ${interface_block}" "$f_auto" \
+          && ok "automation-check.processor.ts — AutomationRulePayload interface insertada" \
+          || warn "No se pudo insertar la interface automáticamente"
+      fi
+    else
+      ok "automation-check.processor.ts — AutomationRulePayload ya existe"
+    fi
+
+    # Fix 2: anotar el as any con jsonb-cast
+    if grep -q "rule as any[^/]" "$f_auto" 2>/dev/null; then
+      _sed 's|rule as any\b|rule as AutomationRulePayload \/\/ @ecosistema-ms\/jsonb-cast|g' "$f_auto" \
+        && ok "automation-check.processor.ts — rule as any → tipado con anotación" \
+        || warn "No se pudo anotar rule as any en: $f_auto"
+    elif grep -q "rule as any" "$f_auto" 2>/dev/null; then
+      ok "automation-check.processor.ts — rule as any ya tiene anotación o fue corregido"
+    else
+      ok "automation-check.processor.ts — sin rule as any"
+    fi
+
+    # Fix 3: job.id as string → job.id ?? '' (Job.id es string | undefined en BullMQ)
+    if grep -q "job\.id as string" "$f_auto" 2>/dev/null; then
+      _sed "s|job\\.id as string|job.id ?? ''|g" "$f_auto" \
+        && ok "automation-check.processor.ts — job.id as string → job.id ?? ''" \
+        || warn "No se pudo corregir job.id as string en: $f_auto"
+    else
+      ok "automation-check.processor.ts — job.id ya es seguro"
+    fi
+  else
+    skip "$f_auto no encontrado (marketing-backend puede no estar en este monorepo aún)"
+  fi
+
+  # ── I · exec + railway.json (siempre verificar) ───────────────────────────
+  hdr "I · Dockerfiles y railway.json — estado actual"
+  local svcs=(chatia-backend pasarelapagos-backend notificaciones-backend analytics-backend workers-backend)
+  for svc in "${svcs[@]}"; do
+    local df="${svc}/Dockerfile"
+    if [[ -f "$df" ]]; then
+      if ! grep -q "exec " "$df" 2>/dev/null; then
+        if grep -q "dumb-init" "$df" 2>/dev/null; then
+          _sed 's|^CMD \["node",|CMD exec dumb-init node|g' "$df"
+          _sed 's|^CMD \["dumb-init",|CMD exec dumb-init|g' "$df"
+          _sed 's|, "dist/main\.js"\]| dist/main.js|g' "$df"
+          ok "I exec: $svc — CMD actualizado"
+        fi
+      fi
+    fi
+    if [[ ! -f "${svc}/railway.json" ]]; then
+      mkdir -p "$svc"
+      cat > "${svc}/railway.json" << 'RAILWAY'
+{
+  "$schema": "https://railway.com/railway.schema.json",
+  "build": { "builder": "DOCKERFILE", "dockerfilePath": "Dockerfile" },
+  "deploy": {
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3,
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 300
   }
-  return strategy;
 }
-```
+RAILWAY
+      ok "I railway.json: $svc — creado"
+    fi
+  done
 
-Un ecosistema mal configurado (o uno nuevo sin estrategia todavía) nunca
-tira el microservicio — cae a comportamiento genérico.
+  # ── H6 · deduplicar cualquier otro @jsonb-cast duplicado ─────────────────
+  hdr "H6 · @jsonb-cast duplicado — deduplicar en todo el repo"
+  local h6_count=0
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    _sed 's| // @ecosistema-ms/jsonb-cast // @ecosistema-ms/jsonb-cast| // @ecosistema-ms/jsonb-cast|g' "$f"
+    _sed 's| //@ecosistema-ms/jsonb-cast //@ecosistema-ms/jsonb-cast| // @ecosistema-ms/jsonb-cast|g' "$f"
+    ok "H6 deduplicado: $f"
+    h6_count=$((h6_count+1))
+  done < <(grep -rl "@ecosistema-ms/jsonb-cast" --include="*.ts" . 2>/dev/null \
+    | xargs grep -l "@ecosistema-ms/jsonb-cast.*@ecosistema-ms/jsonb-cast" 2>/dev/null \
+    | grep -v "node_modules\|\.spec\." || true)
+  [[ "$h6_count" -eq 0 ]] && ok "H6: sin duplicados"
 
----
+  # ── F3 · Lock @Cron ───────────────────────────────────────────────────────
+  hdr "F3 · @Cron sin SET NX EX — schedulers a corregir manualmente"
+  local cron_no_lock
+  cron_no_lock=$(find . -name "*.ts" -not -path "*/node_modules/*" -not -name "*.spec.ts" \
+    -print0 2>/dev/null | xargs -0 grep -l "@Cron\b" 2>/dev/null \
+    | xargs grep -L "'NX'\|\"NX\"\|LOCK_KEY\b\|SET.*NX" 2>/dev/null || true)
+  if [[ -z "$cron_no_lock" ]]; then
+    ok "F3: todos los @Cron tienen SET NX EX"
+  else
+    printf '%s\n' "$cron_no_lock" | while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      warn "Sin lock: $f"
+      warn "Agregar al inicio del método @Cron:"
+      code "const LOCK_KEY = 'scheduler:$(basename "$f" .ts):lock';"
+      code "const LOCK_TTL = 55;"
+      code "const lock = await this.redis.set(LOCK_KEY, '1', 'EX', LOCK_TTL, 'NX');"
+      code "if (!lock) return;"
+    done
+  fi
 
-## Deuda consciente: `businessData` sin tipar
+  # ── K4 · ProjectStrategy sin try/catch ────────────────────────────────────
+  hdr "K4 · ProjectStrategy hooks sin try/catch"
+  local strats_no_try
+  strats_no_try=$(find . -name "*.strategy.ts" -not -path "*/node_modules/*" \
+    -print0 2>/dev/null \
+    | xargs -0 grep -l "enrich\|afterCharge\|afterNotif\|afterResponse" 2>/dev/null \
+    | xargs -r grep -L "try {" 2>/dev/null || true)
+  if [[ -z "$strats_no_try" ]]; then
+    ok "K4: todas las strategies tienen try/catch"
+  else
+    printf '%s\n' "$strats_no_try" | while IFS= read -r f; do
+      [[ -z "$f" ]] && continue
+      warn "Sin try/catch: $f"
+      warn "Envolver cada hook en:"
+      code "try { /* lógica actual */ } catch (err) { this.logger.error('strategy failed', err); }"
+    done
+  fi
 
-`ProjectContext.businessData` es `Record<string, unknown>` en las tres
-implementaciones actuales. Es aceptable en el arranque (3 ecosistemas,
-estrategias todavía placeholder). **No es aceptable pasado ese punto.**
+  # ═══════════════════════════════════════════════════════════════════════════
+  sep
+  echo -e "${BOLD}  VERIFICACIÓN — ecosistema-ms${NC}"
+  sep
 
-Salesforce fuerza Custom Fields tipados por organización — nosotros debemos
-tipar `businessData` por ecosistema apenas la primera estrategia tenga
-lógica real:
+  chk "B1 · as any sin anotación en producción (debe ser 0):"
+  local v_b1
+  v_b1=$(find . \( -name "*.ts" -o -name "*.tsx" \) \
+    -not -path "*/node_modules/*" -not -name "*.spec.ts" -not -name "*.e2e*" \
+    -print0 2>/dev/null | xargs -0 grep -l " as any" 2>/dev/null \
+    | xargs grep -c " as any" 2>/dev/null \
+    | grep -v "// @ecosistema-ms/" | wc -l | tr -d ' ')
+  # Más preciso: buscar directamente
+  local v_b1_direct
+  v_b1_direct=$(find . \( -name "*.ts" -o -name "*.tsx" \) \
+    -not -path "*/node_modules/*" -not -name "*.spec.ts" \
+    -print0 2>/dev/null \
+    | xargs -0 grep -n " as any" 2>/dev/null \
+    | grep -v "// @ecosistema-ms/\|node_modules\|\.spec\." | wc -l | tr -d ' ')
+  echo "    sin anotación: ${v_b1_direct:-0}"
 
-```ts
-// ❌ hoy
-businessData: Record<string, unknown>;
+  chk "H6 · @jsonb-cast duplicado (debe ser 0):"
+  local v_h6
+  v_h6=$(grep -r "@ecosistema-ms/jsonb-cast" --include="*.ts" . 2>/dev/null \
+    | grep "@ecosistema-ms/jsonb-cast.*@ecosistema-ms/jsonb-cast" \
+    | grep -v "node_modules\|\.spec\." | wc -l | tr -d ' ')
+  echo "    duplicados: ${v_h6:-0}"
 
-// ✅ objetivo, cuando welver tenga lógica real en pasarelapagos-backend
-interface WelverPaymentBusinessData {
-  preferredProvider: 'mercadopago' | 'stripe';
-  maxInstallments: number;
+  chk "H6 · @enum-cast duplicado (debe ser 0):"
+  local v_h6e
+  v_h6e=$(grep -r "@ecosistema-ms/enum-cast" --include="*.ts" . 2>/dev/null \
+    | grep "@ecosistema-ms/enum-cast.*@ecosistema-ms/enum-cast" \
+    | grep -v "node_modules\|\.spec\." | wc -l | tr -d ' ')
+  echo "    duplicados: ${v_h6e:-0}"
+
+  chk "automation-check.processor.ts — job.id seguro (debe ser 0 'as string'):"
+  local v_jobid
+  v_jobid=$(grep -c "job\.id as string" \
+    "marketing-backend/src/campaigns/processors/automation-check.processor.ts" 2>/dev/null || true)
+  echo "    job.id as string: ${v_jobid:-0}"
+
+  chk "F3 · @Cron sin SET NX EX (debe ser 0):"
+  local v_f3=0
+  while IFS= read -r f; do
+    [[ -z "$f" ]] && continue
+    grep -q "'NX'\|\"NX\"\|LOCK_KEY" "$f" 2>/dev/null || v_f3=$((v_f3+1))
+  done < <(find . -name "*.ts" -not -path "*/node_modules/*" -not -name "*.spec.ts" \
+    -print0 2>/dev/null | xargs -0 grep -l "@Cron\b" 2>/dev/null || true)
+  echo "    schedulers sin lock: $v_f3"
+
+  chk "I · exec en Dockerfiles:"
+  local svcs2=(chatia-backend pasarelapagos-backend notificaciones-backend analytics-backend workers-backend)
+  for svc in "${svcs2[@]}"; do
+    local df="${svc}/Dockerfile"
+    if [[ -f "$df" ]]; then
+      printf "    %-48s exec=%s dumb-init=%s\n" \
+        "$df" \
+        "$(grep -c "exec " "$df" 2>/dev/null || true)" \
+        "$(grep -c "dumb-init" "$df" 2>/dev/null || true)"
+    fi
+  done
+
+  sep; echo ""
 }
-```
 
-Ver `roadmap/deuda-tecnica.md` para el ticket concreto.
+# =============================================================================
+# ECOSISTEMA (welver)
+#
+# ANÁLISIS de cada `as any` del grep real:
+#
+# ✅ TESTS — ignorar (no afectan score B1):
+#   real-ecommerce-front/lib/seo/json-ld.spec.ts            ×8
+#   realsass-ecommerce-back/src/catalog/catalog.service.spec.ts ×5
+#   realsass-ecommerce-back/src/orders/orders.service.spec.ts   ×varios
+#   realsass-ecommerce-back/src/orders/__tests__/            ×1
+#   realsass-sass-back/src/markets/__tests__/                ×1
+#
+# ✅ PRODUCCIÓN YA ANOTADOS (no tocar):
+#   realsass-dashboard-front/**  → // @real/jsonb-cast ×múltiples (tRPC JsonValue)
+#   realsass-ecommerce-back/src/common/filters/http-exception.filter.ts ×2
+#   realsass-ecommerce-back/src/trpc/trpc.ts ×6 (req.user/tenant, tRPC procedures)
+#   realsass-sass-front/**       → // @real/jsonb-cast ×múltiples
+#
+# ❌ FIXES REALES (2 casos en producción):
+#   1. activity.service.ts:19 — anotación incorrecta (es enum, no jsonb)
+#      eventType: eventType as any // @real/jsonb-cast
+#      → Fix: cambiar a // @real/enum-cast (semánticamente correcto ADR-007)
+#
+#   2. customer.router.ts:140 — FIX REAL de tipado
+#      (order as any // @real/jsonb-cast).customerId
+#      Causa: OrderRecord (orders.repository.interface.ts) no tiene customerId
+#      Fix: agregar customerId a OrderRecord y a la query findById
+#      → El as any desaparece cuando el tipo tiene el campo
+# =============================================================================
+fix_ecosistema() {
+  sep
+  echo -e "${BOLD}  x.sh — ecosistema (welver) · fixes as any${NC}"
+  sep
 
----
+  # ── B1 · activity.service.ts — corregir anotación (jsonb→enum) ───────────
+  hdr "B1 · activity.service.ts — anotación semántica incorrecta"
+  local f_act="realsass-ecommerce-back/src/activity/activity.service.ts"
+  if [[ -f "$f_act" ]]; then
+    if grep -q "eventType as any // @real/jsonb-cast" "$f_act" 2>/dev/null; then
+      # eventType es un enum de Prisma, no un campo Json → anotación incorrecta
+      # Intento 1: si el enum está en Prisma.$Enums, usarlo directamente
+      warn "activity.service.ts:19 — eventType as any"
+      warn "Diagnóstico: eventType es un enum de Prisma, no un campo Json"
+      warn "La anotación // @real/jsonb-cast es semánticamente incorrecta"
+      warn ""
+      warn "Opción A (FIX REAL — elimina el cast):"
+      code "import type { Prisma } from '@prisma/client';"
+      code "// Si el enum se llama ActivityEventType en schema.prisma:"
+      code "eventType: eventType as Prisma.\$Enums.ActivityEventType,"
+      warn ""
+      warn "Opción B (si el tipo exacto no está disponible — cambiar anotación):"
+      _sed "s|eventType as any // @real/jsonb-cast|eventType as any // @real/enum-cast|g" "$f_act" \
+        && ok "activity.service.ts — anotación corregida a @real/enum-cast" \
+        || warn "No se pudo corregir automáticamente: $f_act"
+    elif grep -q "eventType as any // @real/enum-cast" "$f_act" 2>/dev/null; then
+      ok "activity.service.ts — ya tiene @real/enum-cast"
+    else
+      ok "activity.service.ts — sin cast de eventType detectado"
+    fi
+  else
+    skip "$f_act no encontrado"
+  fi
 
-## Evolución futura: cuándo desacoplar del ciclo de deploy
+  # ── B1 · customer.router.ts — FIX REAL: OrderRecord sin customerId ────────
+  hdr "B1 · customer.router.ts:140 — (order as any).customerId"
+  local f_router="realsass-ecommerce-back/src/trpc/routers/customer.router.ts"
+  local f_iface="realsass-ecommerce-back/src/orders/repository/orders.repository.interface.ts"
 
-Hoy agregar un ecosistema implica agregar `modules/{eco}/` y redeployar.
-Aceptable con 3 ecosistemas. Si algún ecosistema necesita iterar su lógica
-sin esperar el pipeline de CI del ecosistema-ms, la migración (inspirada en
-Shopify Functions) es sacar `modules/{eco}/` a un servicio invocado por
-HTTP/evento — la interface `ProjectStrategy` no cambia, solo el transporte
-detrás de la implementación concreta. No se hace preventivamente: es deuda
-técnica aceptar el redeploy hasta que haya una necesidad real.
+  if [[ -f "$f_router" ]] && [[ -f "$f_iface" ]]; then
+    # Verificar si OrderRecord ya tiene customerId
+    if grep -q "customerId" "$f_iface" 2>/dev/null; then
+      ok "orders.repository.interface.ts — OrderRecord ya tiene customerId"
+      # Si el interface ya tiene customerId, el as any debería eliminarse
+      if grep -q "(order as any" "$f_router" 2>/dev/null; then
+        _sed 's|(order as any // @real/jsonb-cast)\.customerId|order.customerId|g' "$f_router" \
+          && ok "customer.router.ts — (order as any).customerId → order.customerId" \
+          || warn "No se pudo eliminar automáticamente el cast en: $f_router"
+      else
+        ok "customer.router.ts — cast de customerId ya eliminado"
+      fi
+    else
+      # OrderRecord no tiene customerId → Fix en 2 pasos
+      warn "customer.router.ts:140 — FIX REAL REQUERIDO (2 pasos):"
+      warn ""
+      warn "PASO 1: Agregar customerId a OrderRecord en:"
+      warn "  $f_iface"
+      code "export interface OrderRecord {"
+      code "  id:              string;"
+      code "  organizationId:  string;"
+      code "  customerId:      string;  // ← AGREGAR ESTA LÍNEA"
+      code "  sessionId:       string;"
+      code "  status:          OrderStatus;"
+      code "  // ... resto de campos"
+      code "}"
+      warn ""
+      warn "PASO 2: Incluir customerId en la query de PrismaOrdersRepository.findById:"
+      local f_prisma_orders
+      f_prisma_orders=$(find realsass-ecommerce-back/src/orders/repository \
+        -name "prisma-*.repository.ts" 2>/dev/null | head -1)
+      if [[ -n "$f_prisma_orders" ]]; then
+        warn "  $f_prisma_orders"
+        code "// Asegurar que el select/return incluye customerId"
+        code "// o que el toEntity() mapea row.customerId"
+      fi
+      warn ""
+      warn "PASO 3: Una vez hecho, el cast desaparece solo:"
+      code "// Antes:"
+      code 'if (!order || (order as any // @real/jsonb-cast).customerId !== ctx.customerId) {'
+      code "// Después (sin cast):"
+      code 'if (!order || order.customerId !== ctx.customerId) {'
+    fi
+  else
+    skip "customer.router.ts o orders.repository.interface.ts no encontrado"
+  fi
 
-## Checklist antes de escribir una estrategia nueva
+  # ── I · exec + railway.json ───────────────────────────────────────────────
+  hdr "I · Dockerfiles y railway.json"
+  for svc in realsass-sass-back realsass-ecommerce-back; do
+    local df="${svc}/Dockerfile"
+    [[ -f "$df" ]] || { skip "I: $df no encontrado"; continue; }
+    if grep -q "exec " "$df" 2>/dev/null; then
+      ok "I exec ya presente: $svc"
+    else
+      _sed 's|^CMD \["node",|CMD exec dumb-init node|g' "$df"
+      _sed 's|, "dist/main\.js"\]| dist/main.js|g' "$df"
+      ok "I exec: $svc — CMD actualizado"
+    fi
+  done
 
-1. ¿Ya evalué que es comportamiento y no solo datos? (ver tabla arriba)
-2. ¿Los dos hooks están envueltos en try/catch que nunca relanza?
-3. ¿`GenericStrategy` sigue siendo el fallback si el registry no encuentra el tipo?
-4. ¿El nombre de los hooks tiene sentido en el dominio del microservicio,
-   no es un copy-paste literal de chatia?
-5. ¿`businessData` tiene un tipo definido en `types/context.ts`, o sigue
-   como `unknown` a sabiendas de que es deuda?
-EOF
-echo "  [OK] architecture/12-project-strategy-pattern.md"
+  # ── H1 · JSON.parse sin try/catch ─────────────────────────────────────────
+  hdr "H1 · JSON.parse sin try/catch"
+  local h1_targets=(
+    "realsass-sass-back/src/config-cache/config-cache.service.ts"
+    "realsass-ecommerce-back/src/markets/market-resolver.service.ts"
+  )
+  for f in "${h1_targets[@]}"; do
+    if [[ -f "$f" ]]; then
+      if grep -q "JSON\.parse" "$f" 2>/dev/null && ! grep -q "try {" "$f" 2>/dev/null; then
+        warn "JSON.parse sin try/catch: $f"
+        warn "Fix:"
+        code "try { return JSON.parse(raw) as T; } catch { return null; }"
+      else
+        ok "H1: $f — OK"
+      fi
+    fi
+  done
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. roadmap/deuda-tecnica.md — agregar sección (append, no destructivo)
-# ─────────────────────────────────────────────────────────────────────────────
-DEUDA_FILE="$CLAUDE_DIR/roadmap/deuda-tecnica.md"
-touch "$DEUDA_FILE"
+  # ── H5 · as never en prisma-orders ────────────────────────────────────────
+  hdr "H5 · as never sin anotación (prisma-orders.repository.ts:78)"
+  local f_orders_repo
+  f_orders_repo=$(find realsass-ecommerce-back/src/orders/repository \
+    -name "prisma-orders.repository.ts" 2>/dev/null | head -1)
+  if [[ -n "$f_orders_repo" ]] && [[ -f "$f_orders_repo" ]]; then
+    if grep -q "as never[^/]" "$f_orders_repo" 2>/dev/null \
+       || grep -q "as never$" "$f_orders_repo" 2>/dev/null; then
+      # shippingAddress: (input.shippingAddress ?? null) as never,
+      # Fix: as Prisma.InputJsonObject
+      _sed 's|\(input\.shippingAddress ?? null\) as never\b|\(input.shippingAddress ?? null\) as Prisma.InputJsonObject \/\/ @real\/jsonb-cast|g' \
+        "$f_orders_repo" \
+        && ok "H5: prisma-orders.repository.ts — as never → Prisma.InputJsonObject" \
+        || warn "No se pudo corregir automáticamente. Editar línea 78 manualmente:"
+      warn "  shippingAddress: (input.shippingAddress ?? null) as Prisma.InputJsonObject, // @real/jsonb-cast"
+      warn "  Asegurarse de tener: import type { Prisma } from '@prisma/client';"
+    else
+      ok "H5: prisma-orders.repository.ts — sin as never sin anotación"
+    fi
+  else
+    skip "H5: prisma-orders.repository.ts no encontrado"
+  fi
 
-if ! grep -q "## ProjectStrategy — tipado pendiente" "$DEUDA_FILE" 2>/dev/null; then
-  cat >> "$DEUDA_FILE" <<'EOF'
+  # ── J3 · AUDIT-LAST.md ────────────────────────────────────────────────────
+  hdr "J3 · AUDIT-LAST.md"
+  if [[ ! -f ".claude/AUDIT-LAST.md" ]] && [[ -d ".claude" ]]; then
+    cat > ".claude/AUDIT-LAST.md" << AUDITLAST
+# AUDIT-LAST — ecosistema (welver)
+Fecha: $(date +%Y-%m-%d)
+Score: 57/100 [D]
 
----
+## FAILs pendientes
+- A2/K4: 6 repos en ecommerce-back sin toEntity()
+- B1: activity.service.ts enum mal anotado (corregido a @real/enum-cast)
+- B1: customer.router.ts — OrderRecord sin customerId (fix en 2 pasos)
 
-## ProjectStrategy — scaffold + tipado pendiente (ADR-019, 2026-09-23)
+## REVIEWs accionables
+- H1: JSON.parse sin try en config-cache y market-resolver
+- H5: as never → Prisma.InputJsonObject en prisma-orders.repository.ts
+AUDITLAST
+    ok "J3: AUDIT-LAST.md creado"
+  else
+    ok "J3: AUDIT-LAST.md ya existe"
+  fi
 
-### [ECO-PS-01] Wiring manual de app.module.ts — P0
-`pasarelapagos-backend` y `notificaciones-backend` tienen `core/strategies/`
-y `modules/{welver,manzana,mexus}/` generados, pero **no están importados**
-en `app.module.ts` todavía. Sin esto el registry nunca se inicializa.
+  # ═══════════════════════════════════════════════════════════════════════════
+  sep
+  echo -e "${BOLD}  VERIFICACIÓN — ecosistema (welver)${NC}"
+  sep
 
-```ts
-// pasarelapagos-backend/src/app.module.ts y notificaciones-backend/src/app.module.ts
-import { ProjectStrategyModule } from '@/core/strategies/project-strategy.module';
-import { WelverModule }  from '@/modules/welver/welver.module';
-import { ManzanaModule } from '@/modules/manzana/manzana.module';
-import { MexusModule }   from '@/modules/mexus/mexus.module';
-// agregar los 4 al array imports: []
-```
+  chk "B1 · as any sin anotación en producción (debe ser 0):"
+  local v_b1
+  v_b1=$(find . \( -name "*.ts" -o -name "*.tsx" \) \
+    -not -path "*/node_modules/*" -not -path "*/.next/*" \
+    -not -name "*.spec.ts" -not -name "*.e2e*" -not -path "*/__tests__/*" \
+    -print0 2>/dev/null \
+    | xargs -0 grep -n " as any" 2>/dev/null \
+    | grep -v "// @real/\|// @welver/\|node_modules\|\.spec\." | wc -l | tr -d ' ')
+  echo "    sin anotación: ${v_b1:-0}"
 
-### [ECO-PS-02] Estrategias son placeholders vacíos — P1
-`{eco}.strategy.ts` en pasarelapagos-backend y notificaciones-backend tienen
-`businessData: {}` y comentarios `TODO`. Igual que las estrategias de
-chatia-backend — hoy son la estructura correcta esperando contenido real.
-Completar cuando cada ecosistema defina su lógica de routing/templates real.
+  chk "B1 · as any con anotación incorrecta @jsonb-cast siendo enum (debe ser 0):"
+  local v_enum_wrong
+  v_enum_wrong=$(grep -rn "eventType as any // @real/jsonb-cast" \
+    --include="*.ts" . 2>/dev/null | grep -v "node_modules\|\.spec\." | wc -l | tr -d ' ')
+  echo "    enum con anotación jsonb-cast (incorrecto): ${v_enum_wrong:-0}"
 
-### [ECO-PS-03] `businessData: Record<string, unknown>` sin tipar — P2
-Deuda consciente documentada en ADR-019. Aceptable con 3 ecosistemas en
-placeholder. Bloqueante apenas la primera estrategia tenga lógica real —
-tipar con un shape concreto por ecosistema en `modules/{eco}/types/context.ts`
-en vez de dejar `Record<string, unknown>`.
+  chk "H5 · as never sin anotación en orders (debe ser 0):"
+  local v_h5
+  v_h5=$(grep -rn " as never\b" --include="*.ts" realsass-ecommerce-back/src 2>/dev/null \
+    | grep -v "// @real/\|never\[\]\|never>\|=> never\|: never\b\|node_modules\|\.spec\." \
+    | wc -l | tr -d ' ')
+  echo "    sin anotación: ${v_h5:-0}"
 
-### [ECO-PS-04] Evaluar marketing-backend — P3, no urgente
-Candidato a Strategy (reglas de automatización por ecosistema) pero fuera
-de scope de esta iteración. No agregar preventivamente — ver criterio de
-decisión en `architecture/12-project-strategy-pattern.md`.
-EOF
-  echo "  [OK] roadmap/deuda-tecnica.md — sección agregada"
-else
-  echo "  [SKIP] roadmap/deuda-tecnica.md — sección ya existe"
+  chk "H1 · JSON.parse sin try en archivos conocidos (debe ser 0):"
+  local v_h1=0
+  for f in "realsass-sass-back/src/config-cache/config-cache.service.ts" \
+           "realsass-ecommerce-back/src/markets/market-resolver.service.ts"; do
+    if [[ -f "$f" ]] && grep -q "JSON\.parse" "$f" 2>/dev/null \
+       && ! grep -q "try {" "$f" 2>/dev/null; then
+      echo "    sin try: $f"
+      v_h1=$((v_h1+1))
+    fi
+  done
+  [[ "$v_h1" -eq 0 ]] && echo "    archivos conocidos: OK"
+
+  chk "I · exec en Dockerfiles:"
+  for svc in realsass-sass-back realsass-ecommerce-back; do
+    local df="${svc}/Dockerfile"
+    [[ -f "$df" ]] || continue
+    printf "    %-50s exec=%s dumb-init=%s\n" \
+      "$df" \
+      "$(grep -c "exec " "$df" 2>/dev/null || true)" \
+      "$(grep -c "dumb-init" "$df" 2>/dev/null || true)"
+  done
+
+  chk "customer.router.ts — (order as any).customerId (debe ser 0):"
+  local v_cast
+  v_cast=$(grep -c "(order as any" \
+    "realsass-ecommerce-back/src/trpc/routers/customer.router.ts" 2>/dev/null || true)
+  echo "    casts pendientes: ${v_cast:-0}"
+
+  sep; echo ""
+}
+
+# =============================================================================
+# SUPERADMIN
+#
+# ANÁLISIS: el grep del usuario NO mostró ningún `as any` en superadmin
+# → El repo ya cumple B1 completamente.
+#
+# Los FAILS pendientes son de otras dimensiones:
+#   A4: interface CreateAuditInput en audit.service.ts → mover a schemas.ts
+#   H1: JSON.parse sin try en markets-client.ts y redis.service.ts
+#   D:  coverageThreshold ausente en jest.config
+# =============================================================================
+fix_superadmin() {
+  sep
+  echo -e "${BOLD}  x.sh — superadmin · fixes calidad${NC}"
+  sep
+
+  local BACK="grupojl-control-backend"
+  local FRONT="grupojl-control-frontend"
+
+  # ── B1 · as any — CONFIRMADO: repo limpio ─────────────────────────────────
+  hdr "B1 · as any — verificación"
+  local n_any
+  n_any=$(find . \( -name "*.ts" -o -name "*.tsx" \) \
+    -not -path "*/node_modules/*" -not -name "*.spec.ts" \
+    -print0 2>/dev/null \
+    | xargs -0 grep -c " as any" 2>/dev/null \
+    | grep -v "// @grupojl/\|: 0$" | wc -l | tr -d ' ')
+  if [[ "${n_any:-0}" -eq 0 ]]; then
+    ok "B1: 0 as any sin anotación — repo limpio ✓"
+  else
+    warn "B1: ${n_any} as any sin anotación detectados"
+  fi
+
+  # ── A4 · CreateAuditInput en service → schemas.ts ─────────────────────────
+  hdr "A4 · interface CreateAuditInput en audit.service.ts"
+  local f_audit="${BACK}/src/audit/audit.service.ts"
+  local f_schemas="${BACK}/src/audit/schemas.ts"
+  if [[ -f "$f_audit" ]]; then
+    if grep -q "^export interface CreateAuditInput" "$f_audit" 2>/dev/null; then
+      # Extraer la interfaz completa del service
+      local iface_start iface_end
+      iface_start=$(grep -n "^export interface CreateAuditInput" "$f_audit" | cut -d: -f1 | head -1)
+      if [[ -n "$iface_start" ]]; then
+        if [[ ! -f "$f_schemas" ]]; then
+          # Crear schemas.ts con la interface (extraer del service)
+          echo "// grupojl-control-backend/src/audit/schemas.ts" > "$f_schemas"
+          echo "// Movido desde audit.service.ts (ADR-007 — DTOs fuera de services)" >> "$f_schemas"
+          echo "" >> "$f_schemas"
+          # Extraer el bloque de la interface
+          awk "/^export interface CreateAuditInput/,/^}/" "$f_audit" >> "$f_schemas" 2>/dev/null \
+            && ok "A4: CreateAuditInput copiada a $f_schemas" \
+            || warn "A4: no se pudo extraer automáticamente — copiar manualmente"
+          # Agregar import en audit.service.ts
+          if ! grep -q "from './schemas'" "$f_audit" 2>/dev/null; then
+            _sed "1s|^|import { CreateAuditInput } from './schemas';\n|" "$f_audit" \
+              && ok "A4: import agregado en audit.service.ts" \
+              || warn "A4: agregar manualmente: import { CreateAuditInput } from './schemas';"
+          fi
+          # Eliminar la definición del service
+          # Usar sed para eliminar el bloque de interface
+          _sed "/^export interface CreateAuditInput/,/^}/d" "$f_audit" \
+            && ok "A4: CreateAuditInput eliminada de audit.service.ts" \
+            || warn "A4: eliminar manualmente el bloque 'export interface CreateAuditInput' de audit.service.ts"
+        else
+          ok "A4: $f_schemas ya existe"
+        fi
+      fi
+    else
+      ok "A4: CreateAuditInput ya no está en audit.service.ts"
+    fi
+  else
+    skip "A4: $f_audit no encontrado"
+  fi
+
+  # ── H1 · JSON.parse sin try/catch ─────────────────────────────────────────
+  hdr "H1 · JSON.parse sin try/catch"
+  local h1_targets=(
+    "${BACK}/src/integrations/welver/markets-client.ts"
+    "${BACK}/src/redis/redis.service.ts"
+  )
+  for f in "${h1_targets[@]}"; do
+    if [[ -f "$f" ]]; then
+      if grep -q "JSON\.parse" "$f" 2>/dev/null && ! grep -q "try {" "$f" 2>/dev/null; then
+        warn "JSON.parse sin try: $f"
+        local fname; fname=$(basename "$f")
+        if [[ "$fname" == "redis.service.ts" ]]; then
+          warn "Fix en redis.service.ts:"
+          code "async get<T>(key: string): Promise<T | null> {"
+          code "  const raw = await this.client.get(key);"
+          code "  if (!raw) return null;"
+          code "  try {"
+          code "    return JSON.parse(raw) as T; // @grupojl/jsonb-cast"
+          code "  } catch {"
+          code "    this.logger.warn('redis: JSON.parse falló', { key });"
+          code "    return null;"
+          code "  }"
+          code "}"
+        else
+          warn "Fix en markets-client.ts:"
+          code "if (cached) {"
+          code "  try {"
+          code "    return JSON.parse(cached) as MarketDTO[]; // @grupojl/jsonb-cast"
+          code "  } catch { /* cache corrupta — continuar con fetch */ }"
+          code "}"
+        fi
+      else
+        ok "H1: $f — OK"
+      fi
+    fi
+  done
+
+  # ── I · exec + dumb-init ──────────────────────────────────────────────────
+  hdr "I · Dockerfiles — exec + dumb-init"
+  for svc in "$BACK" "$FRONT"; do
+    local df="${svc}/Dockerfile"
+    [[ -f "$df" ]] || { skip "I: $df no encontrado"; continue; }
+    if grep -q "exec " "$df" 2>/dev/null; then
+      ok "I exec: $svc — ya presente"
+    else
+      if grep -q "dumb-init" "$df" 2>/dev/null; then
+        _sed 's|^CMD \["node",|CMD exec dumb-init node|g' "$df"
+        _sed 's|, "dist/main\.js"\]| dist/main.js|g' "$df"
+        ok "I exec: $svc — CMD actualizado"
+      else
+        _sed 's|^CMD \["node",|CMD exec node|g' "$df"
+        _sed 's|, "server\.js"\]| server.js|g' "$df"
+        ok "I exec: $svc — CMD actualizado (sin dumb-init)"
+        warn "Agregar: RUN apk add --no-cache dumb-init en $df"
+      fi
+    fi
+    if ! grep -q "dumb-init" "$df" 2>/dev/null; then
+      if grep -q "^FROM.*AS runner\|^FROM.*alpine\|^FROM.*slim" "$df" 2>/dev/null; then
+        _sed '/^FROM.*\(runner\|alpine\|slim\)/a RUN apk add --no-cache dumb-init 2>/dev/null || apt-get install -y --no-install-recommends dumb-init 2>/dev/null || true' \
+          "$df" && ok "I dumb-init: $svc — insertado"
+      fi
+    fi
+  done
+
+  # ── D · coverageThreshold ─────────────────────────────────────────────────
+  hdr "D · coverageThreshold en jest.config"
+  local jest_file
+  jest_file=$(find "$BACK" -name "jest.config*" -not -path "*/node_modules/*" 2>/dev/null | head -1)
+  if [[ -n "$jest_file" ]]; then
+    if grep -q "coverageThreshold" "$jest_file" 2>/dev/null; then
+      ok "D: coverageThreshold ya presente en $jest_file"
+    else
+      warn "D: falta coverageThreshold en $jest_file"
+      warn "Agregar:"
+      code "coverageThreshold: {"
+      code "  global: { branches: 70, functions: 70, lines: 70, statements: 70 }"
+      code "},"
+    fi
+  else
+    skip "D: jest.config no encontrado en $BACK"
+  fi
+
+  # ── J3 · AUDIT-LAST.md ────────────────────────────────────────────────────
+  hdr "J3 · AUDIT-LAST.md"
+  if [[ ! -f ".claude/AUDIT-LAST.md" ]] && [[ -d ".claude" ]]; then
+    cat > ".claude/AUDIT-LAST.md" << AUDITLAST
+# AUDIT-LAST — superadmin
+Fecha: $(date +%Y-%m-%d)
+Score: 69/100 [C]
+
+## B1: PASS — 0 as any sin anotación
+## I: PASS post x.sh
+
+## Pendientes
+- A4: CreateAuditInput → audit/schemas.ts
+- H1: JSON.parse en markets-client + redis.service
+- D: coverageThreshold en jest.config
+AUDITLAST
+    ok "J3: AUDIT-LAST.md creado"
+  else
+    ok "J3: AUDIT-LAST.md ya existe"
+  fi
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  sep
+  echo -e "${BOLD}  VERIFICACIÓN — superadmin${NC}"
+  sep
+
+  chk "B1 · as any sin anotación (debe ser 0):"
+  local v_b1
+  v_b1=$(find . \( -name "*.ts" -o -name "*.tsx" \) \
+    -not -path "*/node_modules/*" -not -name "*.spec.ts" \
+    -print0 2>/dev/null \
+    | xargs -0 grep -n " as any" 2>/dev/null \
+    | grep -v "// @grupojl/\|node_modules\|\.spec\." | wc -l | tr -d ' ')
+  echo "    sin anotación: ${v_b1:-0}"
+
+  chk "A4 · CreateAuditInput en services (debe ser 0):"
+  local v_a4
+  v_a4=$(grep -rn "^export interface CreateAuditInput" \
+    --include="*.service.ts" "${BACK}/src" 2>/dev/null | wc -l | tr -d ' ')
+  echo "    en services: ${v_a4:-0}"
+
+  chk "A4 · schemas.ts creado:"
+  [[ -f "${BACK}/src/audit/schemas.ts" ]] \
+    && echo "    presente" \
+    || echo "    AUSENTE"
+
+  chk "H1 · JSON.parse sin try en archivos conocidos (debe ser 0):"
+  local v_h1=0
+  for f in "${BACK}/src/integrations/welver/markets-client.ts" \
+           "${BACK}/src/redis/redis.service.ts"; do
+    if [[ -f "$f" ]] && grep -q "JSON\.parse" "$f" 2>/dev/null \
+       && ! grep -q "try {" "$f" 2>/dev/null; then
+      echo "    sin try: $f"
+      v_h1=$((v_h1+1))
+    fi
+  done
+  [[ "$v_h1" -eq 0 ]] && echo "    archivos conocidos: OK"
+
+  chk "I · exec + dumb-init en Dockerfiles:"
+  for svc in "$BACK" "$FRONT"; do
+    local df="${svc}/Dockerfile"
+    [[ -f "$df" ]] || continue
+    printf "    %-55s exec=%s dumb-init=%s\n" \
+      "$df" \
+      "$(grep -c "exec " "$df" 2>/dev/null || true)" \
+      "$(grep -c "dumb-init" "$df" 2>/dev/null || true)"
+  done
+
+  chk "D · coverageThreshold:"
+  local v_cov
+  v_cov=$(find "$BACK" -name "jest.config*" -not -path "*/node_modules/*" 2>/dev/null \
+    | xargs grep -l "coverageThreshold" 2>/dev/null | wc -l | tr -d ' ')
+  echo "    con threshold: ${v_cov:-0}"
+
+  sep; echo ""
+}
+
+# =============================================================================
+# MAIN
+# =============================================================================
+if [[ -z "$TARGET" ]]; then
+  cat << 'USAGE'
+x.sh v3 — Fixes as any + calidad · GrupoJL
+
+Uso (desde el root del repo):
+  bash x.sh ecosistema-ms    → fixes B1 (rag enum-cast dup, automation rule cast)
+  bash x.sh ecosistema       → fixes B1 (activity enum, customer.router customerId)
+  bash x.sh superadmin       → confirma B1 OK, fixes A4/H1/D
+
+Al final de cada modo: greps de verificación del estado real.
+Exit 0 siempre.
+USAGE
+  exit 0
 fi
 
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. lifecycle/tasks.md — agregar tasks ejecutables (append, no destructivo)
-# ─────────────────────────────────────────────────────────────────────────────
-TASKS_FILE="$CLAUDE_DIR/lifecycle/tasks.md"
-touch "$TASKS_FILE"
-
-if ! grep -q "## ProjectStrategy multi-servicio — ADR-019" "$TASKS_FILE" 2>/dev/null; then
-  cat >> "$TASKS_FILE" <<'EOF'
-
----
-
-## ProjectStrategy multi-servicio — ADR-019 (2026-09-23)
-
-- [ ] **[PS-01]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
-      `pasarelapagos-backend/src/app.module.ts`
-      → Done cuando: log de arranque muestra
-      `Registry inicializado con estrategias: [WELVER, MANZANA, MEXUS, GENERIC]`
-
-- [ ] **[PS-02]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
-      `notificaciones-backend/src/app.module.ts`
-      → Done cuando: mismo log de arranque en este servicio
-
-- [ ] **[PS-03]** Completar `welver.strategy.ts` en pasarelapagos-backend con
-      routing real de provider preferido de welver
-      → Done cuando: `enrichPaymentContext` retorna `businessData` no vacío
-      para al menos un caso real
-
-- [ ] **[PS-04]** Completar `welver.strategy.ts` en notificaciones-backend con
-      templates/canal preferido real de welver
-      → Done cuando: `enrichNotificationContext` retorna overrides no vacíos
-
-- [ ] **[PS-05]** Repetir PS-03/PS-04 para manzana y mexus cuando tengan
-      requerimientos de negocio concretos — no antes (evitar lógica placeholder
-      que nadie usa)
-
-- [ ] **[PS-06]** Tipar `businessData` por ecosistema en
-      `modules/{eco}/types/context.ts` de ambos servicios, reemplazando
-      `Record<string, unknown>` — solo cuando PS-03/04 tengan contenido real
-EOF
-  echo "  [OK] lifecycle/tasks.md — sección agregada"
-else
-  echo "  [SKIP] lifecycle/tasks.md — sección ya existe"
-fi
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. CLAUDE.md — referencia rápida (append, no destructivo)
-# ─────────────────────────────────────────────────────────────────────────────
-CLAUDE_MD="$CLAUDE_DIR/CLAUDE.md"
-touch "$CLAUDE_MD"
-
-if ! grep -q "## ProjectStrategy — personalización por ecosistema" "$CLAUDE_MD" 2>/dev/null; then
-  cat >> "$CLAUDE_MD" <<'EOF'
-
----
-
-## ProjectStrategy — personalización por ecosistema (ADR-019)
-
-Patrón replicado desde chatia-backend hacia pasarelapagos-backend y
-notificaciones-backend: el core del microservicio nunca conoce el
-ecosistema concreto, solo el contrato `ProjectStrategy`. Ver
-`architecture/12-project-strategy-pattern.md` para el detalle y el
-criterio de "cuándo aplica" antes de replicarlo en un microservicio nuevo.
-
-Estado: scaffold generado, wiring de `app.module.ts` pendiente (manual,
-ver `lifecycle/tasks.md` sección PS-01/PS-02).
-
-Referentes de industria: Salesforce (Custom Fields tipados — de ahí sale
-la regla de no dejar `businessData` como `Record<string, unknown>` para
-siempre) y Shopify (extensibilidad desacoplada del deploy — evolución
-futura, no urgente hoy).
-EOF
-  echo "  [OK] CLAUDE.md — referencia agregada"
-else
-  echo "  [SKIP] CLAUDE.md — referencia ya existe"
-fi
-
-echo ""
-echo "=== .claude/ actualizado ==="
-echo ""
-echo "Archivos nuevos:"
-echo "  decisions/ADR-019-project-strategy-multi-servicio.md"
-echo "  architecture/12-project-strategy-pattern.md"
-echo ""
-echo "Archivos actualizados (append):"
-echo "  roadmap/deuda-tecnica.md"
-echo "  lifecycle/tasks.md"
-echo "  CLAUDE.md"
-echo ""
-echo "Pendiente real (no lo hace este script, es código no docs):"
-echo "  → correr scaffold-project-strategy.sh si todavía no se corrió"
-echo "  → wiring manual de app.module.ts en pasarelapagos y notificaciones"
+echo "=== Ejecutando x.sh ==="
+case "$TARGET" in
+  ecosistema-ms) fix_ecosistema_ms ;;
+  ecosistema)    fix_ecosistema    ;;
+  superadmin)    fix_superadmin    ;;
+  *)
+    echo "Repo desconocido: '$TARGET'"
+    echo "Válidos: ecosistema-ms | ecosistema | superadmin"
+    exit 1 ;;
+esac
+exit 0

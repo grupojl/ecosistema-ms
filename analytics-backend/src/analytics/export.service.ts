@@ -39,7 +39,7 @@ export class ExportService {
       `Export encolado [${job.id}] org:${data.organizationId} format:${data.format}`,
     );
 
-    return { jobId: job.id as string, status: 'PENDING' };
+    return { jobId: (job.id ?? 'unknown'), status: 'PENDING' };
   }
 
   async getStatus(jobId: string): Promise<{

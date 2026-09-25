@@ -1,3 +1,4 @@
+import { requireJobId } from '../services/job-id.helper.js';
 // workers-backend/src/jobs/processors/vector-index.processor.ts
 //
 // W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
@@ -51,7 +52,7 @@ export class VectorIndexProcessor extends WorkerHost {
 
     this.logger.log(`[${job.id}] VectorIndex — doc:${documentId} chunks:${chunks.length}`);
 
-    await this.jobs.updateJobLog(job.id as string, {
+    await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
       status:    'PROCESSING',
       startedAt: new Date(startedAt),
       attempts:  job.attemptsMade + 1,
@@ -85,11 +86,11 @@ export class VectorIndexProcessor extends WorkerHost {
         durationMs,
       };
 
-      await this.jobs.updateJobLog(job.id as string, {
+      await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      output as unknown as Record<string, unknown>,
+        result:      output as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
       });
 
       // SLA check — warning si supera 30s
@@ -105,7 +106,7 @@ export class VectorIndexProcessor extends WorkerHost {
       const message = error instanceof Error ? error.message : String(error);
       const durationMs = Date.now() - startedAt;
 
-      await this.jobs.updateJobLog(job.id as string, {
+      await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
         status:      'FAILED',
         completedAt: new Date(),
         durationMs,

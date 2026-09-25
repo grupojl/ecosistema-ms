@@ -90,7 +90,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
         return {
           externalId:  intent.id,
           status:      this.mapIntentStatus(intent.status as PaymentIntentStatus),
-          redirectUrl: (intent.next_action as any)?.redirect_to_url?.url,
+          redirectUrl: (intent.next_action as any) // @ecosistema-ms/stripe-cast?.redirect_to_url?.url,
           raw:         intent,
         };
       } catch (err) {

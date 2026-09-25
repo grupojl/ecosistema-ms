@@ -1,3 +1,8 @@
+import { PaymentProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
+import { PaymentOrgConfigService, REDIS_CLIENT } from '@/organization-config/organization-config.service.js';
+import { WelverPaymentModule }  from '@/modules/welver/welver.module.js';
+import { ManzanaPaymentModule } from '@/modules/manzana/manzana.module.js';
+import { MexusPaymentModule }   from '@/modules/mexus/mexus.module.js';
 // src/app.module.ts
 import { Module, type NestModule, type MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware.js';
@@ -20,6 +25,12 @@ import { AuditModule }    from '@/modules/audit/audit.module';
 import { MetricsModule }  from '@/modules/metrics/metrics.module';
 
 // Business
+    // ProjectStrategy org-aware — ADR-019 v2
+    PaymentProjectStrategyModule,
+    { provide: 'PAYMENT_ORG_CONFIG_SVC', useClass: PaymentOrgConfigService },
+    WelverPaymentModule,
+    ManzanaPaymentModule,
+    MexusPaymentModule,
 import { AuthModule }      from '@/modules/auth/auth.module';
 import { PaymentsModule }  from '@/modules/payments/payments.module';
 import { WebhooksModule }  from '@/modules/webhooks/webhooks.module';
@@ -82,6 +93,12 @@ import { TenantThrottlerGuard } from '@/common/guards/tenant-throttler.guard';
     MetricsModule,
 
     // Business
+    // ProjectStrategy org-aware — ADR-019 v2
+    PaymentProjectStrategyModule,
+    { provide: 'PAYMENT_ORG_CONFIG_SVC', useClass: PaymentOrgConfigService },
+    WelverPaymentModule,
+    ManzanaPaymentModule,
+    MexusPaymentModule,
     AuthModule,
     PaymentsModule,
     WebhooksModule,

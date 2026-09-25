@@ -161,3 +161,114 @@ Referentes de industria: Salesforce (Custom Fields tipados — de ahí sale
 la regla de no dejar `businessData` como `Record<string, unknown>` para
 siempre) y Shopify (extensibilidad desacoplada del deploy — evolución
 futura, no urgente hoy).
+
+---
+
+## Sesión 2026-09-24 — ProjectStrategy org-aware (ADR-019 v2)
+
+### Lo que se implementó
+
+**Patrón extendido: variación por organización dentro del ecosistema**
+
+El patrón `ProjectStrategy` existía para variación por `ecosystemId`.
+Esta sesión agrega variación por `organizationId` dentro del mismo ecosistema —
+una org enterprise de Welver tiene featureFlags distintos a una org starter.
+
+#### chatia-backend — implementación completa
+
+**`core/strategies/`** (5 archivos reemplazados con contratos extendidos):
+- `project-context.interface.ts` — `OrganizationProfile` con `ChatFeatureFlags` + `ChatLimits` + `DEFAULT_ORG_PROFILE`
+- `project-strategy.interface.ts` — nuevo método `resolveOrgProfile()` obligatorio
+- `project-strategy.registry.ts` — sin cambios estructurales
+- `generic.strategy.ts` — implementa `resolveOrgProfile` con `DEFAULT_ORG_PROFILE`
+- `project-strategy.module.ts` — sin cambios
+
+**`organization-config/`** (módulo nuevo `@Global()`):
+- `organization-config.repository.interface.ts` — `ORGANIZATION_CONFIG_REPO`, `IOrganizationConfigRepository`, `toOrgProfile()`
+- `prisma-organization-config.repository.ts` — adaptador Prisma (ÚNICO lugar con PrismaService en este módulo)
+- `organization-config.service.ts` — cache-aside Redis TTL 5min + degradación elegante garantizada (NUNCA lanza)
+- `organization-config.module.ts` — `@Global()` para que todas las strategies lo consuman
+
+**`modules/`** (welver con lógica real, manzana/mexus como placeholders tipados):
+- `welver/types/context.ts` — `WELVERBusinessData` tipado (merchantPlan, storeName, activeMarkets, humanAgentsOnline...)
+- `welver/welver.config.ts` — `WELVER_CONFIG` + `buildWelverSystemPrompt()` personalizado por org
+- `welver/welver.strategy.ts` — enrich resuelve OrgProfile + bizData, after actualiza stage + log escalación
+- `manzana/` y `mexus/` — placeholders org-aware con `MANZANABusinessData` / `MEXUSBusinessData` tipados
+
+**`assistant/chat/assistant-chat.service.ts`** (reemplazado — PUNTO DE CONEXIÓN):
+- Inyecta `ProjectStrategyRegistry`
+- Llama `strategy.enrichConversationContext()` ANTES del LLM
+- Verifica `orgProfile.featureFlags.aiAssistantEnabled` antes de procesar
+- Usa `projectCtx.systemPrompt` y `projectCtx.preferredModel`
+- Llama `strategy.afterConversationResult()` DESPUÉS del LLM
+- `ChatInput` ahora requiere `ecosystemId` además de `organizationId`
+
+**Prisma**: `OrganizationConfig` model en `chatia-backend/prisma/schema.prisma`
+```prisma
+model OrganizationConfig {
+  ecosystemId    String
+  organizationId String
+  plan           String   @default("starter")
+  featureFlags   Json     @default("{}")
+  limits         Json     @default("{}")
+  @@unique([ecosystemId, organizationId])
+}
+```
+
+#### pasarelapagos-backend — port del patrón para pagos
+
+**`core/strategies/`** — contratos con nombres de dominio de PAGOS:
+- `PaymentProjectContext`, `PaymentFeatureFlags`, `PaymentLimits`
+- `enrichPaymentContext()` / `afterChargeResult()` — no copias de chatia
+- `PaymentProjectStrategyRegistry`, `GenericPaymentStrategy`, `PaymentProjectStrategyModule`
+
+**`organization-config/organization-config.service.ts`** — usa `REDIS_CLIENT` existente, sin Prisma (cache only en v1)
+
+**`modules/welver/welver.strategy.ts`** — `WelverPaymentStrategy`:
+- Resuelve provider óptimo por país + featureFlags de la org
+- `stripeEnabled` → stripe; `dlocalEnabled` + no-LATAM → dlocal; default → mercadopago
+- Currencies por país hardcodeadas (AR, MX, CO, CL, BR, PE)
+
+**`app.module.ts`** — `PaymentProjectStrategyModule` + `WelverPaymentModule` importados
+
+#### notificaciones-backend — port del patrón para notificaciones
+
+**`core/strategies/`** — contratos de dominio NOTIFICACIONES:
+- `NotifProjectContext`, `NotifFeatureFlags`, `NotifLimits`
+- `enrichNotifContext()` / `afterNotifSent()`
+- `NotifProjectStrategyRegistry`, `GenericNotifStrategy`, `NotifProjectStrategyModule`
+
+**`modules/welver/welver.strategy.ts`** — `WelverNotifStrategy`:
+- Canal preferido: whatsapp > email
+- `afterNotifSent` loguea resultado
+
+**`app.module.ts`** — `NotifProjectStrategyModule` + `WelverNotifModule` importados
+
+### Invariantes que se respetaron
+
+1. `enrichXContext()` y `afterXResult()` **NUNCA lanzan** — try/catch en todos, degradación a defaults
+2. `GenericStrategy` siempre registrada primero — fallback garantizado para ecosistemas sin strategy
+3. Un bug en `welver.strategy.ts` **no afecta** manzana ni mexus
+4. `businessData` tipado por ecosistema en `types/context.ts` (deuda cerrada para welver)
+
+### Variables de entorno — sin cambios
+
+No se agregaron variables de entorno nuevas. `OrganizationConfig` se resuelve de DB + Redis existentes.
+
+### Migrations pendientes (a correr antes del primer deploy post-sesión)
+
+```bash
+pnpm --filter chatia-backend        prisma migrate dev --name add-organization-config
+pnpm --filter pasarelapagos-backend  prisma migrate dev --name add-organization-config
+pnpm --filter notificaciones-backend prisma migrate dev --name add-organization-config
+```
+
+### Estado post-sesión
+
+| Bloqueante para primer cliente | Estado |
+|-------------------------------|--------|
+| Tests cross-tenant isolation | 🔴 Pendiente |
+| Branch protection GitHub | 🔴 Pendiente |
+| pnpm install (lockfile) | 🔴 Pendiente |
+| Migrations OrganizationConfig | ⏳ Comando listo, correr manualmente |
+| Grafana dashboard base | 🟡 Pendiente |

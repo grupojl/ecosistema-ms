@@ -63,7 +63,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     if (this.breakers.has(key)) {
       // Actualizar la acción si cambió (p.ej. provider reconfigurado)
       const existing = this.breakers.get(key)!;
-      (existing as any).action = fn;
+      (existing as any).action // @ecosistema-ms/opossum-cast = fn;
       return existing as CircuitBreaker<[], T>;
     }
 

@@ -76,7 +76,7 @@ export class CampaignsService {
 
   async cancel(id: string, organizationId: string) {
     const campaign = await this.findOne(id, organizationId);
-    assertValidCampaignTransition(campaign.status as never, 'CANCELLED');
+    assertValidCampaignTransition(campaign.status as never // @ecosistema-ms/jsonb-cast, 'CANCELLED');
 
     // Cancelar jobs pendientes en BullMQ
     const jobs = await this.queue.getJobs(['waiting', 'delayed']);

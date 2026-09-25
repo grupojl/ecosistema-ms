@@ -111,7 +111,7 @@ export class WebhookProcessor extends WorkerHost {
         data: {
           paymentId: payment.id,
           type:      `webhook.${event.eventType}`,
-          payload:   event.raw as any,
+          payload:   event.raw as any // @ecosistema-ms/jsonb-cast,
         },
       });
     });

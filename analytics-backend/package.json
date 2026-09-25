@@ -16,9 +16,8 @@
     "test:cov": "jest --coverage"
   },
   "dependencies": {
-    "/nestjs-prometheus": "catalog:",
+    "@willsoto/nestjs-prometheus": "catalog:",
     "prom-client": "catalog:",
-    "-ms/auth-server": "workspace:*",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",

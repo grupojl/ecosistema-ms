@@ -29,7 +29,7 @@ export class EcosystemService {
       data: {
         firebaseProjectId: dto.firebaseProjectId,
         name:   dto.name,
-        config: (dto.config ?? {}) as Prisma.InputJsonValue,
+        config: (dto.config ?? {}) as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
       },
     });
     this.logger.log(`Ecosistema registrado: ${ecosystem.name} (${ecosystem.id})`);
@@ -64,7 +64,7 @@ export class EcosystemService {
   async updateConfig(id: string, config: Record<string, unknown>) {
     const ecosystem = await this.prisma.ecosystem.findUnique({ where: { id } });
     if (!ecosystem) throw new NotFoundException(`Ecosistema ${id} no encontrado`);
-    return this.prisma.ecosystem.update({ where: { id }, data: { config: config as Prisma.InputJsonValue } });
+    return this.prisma.ecosystem.update({ where: { id }, data: { config: config as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast } });
   }
 
   // ── Desactivar ────────────────────────────────────────────────────────────

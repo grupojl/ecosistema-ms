@@ -79,4 +79,4 @@ WORKDIR /app/pasarelapagos-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
-CMD ["dumb-init", "/app/pasarelapagos-backend/entrypoint.sh"]
+CMD exec dumb-init "/app/pasarelapagos-backend/entrypoint.sh"]

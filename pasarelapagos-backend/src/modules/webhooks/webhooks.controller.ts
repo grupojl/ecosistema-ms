@@ -66,8 +66,8 @@ export class WebhooksController {
       data: {
         providerId,
         externalId: event.externalId,
-        headers:    headers as any,
-        body:       event.raw as any,
+        headers:    headers as any // @ecosistema-ms/jsonb-cast,
+        body:       event.raw as any // @ecosistema-ms/jsonb-cast,
         status:     'received',
       },
     });

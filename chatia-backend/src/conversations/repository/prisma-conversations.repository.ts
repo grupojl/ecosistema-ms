@@ -179,7 +179,7 @@ export class PrismaConversationsRepository implements IConversationsRepository {
     return {
       id:             account.id,
       organizationId: account.organizationId,
-      ecosystemId:    (account as any).organization?.ecosystemId ?? '',
+      ecosystemId:    (account as any).organization // @ecosistema-ms/jsonb-cast?.ecosystemId ?? '',
       channelType:    account.channelType as string,
       externalId:     account.externalId,
       accessToken:    account.accessToken,

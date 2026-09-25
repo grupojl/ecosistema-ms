@@ -75,7 +75,7 @@ export class FaqIngestionService {
       `FAQ ingest encolado — doc:${documentId} job:${job.id} org:${organizationId}`,
     );
 
-    return { jobId: job.id as string };
+    return { jobId: (job.id ?? 'unknown') };
   }
 
   /**
