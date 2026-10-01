@@ -1,6 +1,6 @@
 // pasarelapagos-backend/src/core/strategies/project-strategy.registry.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { ProjectType, type PaymentProjectStrategy } from './project-strategy.interface.js';
+import { ProjectType, type PaymentProjectStrategy } from '@/core/strategies/project-strategy.interface.js';
 
 @Injectable()
 export class PaymentProjectStrategyRegistry {

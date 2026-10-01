@@ -6,7 +6,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '@/channel.interface';
+} from '@/channel.interface.js';
 
 @Injectable()
 export class InstagramChannel implements IChannel {
@@ -42,7 +42,7 @@ export class InstagramChannel implements IChannel {
     }
   }
 
-  parseIncomingWebhook(payload: any): IncomingMessage[] | null {
+  parseIncomingWebhook(payload: unknown): IncomingMessage[] | null {
     try {
       // Instagram usa el mismo formato de webhook que Messenger (Meta Messaging)
       const entry = payload?.entry?.[0];

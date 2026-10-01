@@ -6,7 +6,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '@/channel.interface';
+} from '@/channel.interface.js';
 
 @Injectable()
 export class WhatsAppChannel implements IChannel {
@@ -42,7 +42,7 @@ export class WhatsAppChannel implements IChannel {
     }
   }
 
-  parseIncomingWebhook(payload: any): IncomingMessage[] | null {
+  parseIncomingWebhook(payload: unknown): IncomingMessage[] | null {
     try {
       const entry = payload?.entry?.[0];
       const changes = entry?.changes?.[0];
@@ -50,8 +50,8 @@ export class WhatsAppChannel implements IChannel {
 
       if (!value?.messages?.length) return null;
 
-      return value.messages.map((msg: any): IncomingMessage => {
-        const contact = value.contacts?.find((c: any) => c.wa_id === msg.from);
+      return (value as WhatsAppWebhookValue).messages.map((msg): IncomingMessage => {
+        const contact = (value as WhatsAppWebhookValue).contacts?.find((c) => c.wa_id === msg.from);
         return {
           externalId: msg.id,
           senderExternalId: msg.from,
@@ -116,7 +116,7 @@ export class WhatsAppChannel implements IChannel {
     return map[type] ?? 'text';
   }
 
-  private extractContent(msg: any): string {
+  private extractContent(msg: WhatsAppMessage): string {
     if (msg.type === 'text') return msg.text?.body ?? '';
     if (msg.type === 'image') return msg.image?.caption ?? '[imagen]';
     if (msg.type === 'audio') return '[audio]';
@@ -129,6 +129,6 @@ export class WhatsAppChannel implements IChannel {
     return '[mensaje]';
   }
 
-  private extractMediaUrl(msg: any): string | undefined {
+  private extractMediaUrl(msg: WhatsAppMessage): string | undefined {
     return msg.image?.id || msg.video?.id || msg.audio?.id || msg.document?.id;
   }

@@ -1,8 +1,8 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { ReconciliationService, ReconcileJobData } from '@/modules/payments/reconciliation.service';
-import { QUEUE_RECONCILE } from '@/common/constants/queues';
+import { ReconciliationService, ReconcileJobData } from '@/modules/payments/reconciliation.service.js';
+import { QUEUE_RECONCILE } from '@/common/constants/queues.js';
 
 @Processor(QUEUE_RECONCILE, { concurrency: 3 })
 export class ReconcileProcessor extends WorkerHost {

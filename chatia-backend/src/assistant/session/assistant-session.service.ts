@@ -1,6 +1,6 @@
 // src/assistant/session/assistant-session.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/prisma/prisma.service.js';
 
 export interface SessionMessage {
   role: 'user' | 'assistant';
@@ -39,7 +39,7 @@ export class AssistantSessionService {
     const session = await this.prisma.assistantSession.findUniqueOrThrow({
       where: { id: sessionId },
     });
-    const history = (session.history as unknown as SessionMessage[] // @ecosistema-ms/jsonb-cast) ?? [];
+    const history = (session.history as SessionMessage[]) ?? [];
     const newMsg: SessionMessage = { role, content, createdAt: new Date().toISOString() };
 
     await this.prisma.assistantSession.update({
@@ -53,7 +53,7 @@ export class AssistantSessionService {
     const session = await this.prisma.assistantSession.findUniqueOrThrow({
       where: { id: sessionId },
     });
-    const history = (session.history as unknown as SessionMessage[] // @ecosistema-ms/jsonb-cast) ?? [];
+    const history = (session.history as SessionMessage[]) ?? [];
     return history.slice(-limit);
   }
 

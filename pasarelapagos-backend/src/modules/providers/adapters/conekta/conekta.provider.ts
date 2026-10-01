@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface';
-import { ProviderRegistry } from '@/provider.registry';
-import { CircuitBreakerService } from '@/circuit-breaker.service';
-import { mapConektaError } from '@/modules/providers/adapters/conekta/conekta-error.mapper';
+} from '@/provider.interface.js';
+import { ProviderRegistry } from '@/provider.registry.js';
+import { CircuitBreakerService } from '@/circuit-breaker.service.js';
+import { mapConektaError } from '@/modules/providers/adapters/conekta/conekta-error.mapper.js';
 
 /**
  * Adapter Conekta v2 (México).
@@ -66,7 +66,7 @@ export class ConektaProvider implements PaymentProvider, OnModuleInit {
       try {
         const isOxxo = input.method === 'cash_voucher';
 
-        const body: any = {
+        const body: Record<string, unknown> = {
           currency:    'MXN',
           customer_info: {
             name:  input.customer.id,
@@ -114,7 +114,7 @@ export class ConektaProvider implements PaymentProvider, OnModuleInit {
     return this.cb.execute(`conekta:refund`, async () => {
       try {
         // Conekta requiere orderId para refund — el externalId es el charge id
-        const body: any = { reason: input.reason ?? 'requested_by_client' };
+        const body: Record<string, unknown> = { reason: input.reason ?? 'requested_by_client' };
         if (input.amountMinor) body.amount = Number(input.amountMinor);
 
         const { data } = await this.http.post(
@@ -166,7 +166,7 @@ export class ConektaProvider implements PaymentProvider, OnModuleInit {
       }
     }
 
-    let body: any;
+    let body: Record<string, unknown>;
     try { body = JSON.parse(raw.toString()); } catch { body = {}; }
 
     const order   = body.data?.object ?? {};

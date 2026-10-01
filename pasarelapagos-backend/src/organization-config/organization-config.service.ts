@@ -4,8 +4,8 @@ import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   PAYMENT_ORG_CONFIG_REPO, toOrgProfile,
   type IPaymentOrgConfigRepository, type UpsertOrgConfigInput,
-} from './organization-config.repository.interface.js';
-import { DEFAULT_ORG_PROFILE, type OrganizationProfile } from '../core/strategies/project-context.interface.js';
+} from '@/organization-config/organization-config.repository.interface.js';
+import { DEFAULT_ORG_PROFILE, type OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 // Redis inyectado via REDIS_CLIENT (ya existe en pasarelapagos-backend)
 const REDIS_CLIENT = 'REDIS_CLIENT';

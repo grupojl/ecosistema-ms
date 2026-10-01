@@ -1,7 +1,7 @@
 // notificaciones-backend/src/core/strategies/project-strategy.module.ts
 import { Global, Module, OnModuleInit } from '@nestjs/common';
-import { NotifProjectStrategyRegistry } from './project-strategy.registry.js';
-import { GenericNotifStrategy }         from './generic.strategy.js';
+import { NotifProjectStrategyRegistry } from '@/core/strategies/project-strategy.registry.js';
+import { GenericNotifStrategy }         from '@/core/strategies/generic.strategy.js';
 
 @Global()
 @Module({

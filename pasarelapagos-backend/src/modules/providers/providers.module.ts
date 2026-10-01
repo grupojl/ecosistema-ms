@@ -1,14 +1,14 @@
 import { Global, Module } from '@nestjs/common';
 import { CacheModule } from '@nestjs/cache-manager';
-import { ProviderRegistry } from '@/modules/providers/provider.registry';
-import { CircuitBreakerService } from '@/modules/providers/circuit-breaker.service';
-import { RoutingService } from '@/modules/providers/routing.service';
+import { ProviderRegistry } from '@/modules/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/modules/providers/circuit-breaker.service.js';
+import { RoutingService } from '@/modules/providers/routing.service.js';
 // Adapters
-import { StripeModule } from '@/modules/providers/adapters/stripe/stripe.module';
-import { MercadoPagoModule } from '@/modules/providers/adapters/mercadopago/mercadopago.module';
-import { PagarmeModule } from '@/modules/providers/adapters/pagarme/pagarme.module';
-import { ConektaModule } from '@/modules/providers/adapters/conekta/conekta.module';
-import { DlocalModule } from '@/modules/providers/adapters/dlocal/dlocal.module';
+import { StripeModule } from '@/modules/providers/adapters/stripe/stripe.module.js';
+import { MercadoPagoModule } from '@/modules/providers/adapters/mercadopago/mercadopago.module.js';
+import { PagarmeModule } from '@/modules/providers/adapters/pagarme/pagarme.module.js';
+import { ConektaModule } from '@/modules/providers/adapters/conekta/conekta.module.js';
+import { DlocalModule } from '@/modules/providers/adapters/dlocal/dlocal.module.js';
 
 @Global()
 @Module({

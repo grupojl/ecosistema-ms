@@ -23,11 +23,11 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService }    from '@nestjs/config';
-import { FirebaseService }  from '@/firebase/firebase.service';
-import { EcosystemService } from '@/ecosystem/ecosystem.service';
-import { PrismaService }    from '@/prisma/prisma.service';
-import { TenantClaimsSchema } from '@/schemas/tenant-claims.schema';
-import type { TenantContext }  from '@/types/tenant-context';
+import { FirebaseService }  from '@/firebase/firebase.service.js';
+import { EcosystemService } from '@/ecosystem/ecosystem.service.js';
+import { PrismaService }    from '@/prisma/prisma.service.js';
+import { TenantClaimsSchema } from '@/schemas/tenant-claims.schema.js';
+import type { TenantContext }  from '@/types/tenant-context.js';
 
 const PRODUCT_KEY = 'chat';
 

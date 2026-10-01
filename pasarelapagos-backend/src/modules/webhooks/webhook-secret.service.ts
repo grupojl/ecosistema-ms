@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Logger, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 
@@ -18,6 +18,7 @@ import * as crypto from 'crypto';
  */
 @Injectable()
 export class WebhookSecretService {
+  private readonly logger = new Logger(WebhookSecretService.name);
   private readonly current:  string;
   private readonly previous: string | undefined;
 

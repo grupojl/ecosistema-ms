@@ -3,10 +3,10 @@ import { Injectable } from '@nestjs/common';
 import {
   ProjectType, type NotifProjectStrategy,
   type NotifEnrichInput, type NotifSentResult,
-} from './project-strategy.interface.js';
+} from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE, type NotifProjectContext, type OrganizationProfile,
-} from './project-context.interface.js';
+} from '@/core/strategies/project-context.interface.js';
 
 @Injectable()
 export class GenericNotifStrategy implements NotifProjectStrategy {

@@ -1,12 +1,12 @@
 // src/queue/queue.module.ts
 import { Module }     from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
-import { QUEUES }     from '@/queue/queue.constants';
-import { IncomingMessageProcessor } from '@/queue/processors/incoming-message.processor';
-import { OutgoingMessageProcessor } from '@/queue/processors/outgoing-message.processor';
-import { ChannelsModule }      from '@/channels/channel.module';
-import { ConversationsModule } from '@/conversations/conversations.module';
-import { EventsModule }        from '@/events/events.module';
+import { QUEUES }     from '@/queue/queue.constants.js';
+import { IncomingMessageProcessor } from '@/queue/processors/incoming-message.processor.js';
+import { OutgoingMessageProcessor } from '@/queue/processors/outgoing-message.processor.js';
+import { ChannelsModule }      from '@/channels/channel.module.js';
+import { ConversationsModule } from '@/conversations/conversations.module.js';
+import { EventsModule }        from '@/events/events.module.js';
 
 const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
 const REDIS_URL     = process.env['REDIS_URL'] ?? 'redis://localhost:6379';

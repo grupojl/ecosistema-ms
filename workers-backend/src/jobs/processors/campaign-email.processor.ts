@@ -1,4 +1,4 @@
-import { requireJobId } from '../services/job-id.helper.js';
+import { requireJobId } from '@/jobs/services/job-id.helper.js';
 // workers-backend/src/jobs/processors/campaign-email.processor.ts
 //
 // W-2.2: Procesa campañas masivas de email.
@@ -87,7 +87,7 @@ export class CampaignEmailProcessor extends WorkerHost {
           // Verificar opt-out
           try {
             const pref = await firstValueFrom(
-              // @ts-expect-error — rxjs interop
+              // @ts-expect-error — rxjs/grpc interop: Observable<T> vs ObservableInput<T> en ClientGrpc.getService (ADR-007)
               this.notifClient.getPreferences({ organizationId, contactId }),
             ) as { optedOut: boolean };
 
@@ -137,7 +137,7 @@ export class CampaignEmailProcessor extends WorkerHost {
         // Actualizar cursor en JobLog después de cada batch
         cursor += batch.length;
         await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
-          result: { cursor, totalSent, totalFailed } as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
+          result: { cursor, totalSent, totalFailed } as import("@prisma/client").Prisma.InputJsonValue,
         });
 
         this.logger.debug(`[${job.id}] Batch procesado: ${cursor}/${recipientIds.length}`);
@@ -150,7 +150,7 @@ export class CampaignEmailProcessor extends WorkerHost {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      output as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
+        result:      output as import("@prisma/client").Prisma.InputJsonValue,
       });
 
       this.logger.log(
@@ -167,7 +167,7 @@ export class CampaignEmailProcessor extends WorkerHost {
         completedAt: new Date(),
         durationMs,
         error:       message,
-        result:      { cursor, totalSent, totalFailed } as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
+        result:      { cursor, totalSent, totalFailed } as import("@prisma/client").Prisma.InputJsonValue,
       });
 
       throw error;

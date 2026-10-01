@@ -1,7 +1,7 @@
 // pasarelapagos-backend/src/core/strategies/project-strategy.module.ts
 import { Global, Module, OnModuleInit } from '@nestjs/common';
-import { PaymentProjectStrategyRegistry } from './project-strategy.registry.js';
-import { GenericPaymentStrategy }         from './generic.strategy.js';
+import { PaymentProjectStrategyRegistry } from '@/core/strategies/project-strategy.registry.js';
+import { GenericPaymentStrategy }         from '@/core/strategies/generic.strategy.js';
 
 @Global()
 @Module({

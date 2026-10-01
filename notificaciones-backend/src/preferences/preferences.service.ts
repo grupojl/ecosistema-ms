@@ -1,10 +1,11 @@
 // notificaciones-backend/src/preferences/preferences.service.ts
 // DT-014 fix: ecosystemId en getPreferences() para aislamiento multi-tenant
-import { Injectable } from '@nestjs/common';
+import { Logger, Injectable } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service.js';
 
 @Injectable()
 export class PreferencesService {
+  private readonly logger = new Logger(PreferencesService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   getPreferences(ecosystemId: string, organizationId: string, contactId: string) {
@@ -29,14 +30,14 @@ export class PreferencesService {
         organizationId_contactId_channel: {
           organizationId,
           contactId,
-          channel: channel as any // @ecosistema-ms/enum-cast,
+          channel: channel as import("@prisma/client").NotificationChannel,
         },
       },
       create: {
         ecosystemId,
         organizationId,
         contactId,
-        channel:     channel as any // @ecosistema-ms/enum-cast,
+        channel:     channel as import("@prisma/client").NotificationChannel,
         optedOut,
         optedOutAt:  optedOut ? new Date() : null,
       },

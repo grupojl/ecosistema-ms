@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Logger, Injectable, OnModuleInit } from '@nestjs/common';
 import { metrics } from '@opentelemetry/api';
 import { Counter, Histogram, UpDownCounter } from '@opentelemetry/api';
 
@@ -14,6 +14,7 @@ import { Counter, Histogram, UpDownCounter } from '@opentelemetry/api';
  */
 @Injectable()
 export class MetricsService implements OnModuleInit {
+  private readonly logger = new Logger(MetricsService.name);
   private paymentsTotal!:        Counter;
   private paymentDuration!:      Histogram;
   private webhookTotal!:         Counter;

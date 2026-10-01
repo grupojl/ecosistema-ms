@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
-import { PaymentException } from '@/common/errors/payment.exception';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/common/errors/payment.exception.js';
 
 /**
  * Referencia: https://docs.dlocal.com/reference/payment-error-codes
@@ -19,7 +19,7 @@ const CODE_MAP: Record<number, PaymentErrorCode> = {
   500:  PaymentErrorCode.PROCESSING_ERROR,
 };
 
-export function mapDlocalError(error: any): never {
+export function mapDlocalError(error: unknown): never {
   if (error?.response?.status >= 500) {
     throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
   }

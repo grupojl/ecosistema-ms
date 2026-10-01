@@ -1,3 +1,4 @@
+import { z } from 'zod';
 // chatia-backend/src/conversations/repository/prisma-conversations.repository.ts
 //
 // Adaptador Prisma → entidad de dominio.
@@ -32,15 +33,15 @@ export class PrismaConversationsRepository implements IConversationsRepository {
       channelAccountId: row.channelAccountId,
       contactId:        row.contactId,
       // organizationId viene del join con Contact o ChannelAccount según la query
-      // @ecosistema-ms/jsonb-cast — Prisma no tiene organizationId directo en Conversation
+      // Nota de arquitectura: organizationId viene del join con Contact, no del modelo Conversation (ver schema.prisma)
       organizationId:   (row as { organizationId?: string }).organizationId ?? '',
       status:           row.status          as ConversationStatus,
       stage:            row.stage           as ConversationStage,
       isAiActive:       row.isAiActive,
       assignedAgentId:  row.assignedAgentId,
       detectedIntent:   row.detectedIntent,
-      // @ecosistema-ms/jsonb-cast — Prisma retorna Json
-      extractedEntities: (row.extractedEntities as Record<string, string>) ?? {},
+      // Zod parse: campo Json de Prisma — validar shape en el boundary del repository
+      extractedEntities: z.record(z.string()).catch({}).parse(row.extractedEntities ?? {}),
       summary:          row.summary,
       tags:             row.tags,
       lastMessageAt:    row.lastMessageAt,
@@ -179,7 +180,7 @@ export class PrismaConversationsRepository implements IConversationsRepository {
     return {
       id:             account.id,
       organizationId: account.organizationId,
-      ecosystemId:    (account as any).organization // @ecosistema-ms/jsonb-cast?.ecosystemId ?? '',
+      ecosystemId:    (account.organization as { ecosystemId: string } | null)?.ecosystemId ?? '',
       channelType:    account.channelType as string,
       externalId:     account.externalId,
       accessToken:    account.accessToken,

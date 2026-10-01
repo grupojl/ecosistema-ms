@@ -1,14 +1,14 @@
 // notificaciones-backend/src/modules/welver/welver.strategy.ts
 // Strategy de notificaciones para Welver. NUNCA lanza.
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { NotifProjectStrategyRegistry }     from '../../core/strategies/project-strategy.registry.js';
+import { NotifProjectStrategyRegistry }     from '@/core/strategies/project-strategy.registry.js';
 import {
   ProjectType, type NotifProjectStrategy,
   type NotifEnrichInput, type NotifSentResult,
-} from '../../core/strategies/project-strategy.interface.js';
+} from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE, type NotifProjectContext, type OrganizationProfile,
-} from '../../core/strategies/project-context.interface.js';
+} from '@/core/strategies/project-context.interface.js';
 
 @Injectable()
 export class WelverNotifStrategy implements NotifProjectStrategy, OnModuleInit {

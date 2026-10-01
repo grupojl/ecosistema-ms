@@ -1,7 +1,7 @@
 // notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts
 import { Controller, Logger }    from '@nestjs/common';
 import { GrpcMethod }            from '@nestjs/microservices';
-import { PrismaService }         from '@/prisma/prisma.service.js';
+import { PreferencesService }  from '@/preferences/preferences.service.js';
 import { NotificationsService }  from '@/notifications/notifications.service.js';
 
 interface SendNotificationRequest {
@@ -31,7 +31,7 @@ export class NotificacionesGrpcController {
   private readonly logger = new Logger(NotificacionesGrpcController.name);
 
   constructor(
-    private readonly prisma:   PrismaService,
+    private readonly prefsSvc: PreferencesService,
     private readonly notifSvc: NotificationsService,
   ) {}
 
@@ -42,7 +42,7 @@ export class NotificacionesGrpcController {
       return { notificationId: '', status: 0, message: `Canal desconocido: ${req.channel}` };
     }
     try {
-      let payload: Record<string, unknown>; try { payload = JSON.parse(req.payloadJson) as Record<string, unknown>; } catch { throw new Error('payloadJson invalido'); } // @ecosistema-ms/jsonb-cast
+      let payload: Record<string, unknown>; try { payload = JSON.parse(req.payloadJson) as Record<string, unknown>; } catch { throw new Error('payloadJson invalido'); }
       // enqueue retorna { jobId, channel } — mapeamos al contrato gRPC
       const result  = await this.notifSvc.enqueue({
         ecosystemId:    req.ecosystemId,
@@ -64,24 +64,13 @@ export class NotificacionesGrpcController {
     const channel = CHANNEL_MAP[req.channel];
     if (!channel) return { success: false };
     try {
-      await this.prisma.contactPreference.upsert({
-        where: {
-          organizationId_contactId_channel: {
-            organizationId: req.organizationId,
-            contactId:      req.contactId,
-            channel,
-          },
-        },
-        update: { optedOut: req.optedOut, optedOutAt: req.optedOut ? new Date() : null },
-        create: {
-          ecosystemId:    req.ecosystemId,
-          organizationId: req.organizationId,
-          contactId:      req.contactId,
-          channel,
-          optedOut:       req.optedOut,
-          optedOutAt:     req.optedOut ? new Date() : null,
-        },
-      });
+      await this.prefsSvc.upsertPreference(
+        req.ecosystemId,
+        req.organizationId,
+        req.contactId,
+        channel,
+        req.optedOut,
+      );
       return { success: true };
     } catch (e: unknown) {
       this.logger.error(`UpdatePreference error: ${String(e)}`);

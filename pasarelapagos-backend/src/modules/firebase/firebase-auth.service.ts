@@ -6,7 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import type * as admin from 'firebase-admin';
-import { FIREBASE_ADMIN } from '@/modules/firebase/firebase.module';
+import { FIREBASE_ADMIN } from '@/modules/firebase/firebase.module.js';
 
 export interface FirebaseDecodedToken {
   uid: string;

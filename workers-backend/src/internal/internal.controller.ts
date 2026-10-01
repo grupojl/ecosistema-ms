@@ -1,3 +1,4 @@
+import type { Job } from 'bullmq';
 // workers-backend/src/internal/internal.controller.ts
 //
 // Endpoints REST para superadmin — DLQ viewer y retry de jobs.
@@ -43,7 +44,7 @@ export class InternalController {
     // DlqService.listAll() devuelve todos los jobs fallidos
     const all = await this.dlq.listAll();
     const filtered = dto.queue
-      ? all.filter((j: any) => j.queue === dto.queue)
+      ? all.filter((j) => j.queueName === dto.queue)
       : all;
     return filtered.slice(0, dto.limit);
   }

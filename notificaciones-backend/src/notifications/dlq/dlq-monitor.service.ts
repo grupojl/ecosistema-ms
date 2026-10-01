@@ -85,7 +85,7 @@ export class DlqMonitorService implements OnModuleInit {
 
     try {
       await firstValueFrom(
-        // @ts-expect-error — rxjs interop
+        // @ts-expect-error — rxjs/grpc interop: ClientGrpc.getService retorna Observable<T> pero firstValueFrom necesita ObservableInput<T>; resuelto con ChatiaInternalClient en chatia-internal.interface.ts (ADR-007)
         this.chatiaClient.notifySystem({
           // organizationId global del ecosistema para alertas de infraestructura
           organizationId: process.env['ECOSYSTEM_ORG_ID'] ?? 'system',

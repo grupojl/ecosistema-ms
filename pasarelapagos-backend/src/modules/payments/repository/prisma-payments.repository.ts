@@ -1,3 +1,4 @@
+import { z } from 'zod';
 // pasarelapagos-backend/src/modules/payments/repository/prisma-payments.repository.ts
 //
 // Adaptador Prisma → entidad de dominio.
@@ -33,8 +34,8 @@ export class PrismaPaymentsRepository implements IPaymentsRepository {
       providerId:     row.providerId,
       externalId:     row.externalId,
       description:    row.description,
-      // @ecosistema-ms/jsonb-cast — Prisma retorna Json, sabemos que es Record<string,string>
-      metadata:       (row.metadata as Record<string, string>) ?? {},
+      // Zod parse: campo Json de Prisma — shape validado en el boundary del repository
+      metadata:       z.record(z.string()).nullable().catch(null).parse(row.metadata) ?? {},
       failureCode:    row.failureCode,
       failureMessage: row.failureMessage,
       idempotencyKey: row.idempotencyKey,

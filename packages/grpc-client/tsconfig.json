@@ -8,7 +8,13 @@
     "emitDecoratorMetadata": true,
     "declaration": true,
     "skipLibCheck": true,
-    "baseUrl": "."
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

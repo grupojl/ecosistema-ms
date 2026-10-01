@@ -1,7 +1,7 @@
 // src/faq/knowledge-base/knowledge-base.service.ts
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service';
-import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from '@/faq/knowledge-base/dto/knowledge-base.dto';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from '@/faq/knowledge-base/dto/knowledge-base.dto.js';
 
 @Injectable()
 export class KnowledgeBaseService {

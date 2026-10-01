@@ -1,11 +1,12 @@
+import { GroqCbService, CircuitOpenError } from '@/groq/groq-cb.service.js';
 // chatia-backend/src/assistant/chat/assistant-chat.service.ts
 // ADR-019 v2: ProjectStrategyRegistry conectado — enriquece contexto por org antes del LLM.
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { GroqService, GroqMessage }      from '@/groq/groq.service';
-import { EventsGateway }                 from '@/events/events.gateway';
-import { PrismaService }                 from '@/prisma/prisma.service';
-import { AssistantConfigService }        from '@/config/assistant-config.service';
-import { AssistantSessionService }       from '@/session/assistant-session.service';
+import { GroqService, GroqMessage }      from '@/groq/groq.service.js';
+import { EventsGateway }                 from '@/events/events.gateway.js';
+import { PrismaService }                 from '@/prisma/prisma.service.js';
+import { AssistantConfigService }        from '@/config/assistant-config.service.js';
+import { AssistantSessionService }       from '@/session/assistant-session.service.js';
 import { ProjectStrategyRegistry }       from '@/core/strategies/project-strategy.registry.js';
 
 export type RagServiceLike = {
@@ -100,8 +101,9 @@ export class AssistantChatService {
     let faqSources: unknown[] | undefined;
 
     try {
-      const result = await this.groq.chat(messages, {
-        model:       modelToUse as never // @ecosistema-ms/jsonb-cast,
+      const groqRunner = this.groqCb ?? this.groq;
+      const result = await groqRunner.chat(messages, {
+        model:       modelToUse as string,
         temperature: config.temperature,
         maxTokens:   config.maxTokens,
       });
@@ -124,6 +126,19 @@ export class AssistantChatService {
         }
       }
     } catch (err) {
+      if (err instanceof CircuitOpenError) {
+        this.logger.warn('Groq circuit OPEN — escalando a humano');
+        await this.sessionService.appendMessage(session.id, 'assistant',
+          config.fallbackMessage ?? 'Servicio temporalmente no disponible. Un agente te atenderá pronto.');
+        this.events.emitToAgent(organizationId, 'assistant:escalate', { sessionId: session.id, userId });
+        return {
+          sessionId:       session.id,
+          response:        config.fallbackMessage ?? 'Servicio temporalmente no disponible.',
+          tokensUsed:      0,
+          modelUsed:       'fallback',
+          usedFaqFallback: false,
+        };
+      }
       this.logger.error(`Error en Groq: ${err}`);
       responseText = config.fallbackMessage ?? '¡Disculpá! Tuve un problema. ¿Podés repetir?';
     }

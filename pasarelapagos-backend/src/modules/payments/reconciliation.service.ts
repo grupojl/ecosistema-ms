@@ -7,13 +7,13 @@ import { InjectQueue }    from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue }          from 'bullmq';
-import { PrismaService }  from '@/prisma/prisma.service';
-import { ProviderRegistry } from '@/providers/provider.registry';
-import { assertValidTransition } from '@/modules/payments/payment-state.machine';
+import { PrismaService }  from '@/prisma/prisma.service.js';
+import { ProviderRegistry } from '@/providers/provider.registry.js';
+import { assertValidTransition } from '@/modules/payments/payment-state.machine.js';
 import {
   QUEUE_RECONCILE,
   JOB_RECONCILE_PAYMENT,
-} from '@/common/constants/queues';
+} from '@/common/constants/queues.js';
 import { PaymentStatus } from '@prisma/client';
 
 export interface ReconcileJobData {
@@ -120,7 +120,7 @@ export class ReconciliationService {
         data: {
           paymentId,
           type:    'reconciliation.updated',
-          payload: { from: payment.status, to: newStatus, raw: result.raw as any // @ecosistema-ms/jsonb-cast },
+          payload: { from: payment.status, to: newStatus, raw: result.raw as import("@prisma/client").Prisma.InputJsonValue },
         },
       });
     });

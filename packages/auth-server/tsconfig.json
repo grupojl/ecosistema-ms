@@ -11,7 +11,12 @@
     "emitDecoratorMetadata": true,
     "declaration": true,
     "skipLibCheck": true,
-    "baseUrl": "."
+    "types": ["node"],
+    "ignoreDeprecations": "6.0",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
   },
   "include": ["src/**/*"]
 }

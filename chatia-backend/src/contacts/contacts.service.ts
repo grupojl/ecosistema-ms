@@ -1,6 +1,6 @@
 // chatia-backend/src/contacts/contacts.service.ts
 // FIX-02: refactorizado para usar IContactsRepository via @Inject.
-// PrismaService eliminado — toda la persistencia va por el repository.
+// C5 fix: ecosystemId agregado a todas las operaciones para aislamiento multi-tenant.
 import {
   Inject,
   Injectable,
@@ -17,18 +17,19 @@ import type { ListContactsFilter } from '@/contacts/repository/contacts.reposito
 
 @Injectable()
 export class ContactsService {
+  private readonly logger = new Logger(ContactsService.name);
   constructor(
     @Inject(CONTACTS_REPOSITORY)
     private readonly contactsRepository: IContactsRepository,
   ) {}
 
-  async list(organizationId: string, filters?: ListContactsFilter) {
-    const contacts = await this.contactsRepository.list(organizationId, filters);
+  async list(organizationId: string, ecosystemId: string, filters?: ListContactsFilter) {
+    const contacts = await this.contactsRepository.list(organizationId, ecosystemId, filters);
     return { success: true, data: contacts };
   }
 
-  async getOne(contactId: string, organizationId: string) {
-    const contact = await this.contactsRepository.findOne(contactId, organizationId);
+  async getOne(contactId: string, organizationId: string, ecosystemId: string) {
+    const contact = await this.contactsRepository.findOne(contactId, organizationId, ecosystemId);
     if (!contact) {
       throw new NotFoundException(
         new ContactNotFoundError(contactId, organizationId).message,
@@ -40,9 +41,9 @@ export class ContactsService {
   async update(
     contactId:      string,
     organizationId: string,
+    ecosystemId:    string,
     dto: UpdateContactDto,
   ) {
-    // Validar invariante de dominio: tags sin duplicados
     if (dto.tags) {
       try {
         assertNoDuplicateTags(dto.tags);
@@ -53,7 +54,7 @@ export class ContactsService {
       }
     }
 
-    const updated = await this.contactsRepository.update(contactId, organizationId, {
+    const updated = await this.contactsRepository.update(contactId, organizationId, ecosystemId, {
       ...(dto.name     !== undefined && { name:     dto.name }),
       ...(dto.email    !== undefined && { email:    dto.email }),
       ...(dto.status   !== undefined && { status:   dto.status }),
@@ -63,8 +64,8 @@ export class ContactsService {
     return { success: true, data: updated };
   }
 
-  async getStats(organizationId: string) {
-    const stats = await this.contactsRepository.getStats(organizationId);
+  async getStats(organizationId: string, ecosystemId: string) {
+    const stats = await this.contactsRepository.getStats(organizationId, ecosystemId);
     return { success: true, data: stats };
   }
 }

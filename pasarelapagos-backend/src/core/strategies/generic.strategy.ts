@@ -3,10 +3,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   ProjectType, type PaymentProjectStrategy,
   type PaymentEnrichInput, type ChargeResult,
-} from './project-strategy.interface.js';
+} from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE, type PaymentProjectContext, type OrganizationProfile,
-} from './project-context.interface.js';
+} from '@/core/strategies/project-context.interface.js';
 
 @Injectable()
 export class GenericPaymentStrategy implements PaymentProjectStrategy {

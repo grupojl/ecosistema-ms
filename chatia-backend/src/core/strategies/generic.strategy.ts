@@ -4,11 +4,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   ProjectType, type ProjectStrategy,
   type ConversationEnrichInput, type ConversationResult,
-} from './project-strategy.interface.js';
+} from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE,
   type ProjectContext, type OrganizationProfile,
-} from './project-context.interface.js';
+} from '@/core/strategies/project-context.interface.js';
 
 @Injectable()
 export class GenericStrategy implements ProjectStrategy {

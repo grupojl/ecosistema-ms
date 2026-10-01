@@ -1,7 +1,7 @@
 # Fase 4 — Escala
 ## Escalones 9, 11, 12, 13 — 3 ecosistemas simultáneos
 
-**Estado:** ⚪ Pendiente — iniciar cuando Fase 3 esté completa
+**Estado: 🟡 ACTIVA — iniciada 2026-10-01
 **Cuándo:** Cuando welver, manzana y mexus operan simultáneamente con tráfico real
 **Referentes:** AWS (DR) · Linear/Figma (UX) · Netflix (Chaos) · Airbnb/Uber (FinOps)
 

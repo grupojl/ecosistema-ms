@@ -1,7 +1,7 @@
 // chatia-backend/src/core/strategies/project-strategy.interface.ts
 // REGLA DURA: enrich* y after* NUNCA lanzan. Capturan, loguean, retornan neutro.
 
-import type { ProjectContext, OrganizationProfile } from './project-context.interface.js';
+import type { ProjectContext, OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 export enum ProjectType {
   WELVER  = 'welver',

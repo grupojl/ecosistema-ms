@@ -1,9 +1,10 @@
 // src/messages/messages.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service';
+import { Logger, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '@/prisma/prisma.service.js';
 
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async listByConversation(

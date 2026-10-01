@@ -8,10 +8,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface';
-import { ProviderRegistry } from '@/provider.registry';
-import { CircuitBreakerService } from '@/circuit-breaker.service';
-import { mapStripeError } from '@/modules/providers/adapters/stripe/stripe-error.mapper';
+} from '@/provider.interface.js';
+import { ProviderRegistry } from '@/provider.registry.js';
+import { CircuitBreakerService } from '@/circuit-breaker.service.js';
+import { mapStripeError } from '@/modules/providers/adapters/stripe/stripe-error.mapper.js';
 
 // Con moduleResolution: nodenext el namespace Stripe.* no resuelve en stripe@22.
 // Usamos ReturnType para tipar la instancia y strings literales para los enums.
@@ -90,7 +90,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
         return {
           externalId:  intent.id,
           status:      this.mapIntentStatus(intent.status as PaymentIntentStatus),
-          redirectUrl: (intent.next_action as any) // @ecosistema-ms/stripe-cast?.redirect_to_url?.url,
+          redirectUrl: (intent.next_action as import("stripe").Stripe.PaymentIntent.NextAction | null)?.redirect_to_url?.url,
           raw:         intent,
         };
       } catch (err) {
@@ -154,11 +154,11 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
     const sig = headers['stripe-signature'];
     if (!sig) throw new UnauthorizedException('Falta stripe-signature');
 
-    let event: any;
+    let event: import("stripe").Stripe.Event;
     try {
       event = this.stripe.webhooks.constructEvent(raw, sig, this.webhookSecret);
-    } catch (err: any) {
-      throw new UnauthorizedException(`Firma Stripe inválida: ${err.message}`);
+    } catch (err: unknown) {
+      throw new UnauthorizedException(`Firma Stripe inválida: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     return {
@@ -196,7 +196,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
     return map[eventType] ?? 'pending';
   }
 
-  private extractExternalId(event: any): string {
+  private extractExternalId(event: import("stripe").Stripe.Event): string {
     const obj = event?.data?.object ?? {};
     return (obj.payment_intent ?? obj.id ?? 'unknown') as string;
   }

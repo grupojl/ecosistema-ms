@@ -1,16 +1,16 @@
 import { BullModule }           from '@nestjs/bullmq';
 import { Module }               from '@nestjs/common';
-import { WebhooksController }   from '@/modules/webhooks/webhooks.controller';
-import { WebhookProcessor }     from '@/modules/webhooks/webhook.processor';
-import { WebhookSecretService } from '@/modules/webhooks/webhook-secret.service';
-import { FirebaseModule }       from '@/firebase/firebase.module';
-import { TenantsModule }        from '@/tenants/tenants.module';
-import { FirebaseAuthService }  from '@/firebase/firebase-auth.service';
-import { AuthGuard }            from '@/common/guards/auth.guard';
-import { TenantGuard }          from '@/common/guards/tenant.guard';
-import { ApiKeyGuard }          from '@/common/guards/api-key.guard';
-import { RolesGuard }           from '@/common/guards/roles.guard';
-import { QUEUE_WEBHOOKS }       from '@/common/constants/queues';
+import { WebhooksController }   from '@/modules/webhooks/webhooks.controller.js';
+import { WebhookProcessor }     from '@/modules/webhooks/webhook.processor.js';
+import { WebhookSecretService } from '@/modules/webhooks/webhook-secret.service.js';
+import { FirebaseModule }       from '@/firebase/firebase.module.js';
+import { TenantsModule }        from '@/tenants/tenants.module.js';
+import { FirebaseAuthService }  from '@/firebase/firebase-auth.service.js';
+import { AuthGuard }            from '@/common/guards/auth.guard.js';
+import { TenantGuard }          from '@/common/guards/tenant.guard.js';
+import { ApiKeyGuard }          from '@/common/guards/api-key.guard.js';
+import { RolesGuard }           from '@/common/guards/roles.guard.js';
+import { QUEUE_WEBHOOKS }       from '@/common/constants/queues.js';
 
 const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
 

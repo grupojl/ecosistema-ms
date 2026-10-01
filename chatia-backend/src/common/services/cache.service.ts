@@ -52,7 +52,7 @@ export class CacheService {
     if (!this.connected || !this.client) return null;
     try {
       const val = await this.client.get(key);
-      if (!val) return null; try { return JSON.parse(val) as T; } catch { return null; } // @ecosistema-ms/jsonb-cast
+      if (!val) return null; try { return JSON.parse(val) as T; } catch { return null; }
     } catch {
       return null;
     }

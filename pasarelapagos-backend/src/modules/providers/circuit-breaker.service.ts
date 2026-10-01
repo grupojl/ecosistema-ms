@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import CircuitBreaker from 'opossum';
-import { PaymentException } from '@/common/errors/payment.exception';
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
+import { PaymentException } from '@/common/errors/payment.exception.js';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
 
 export interface CircuitBreakerOptions {
   timeout?: number;       // ms antes de considerar fallido (default: 5000)
@@ -27,7 +27,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     const breaker = this.getOrCreate(key, fn, options);
     try {
       return await breaker.fire();
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err?.code === 'EOPENBREAKER') {
         this.logger.warn(`Circuit breaker ABIERTO para: ${key}`);
         throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
@@ -47,6 +47,24 @@ export class CircuitBreakerService implements OnModuleDestroy {
     return 'closed';
   }
 
+  /**
+   * Retorna el estado de todos los circuit breakers registrados.
+   * Usado por health.controller.ts para el /health extendido.
+   * Keys: mercadopago, stripe, dlocal, conekta, pagarme (según providers activos)
+   */
+  getAll(): Record<string, 'CLOSED' | 'OPEN' | 'HALF_OPEN'> {
+    const result: Record<string, 'CLOSED' | 'OPEN' | 'HALF_OPEN'> = {};
+    for (const key of this.breakers.keys()) {
+      const state = this.healthOf(key);
+      if (state !== 'unknown') {
+        result[key] = state === 'closed'   ? 'CLOSED'
+                    : state === 'open'     ? 'OPEN'
+                    : 'HALF_OPEN';
+      }
+    }
+    return result;
+  }
+
   statsOf(key: string) {
     return this.breakers.get(key)?.stats ?? null;
   }
@@ -63,7 +81,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     if (this.breakers.has(key)) {
       // Actualizar la acción si cambió (p.ej. provider reconfigurado)
       const existing = this.breakers.get(key)!;
-      (existing as any).action // @ecosistema-ms/opossum-cast = fn;
+      (existing as CircuitBreaker).action = fn;
       return existing as CircuitBreaker<[], T>;
     }
 

@@ -1,6 +1,6 @@
 // notificaciones-backend/src/core/strategies/project-strategy.registry.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { ProjectType, type NotifProjectStrategy } from './project-strategy.interface.js';
+import { ProjectType, type NotifProjectStrategy } from '@/core/strategies/project-strategy.interface.js';
 
 @Injectable()
 export class NotifProjectStrategyRegistry {

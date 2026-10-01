@@ -5,15 +5,15 @@ import {
   HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { ContactsService }    from '@/contacts/contacts.service';
-import { TenantGuard }        from '@/common/guards/tenant.guard';
-import { Tenant }             from '@/common/decorators/tenant.decorator';
-import type { TenantContext } from '@/common/types/tenant-context';
-import { ZodValidationPipe }  from '@/common/pipes/zod-validation.pipe';
+import { ContactsService }    from '@/contacts/contacts.service.js';
+import { TenantGuard }        from '@/common/guards/tenant.guard.js';
+import { Tenant }             from '@/common/decorators/tenant.decorator.js';
+import type { TenantContext } from '@/common/types/tenant-context.js';
+import { ZodValidationPipe }  from '@/common/pipes/zod-validation.pipe.js';
 import {
   UpdateContactSchema, ListContactsSchema,
-} from '@/contacts/schemas';
-import type { UpdateContactInput, ListContactsInput } from '@/contacts/schemas';
+} from '@/contacts/schemas.js';
+import type { UpdateContactInput, ListContactsInput } from '@/contacts/schemas.js';
 
 @ApiTags('contacts')
 @ApiBearerAuth()
@@ -27,12 +27,12 @@ export class ContactsController {
     @Tenant() tenant: TenantContext,
     @Query(new ZodValidationPipe(ListContactsSchema)) query: ListContactsInput,
   ) {
-    return this.contactsService.list(tenant.organizationId, query);
+    return this.contactsService.list(tenant.organizationId, tenant.ecosystemId, query);
   }
 
   @Get('stats')
   stats(@Tenant() tenant: TenantContext) {
-    return this.contactsService.getStats(tenant.organizationId);
+    return this.contactsService.getStats(tenant.organizationId, tenant.ecosystemId);
   }
 
   @Get(':id')
@@ -46,6 +46,6 @@ export class ContactsController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(UpdateContactSchema)) dto: UpdateContactInput,
   ) {
-    return this.contactsService.update(id, tenant.organizationId, dto);
+    return this.contactsService.update(id, tenant.organizationId, tenant.ecosystemId, dto);
   }
 }

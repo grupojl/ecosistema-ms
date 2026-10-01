@@ -1,18 +1,18 @@
 // chatia-backend/src/modules/welver/welver.strategy.ts
 // Strategy org-aware de Welver. NUNCA lanza en enrich/after.
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaService }             from '../../prisma/prisma.service.js';
-import { OrganizationConfigService } from '../../organization-config/organization-config.service.js';
-import { ProjectStrategyRegistry }   from '../../core/strategies/project-strategy.registry.js';
+import { PrismaService }             from '@/prisma/prisma.service.js';
+import { OrganizationConfigService } from '@/organization-config/organization-config.service.js';
+import { ProjectStrategyRegistry }   from '@/core/strategies/project-strategy.registry.js';
 import {
   ProjectType, type ProjectStrategy,
   type ConversationEnrichInput, type ConversationResult,
-} from '../../core/strategies/project-strategy.interface.js';
+} from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE, type ProjectContext, type OrganizationProfile,
-} from '../../core/strategies/project-context.interface.js';
-import { WELVER_CONFIG, buildWelverSystemPrompt } from './welver.config.js';
-import type { WELVERBusinessData } from './types/context.js';
+} from '@/core/strategies/project-context.interface.js';
+import { WELVER_CONFIG, buildWelverSystemPrompt } from '@/modules/welver/welver.config.js';
+import type { WELVERBusinessData } from '@/modules/welver/types/context.js';
 
 @Injectable()
 export class WelverStrategy implements ProjectStrategy, OnModuleInit {
@@ -72,7 +72,7 @@ export class WelverStrategy implements ProjectStrategy, OnModuleInit {
       if (result.newStage && result.newStage !== 'INITIAL') {
         await this.prisma.conversation.updateMany({
           where: { id: result.conversationId, organizationId: result.organizationId },
-          data:  { stage: result.newStage as never // @ecosistema-ms/jsonb-cast },
+          data:  { stage: result.newStage as import("@prisma/client").Prisma.InputJsonValue },
         });
       }
     } catch (err: unknown) {
@@ -90,7 +90,7 @@ export class WelverStrategy implements ProjectStrategy, OnModuleInit {
         where: { id: ecosystemId },
         select: { name: true, config: true },
       });
-      const config = (ecosystem?.config as Record<string, unknown> // @ecosistema-ms/jsonb-cast | null) ?? {};
+      const config = (ecosystem?.config as Record<string, unknown> | null) ?? {};
 
       const hasKb = await this.prisma.knowledgeBase.count({
         where: { organizationId, isActive: true },

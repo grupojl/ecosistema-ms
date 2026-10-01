@@ -3,9 +3,9 @@ import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'crypto';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/modules/prisma/prisma.service';
-import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter';
+import { AppModule } from '../src/app.module.js';
+import { PrismaService } from '../src/modules/prisma/prisma.service.js';
+import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter.js';
 import * as bcrypt from 'bcryptjs';
 
 /**

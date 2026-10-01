@@ -10,10 +10,10 @@ export class JobsService {
     return log;
   }
   async createJobLog(data: { ecosystemId:string; organizationId:string; queue:string; jobId:string; input:unknown }) {
-    return this.prisma.jobLog.create({ data: { ...data, input: data.input as any // @ecosistema-ms/jsonb-cast, status: "PENDING" } });
+    return this.prisma.jobLog.create({ data: { ...data, input: data.input as import("@prisma/client").Prisma.InputJsonValue, status: "PENDING" } });
   }
   async updateJobLog(jobId: string, update: { status?:"PROCESSING"|"DONE"|"FAILED"|"CANCELLED"; result?:unknown; error?:string; attempts?:number; startedAt?:Date; completedAt?:Date; durationMs?:number }) {
-    return this.prisma.jobLog.update({ where: { jobId }, data: { ...update, result: update.result as any // @ecosistema-ms/jsonb-cast } })
+    return this.prisma.jobLog.update({ where: { jobId }, data: { ...update, result: update.result as import("@prisma/client").Prisma.InputJsonValue } })
       .catch(err => this.logger.error(`No se pudo actualizar JobLog ${jobId}: ${err.message}`));
   }
 }

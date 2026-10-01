@@ -5,10 +5,10 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger, Inject }                       from '@nestjs/common';
 import { Job }                                  from 'bullmq';
-import { PrismaService }                        from '../../prisma/prisma.service.js';
-import { MARKETING_QUEUES }                     from '../../marketing.constants.js';
-import { AD_PLATFORM_TOKENS }                   from '../../ad-accounts/adapters/ad-platform.interface.js';
-import type { AdPlatformInterface }             from '../../ad-accounts/adapters/ad-platform.interface.js';
+import { PrismaService }                        from '@/prisma/prisma.service.js';
+import { MARKETING_QUEUES }                     from '@/marketing.constants.js';
+import { AD_PLATFORM_TOKENS }                   from '@/ad-accounts/adapters/ad-platform.interface.js';
+import type { AdPlatformInterface }             from '@/ad-accounts/adapters/ad-platform.interface.js';
 import type { AutomationRule, AdPlatform }      from '@prisma/client';
 /** Tipos para AutomationRule.condition y .action (campos Json en Prisma schema) */
 interface AutomationRuleCondition {
@@ -45,14 +45,16 @@ export class AutomationCheckProcessor extends WorkerHost {
       include: { campaign: { include: { adAccount: true } } },
     });
     for (const rule of rules) {
-      try { await this.evaluateRule(rule as AutomationRulePayload // @ecosistema-ms/jsonb-cast, job.id ?? ''); }
+      try { await this.evaluateRule(rule as AutomationRulePayload, job.id ?? ''); }
       catch (err: unknown) { this.logger.warn(`Rule ${rule.id} failed: ${err instanceof Error ? err.message : err}`); }
     }
   }
 
-  private async evaluateRule(rule: AutomationRule & { campaign: any }, jobId: string): Promise<void> {
-    const condition = rule.condition as unknown as RuleCondition;
-    const action    = rule.action    as unknown as RuleAction;
+  private async evaluateRule(rule: AutomationRule & { campaign: import('@prisma/client').Campaign }, jobId: string): Promise<void> {
+    // @ecosistema-ms/jsonb-cast  14 JSONB de Prisma, forma garantizada por AutomationRule.create()
+    const condition = rule.condition as RuleCondition;
+    // @ecosistema-ms/jsonb-cast  14 JSONB de Prisma, forma garantizada por AutomationRule.create()
+    const action    = rule.action as RuleAction;
 
     if (rule.lastRunAt) {
       const nextRun = new Date(rule.lastRunAt);
@@ -84,7 +86,7 @@ export class AutomationCheckProcessor extends WorkerHost {
     this.logger.log(`Rule ${rule.id} executed — ${action.type} success:${success}`);
   }
 
-  private calcAvg(metrics: any[], metric: RuleCondition['metric']): number {
+  private calcAvg(metrics: Record<string, unknown>[], metric: RuleCondition['metric']): number {
     const vals = metrics.map(m => {
       switch (metric) {
         case 'roas':        return Number(m.roas ?? 0);
@@ -101,7 +103,7 @@ export class AutomationCheckProcessor extends WorkerHost {
     return op === 'lt' ? v < t : op === 'gt' ? v > t : op === 'lte' ? v <= t : v >= t;
   }
 
-  private async execAction(campaign: any, action: RuleAction): Promise<void> {
+  private async execAction(campaign: import('@prisma/client').Campaign, action: RuleAction): Promise<void> {
     const adapter = campaign.platform === 'META' ? this.metaAdapter : null;
     if (!adapter) { this.logger.warn(`No adapter for ${campaign.platform}`); return; }
     if (action.type === 'pause')        await adapter.pauseCampaign(campaign.externalId, campaign.adAccount.accessToken);

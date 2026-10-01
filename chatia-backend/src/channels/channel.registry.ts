@@ -1,11 +1,11 @@
 // src/channels/channel.registry.ts
 import { Injectable } from '@nestjs/common';
 import { ChannelType } from '@prisma/client';
-import type { IChannel } from '@/channels/channel.interface';
-import { WhatsAppChannel } from '@/channels/whatsapp/whatsapp.channel';
-import { InstagramChannel } from '@/channels/instagram/instagram.channel';
-import { MessengerChannel } from '@/channels/messenger/messenger.channel';
-import { TikTokChannel } from '@/channels/tiktok/tiktok.channel';
+import type { IChannel } from '@/channels/channel.interface.js';
+import { WhatsAppChannel } from '@/channels/whatsapp/whatsapp.channel.js';
+import { InstagramChannel } from '@/channels/instagram/instagram.channel.js';
+import { MessengerChannel } from '@/channels/messenger/messenger.channel.js';
+import { TikTokChannel } from '@/channels/tiktok/tiktok.channel.js';
 
 @Injectable()
 export class ChannelRegistry {

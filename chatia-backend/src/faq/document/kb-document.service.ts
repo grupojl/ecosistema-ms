@@ -2,9 +2,9 @@
 import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { InjectQueue }  from '@nestjs/bullmq';
 import { Queue }        from 'bullmq';
-import { PrismaService } from '@/prisma/prisma.service';
-import { CreateKbDocumentDto } from '@/faq/document/dto/kb-document.dto';
-import { QUEUES, JOBS } from '@/queue/queue.constants';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import { CreateKbDocumentDto } from '@/faq/document/dto/kb-document.dto.js';
+import { QUEUES, JOBS } from '@/queue/queue.constants.js';
 
 export interface IngestJobData { documentId: string; organizationId: string; }
 
@@ -37,7 +37,7 @@ export class KbDocumentService {
       where: {
         knowledgeBaseId: kbId,
         organizationId,
-        ...(status ? { status: status as any // @ecosistema-ms/enum-cast } : {}),
+        ...(status ? { status: status as import("@prisma/client").KbDocumentStatus } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

@@ -6,8 +6,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '@/prisma/prisma.service';
-import type { RegisterEcosystemDto } from '@/ecosystem/dto/register-ecosystem.dto';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import type { RegisterEcosystemDto } from '@/ecosystem/dto/register-ecosystem.dto.js';
 
 @Injectable()
 export class EcosystemService {
@@ -29,7 +29,7 @@ export class EcosystemService {
       data: {
         firebaseProjectId: dto.firebaseProjectId,
         name:   dto.name,
-        config: (dto.config ?? {}) as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
+        config: (dto.config ?? {}) as Prisma.InputJsonValue,
       },
     });
     this.logger.log(`Ecosistema registrado: ${ecosystem.name} (${ecosystem.id})`);
@@ -64,7 +64,7 @@ export class EcosystemService {
   async updateConfig(id: string, config: Record<string, unknown>) {
     const ecosystem = await this.prisma.ecosystem.findUnique({ where: { id } });
     if (!ecosystem) throw new NotFoundException(`Ecosistema ${id} no encontrado`);
-    return this.prisma.ecosystem.update({ where: { id }, data: { config: config as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast } });
+    return this.prisma.ecosystem.update({ where: { id }, data: { config: config as Prisma.InputJsonValue } });
   }
 
   // ── Desactivar ────────────────────────────────────────────────────────────

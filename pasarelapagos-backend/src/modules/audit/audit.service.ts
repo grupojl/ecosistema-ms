@@ -2,7 +2,7 @@
 // Audit log inmutable (append-only).
 // Nunca se borran ni modifican registros — compliance PCI-DSS.
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '@/prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 
 export type AuditAction =
@@ -50,9 +50,9 @@ export class AuditService {
         action:         entry.action,
         resourceId:     entry.resourceId,
         resourceType:   entry.resourceType,
-        before:         entry.before   as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast | undefined,
-        after:          entry.after    as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast | undefined,
-        metadata:       entry.metadata as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast | undefined,
+        before:         entry.before   as Prisma.InputJsonValue | undefined,
+        after:          entry.after    as Prisma.InputJsonValue | undefined,
+        metadata:       entry.metadata as Prisma.InputJsonValue | undefined,
         ip:             entry.ip,
       } as Prisma.AuditLogCreateInput;
 

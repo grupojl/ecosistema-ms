@@ -1,4 +1,4 @@
-import { requireJobId } from '../services/job-id.helper.js';
+import { requireJobId } from '@/jobs/services/job-id.helper.js';
 // workers-backend/src/jobs/processors/analytics-export.processor.ts
 //
 // A-3.2: Genera exportaciones de analytics en background.
@@ -102,7 +102,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      { url, format, sizeBytes, rowCount } as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
+        result:      { url, format, sizeBytes, rowCount } as import("@prisma/client").Prisma.InputJsonValue,
       });
 
       this.logger.log(
@@ -132,7 +132,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
     switch (reportType) {
       case 'overview': {
         const result = await firstValueFrom(
-          // @ts-expect-error rxjs interop
+          // @ts-expect-error — rxjs/grpc interop: Observable<T> vs ObservableInput<T> en ClientGrpc.getService (ADR-007, ver chatia-internal.interface.ts para el patrón de fix)
           this.analyticsClient.getOverview(params),
         ) as Record<string, unknown>;
         return [result]; // overview es un objeto — lo envolvemos en array para CSV
@@ -140,7 +140,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
 
       case 'conversations': {
         const result = await firstValueFrom(
-          // @ts-expect-error rxjs interop
+          // @ts-expect-error — rxjs/grpc interop: Observable<T> vs ObservableInput<T> en ClientGrpc.getService (ADR-007, ver chatia-internal.interface.ts para el patrón de fix)
           this.analyticsClient.getConversationsByDay(params),
         ) as { days: unknown[] };
         return result.days ?? [];
@@ -152,7 +152,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
         let page = 1;
         while (true) {
           const result = await firstValueFrom(
-            // @ts-expect-error rxjs interop
+            // @ts-expect-error — rxjs/grpc interop: Observable<T> vs ObservableInput<T> en ClientGrpc.getService (ADR-007, ver chatia-internal.interface.ts para el patrón de fix)
             this.analyticsClient.getAgentMetrics({ ...params, page, limit: 100 }),
           ) as { agents: unknown[]; total: number };
           allAgents.push(...result.agents);

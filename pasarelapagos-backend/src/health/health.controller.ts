@@ -3,8 +3,8 @@
 // El check hardcodeado anterior devolvía 200 aunque la DB estuviera caída.
 import { Controller, Get }  from '@nestjs/common';
 import { ApiTags }           from '@nestjs/swagger';
-import { PrismaService }     from '@/modules/prisma/prisma.service';
-import { RedisService }      from '@/modules/redis/redis.service';
+import { PrismaService }     from '@/modules/prisma/prisma.service.js';
+import { RedisService }      from '@/modules/redis/redis.service.js';
 
 interface DependencyHealth {
   status:    'up' | 'down';

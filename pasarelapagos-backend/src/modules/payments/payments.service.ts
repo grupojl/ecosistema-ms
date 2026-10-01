@@ -12,20 +12,20 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService }    from '@/prisma/prisma.service';
+import { PrismaService }    from '@/prisma/prisma.service.js';
 import {
   PAYMENTS_REPOSITORY,
   IPaymentsRepository,
-} from '@/modules/payments/repository/payments.repository.interface';
-import { ProviderRegistry } from '@/providers/provider.registry';
-import { AuditService }     from '@/audit/audit.service';
-import { MetricsService }   from '@/metrics/metrics.service';
-import type { CreatePaymentInput } from '@/modules/payments/schemas';
-import { assertValidTransition }   from '@/modules/payments/payment-state.machine';
-import type { OrgContext }         from '@/common/interfaces/org-context.interface';
+} from '@/modules/payments/repository/payments.repository.interface.js';
+import { ProviderRegistry } from '@/providers/provider.registry.js';
+import { AuditService }     from '@/audit/audit.service.js';
+import { MetricsService }   from '@/metrics/metrics.service.js';
+import type { CreatePaymentInput } from '@/modules/payments/schemas.js';
+import { assertValidTransition }   from '@/modules/payments/payment-state.machine.js';
+import type { OrgContext }         from '@/common/interfaces/org-context.interface.js';
 import { PaymentStatus, Prisma }   from '@prisma/client';
 import { PaymentMethodKind as PrismaPaymentMethodKind } from '@prisma/client';
-import type { PaymentMethodKind as ProviderMethodKind } from '@/providers/provider.interface';
+import type { PaymentMethodKind as ProviderMethodKind } from '@/providers/provider.interface.js';
 
 // ---------------------------------------------------------------------------
 // Mapper: convierte el value lowercase del provider al ENUM de Prisma
@@ -127,7 +127,7 @@ export class PaymentsService {
           status:         PaymentStatus.PENDING,
           providerId:     provider.id,
           description:    dto.description,
-          metadata:       dto.metadata as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
+          metadata:       dto.metadata as Prisma.InputJsonValue,
           ...(customerId ? { customerId } : {}),
         } satisfies Prisma.PaymentUncheckedCreateInput,
       });
@@ -168,7 +168,7 @@ export class PaymentsService {
           data: {
             paymentId: payment.id,
             type:      `provider.${result.status}`,
-            payload:   result.raw as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
+            payload:   result.raw as Prisma.InputJsonValue,
           },
         });
         return p;
@@ -303,7 +303,7 @@ export class PaymentsService {
             refundId: result.externalRefundId,
             amount:   body.amountMinor ?? payment.amountMinor.toString(),
             reason:   body.reason,
-          } as Prisma.InputJsonValue // @ecosistema-ms/jsonb-cast,
+          } as Prisma.InputJsonValue,
         },
       });
 

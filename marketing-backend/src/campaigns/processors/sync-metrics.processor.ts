@@ -4,10 +4,10 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger, Inject }                       from '@nestjs/common';
 import { Job }                                  from 'bullmq';
-import { PrismaService }                        from '../../prisma/prisma.service.js';
-import { MARKETING_QUEUES }                     from '../../marketing.constants.js';
-import { AD_PLATFORM_TOKENS }                   from '../../ad-accounts/adapters/ad-platform.interface.js';
-import type { AdPlatformInterface }             from '../../ad-accounts/adapters/ad-platform.interface.js';
+import { PrismaService }                        from '@/prisma/prisma.service.js';
+import { MARKETING_QUEUES }                     from '@/marketing.constants.js';
+import { AD_PLATFORM_TOKENS }                   from '@/ad-accounts/adapters/ad-platform.interface.js';
+import type { AdPlatformInterface }             from '@/ad-accounts/adapters/ad-platform.interface.js';
 import type { AdPlatform }                      from '@prisma/client';
 
 @Processor(MARKETING_QUEUES.CAMPAIGN_SYNC, { concurrency: 3 })

@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
-import { PaymentException } from '@/common/errors/payment.exception';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/common/errors/payment.exception.js';
 
 /**
  * Referencia: https://docs.pagar.me/reference/erros-da-api
@@ -18,12 +18,13 @@ const CODE_MAP: Record<string, PaymentErrorCode> = {
   'invalid_document':            PaymentErrorCode.DOCUMENT_INVALID,
 };
 
-export function mapPagarmeError(error: any): never {
+export function mapPagarmeError(error: unknown): never {
   if (error?.response?.status >= 500) {
     throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
   }
 
-  const errors: any[] = error?.response?.data?.errors ?? [];
+  const pagarmeErr = error as { response?: { data?: { errors?: Array<{ message: string; type?: string }> } } };
+  const errors = pagarmeErr?.response?.data?.errors ?? [];
   const firstCode = errors[0]?.code ?? '';
   const internalCode = CODE_MAP[firstCode] ?? PaymentErrorCode.PROVIDER_UNKNOWN;
   throw new PaymentException(internalCode, errors[0]?.message);

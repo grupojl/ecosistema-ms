@@ -1,3 +1,4 @@
+import { CircuitBreakerService } from '@/common/services/circuit-breaker.service.js';
 // notificaciones-backend/src/notifications/notifications.module.ts
 
 import { Module }       from '@nestjs/common';
@@ -29,6 +30,7 @@ import { DlqModule }                 from '@/notifications/dlq/dlq.module.js';
   ],
   controllers: [NotificationsController],
   providers: [
+    CircuitBreakerService,
     NotificationsService,
     // Adapters de canal
     WhatsappAdapter,
@@ -47,4 +49,5 @@ export class NotificationsModule {}
 //   import { PrismaNotificationsRepository } from '@/notifications/repository/prisma-notifications.repository.js';
 //   import { NOTIFICATIONS_REPOSITORY }      from '@/notifications/repository/notifications.repository.interface.js';
 //   providers: [..., PrismaNotificationsRepository, { provide: NOTIFICATIONS_REPOSITORY, useClass: PrismaNotificationsRepository }]
+    CircuitBreakerService,
 //   exports:   [..., NOTIFICATIONS_REPOSITORY]

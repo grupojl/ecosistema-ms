@@ -1,6 +1,6 @@
 // chatia-backend/src/modules/welver/welver.config.ts
-import type { WELVERBusinessData } from './types/context.js';
-import type { OrganizationProfile } from '../../core/strategies/project-context.interface.js';
+import type { WELVERBusinessData } from '@/modules/welver/types/context.js';
+import type { OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 export const WELVER_CONFIG = {
   defaultModel: 'llama-3.3-70b-versatile',

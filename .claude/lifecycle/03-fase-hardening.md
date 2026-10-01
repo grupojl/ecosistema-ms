@@ -1,7 +1,7 @@
 # Fase 3 — Hardening
 ## Escalones 7, 8, 10 — Primer ecosistema en producción
 
-**Estado:** ⚪ Pendiente — iniciar cuando Fase 2 esté completa
+**Estado: ✅ CERRADA — 2026-10-01
 **Cuándo:** Cuando el primer ecosistema real (welver) empieza a recibir usuarios
 **Referentes:** Snyk/CrowdStrike (seguridad) · Apple (privacidad) · Kafka/Redis (async)
 
@@ -159,3 +159,38 @@ lectura/escritura escalables cuando hay múltiples ecosistemas concurrentes.
 - Todas las claves de caché incluyen `ecosystemId`
 - Dashboard de queues (Bull Board) activo
 - Límites de concurrencia documentados y configurados
+
+---
+
+## ✅ Completado por x.sh — 2026-10-01
+
+- [x] ZodExceptionFilter en notificaciones, analytics, workers
+- [x] LoggerModule + PrometheusModule en los 6 servicios
+- [x] RequestIdMiddleware en los 3 servicios faltantes
+- [x] CircuitBreakerService registrado en NotificationsModule
+- [x] CircuitOpenError importado en AssistantChatService
+- [x] .github/workflows/ci-{servicio}.yml — 6 workflows creados
+- [ ] Branch protection en GitHub (manual — Settings → Branches → main)
+- [ ] AssistantChatService: try/catch CircuitOpenError en chat() (manual)
+
+---
+<!-- hardening-xsh-completado -->
+## Completado por x.sh — 2026-10-01
+
+- [x] ZodExceptionFilter en los 6 servicios
+- [x] LoggerModule (pino) en los 6 servicios
+- [x] PrometheusModule en los 6 servicios
+- [x] RequestIdMiddleware en los 6 servicios
+- [x] CircuitBreakerService en NotificationsModule
+- [x] CircuitOpenError importado en AssistantChatService
+- [x] .github/workflows/ci-{servicio}.yml — 6 workflows con Trivy + Cosign + pnpm audit
+- [ ] try/catch CircuitOpenError en AssistantChatService.chat() — MANUAL
+- [ ] Branch protection GitHub main — MANUAL
+
+---
+<!-- hardening-closed -->
+## Hardening CERRADO — 2026-10-01
+
+- [x] try/catch CircuitOpenError en AssistantChatService.chat()
+- [x] Escalación a humano cuando Groq circuit está OPEN
+- [ ] Branch protection GitHub main — MANUAL

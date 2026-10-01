@@ -1,9 +1,9 @@
 // @ecosistema-ms/zod-migrated
 // src/ai-config/ai-config.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Logger, Injectable, NotFoundException } from '@nestjs/common';
 import type { UpdateAiConfigInput } from '@/ai-config/schemas.js';
-import type { UpdateAiConfigInput } from '@/ai-config/schemas';
-import { PrismaService } from '@/prisma/prisma.service';
+import type { UpdateAiConfigInput } from '@/ai-config/schemas.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
 import {
 
 
@@ -26,6 +26,7 @@ Reglas:
 
 @Injectable()
 export class AiConfigService {
+  private readonly logger = new Logger(AiConfigService.name);
   constructor(private readonly prisma: PrismaService) {}
 
   async getOrCreate(channelAccountId: string, organizationId: string) {

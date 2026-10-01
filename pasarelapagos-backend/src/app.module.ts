@@ -1,3 +1,4 @@
+import { createMetricsModule } from '@ecosistema-ms/metrics';
 import { PaymentProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
 import { PaymentOrgConfigService, REDIS_CLIENT } from '@/organization-config/organization-config.service.js';
 import { WelverPaymentModule }  from '@/modules/welver/welver.module.js';
@@ -12,17 +13,17 @@ import { LoggerModule } from 'nestjs-pino';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { envSchema } from '@/config/env.validation';
+import { envSchema } from '@/config/env.validation.js';
 
 // Core
 import { InternalModule } from '@/internal/internal.module.js';
-import { PrismaModule }   from '@/modules/prisma/prisma.module';
-import { FirebaseModule }    from '@/modules/firebase/firebase.module';
-import { SharedGuardsModule } from '@/common/shared-guards.module';
-import { RedisModule }    from '@/modules/redis/redis.module';
-import { QueueModule }    from '@/modules/queue/queue.module';
-import { AuditModule }    from '@/modules/audit/audit.module';
-import { MetricsModule }  from '@/modules/metrics/metrics.module';
+import { PrismaModule }   from '@/modules/prisma/prisma.module.js';
+import { FirebaseModule }    from '@/modules/firebase/firebase.module.js';
+import { SharedGuardsModule } from '@/common/shared-guards.module.js';
+import { RedisModule }    from '@/modules/redis/redis.module.js';
+import { QueueModule }    from '@/modules/queue/queue.module.js';
+import { AuditModule }    from '@/modules/audit/audit.module.js';
+import { MetricsModule }  from '@/modules/metrics/metrics.module.js';
 
 // Business
     // ProjectStrategy org-aware — ADR-019 v2
@@ -31,18 +32,19 @@ import { MetricsModule }  from '@/modules/metrics/metrics.module';
     WelverPaymentModule,
     ManzanaPaymentModule,
     MexusPaymentModule,
-import { AuthModule }      from '@/modules/auth/auth.module';
-import { PaymentsModule }  from '@/modules/payments/payments.module';
-import { WebhooksModule }  from '@/modules/webhooks/webhooks.module';
-import { TenantsModule }   from '@/modules/tenants/tenants.module';
-import { ProvidersModule } from '@/modules/providers/providers.module';
-import { HealthModule }    from '@/modules/health/health.module';
+import { AuthModule }      from '@/modules/auth/auth.module.js';
+import { PaymentsModule }  from '@/modules/payments/payments.module.js';
+import { WebhooksModule }  from '@/modules/webhooks/webhooks.module.js';
+import { TenantsModule }   from '@/modules/tenants/tenants.module.js';
+import { ProvidersModule } from '@/modules/providers/providers.module.js';
+import { HealthModule }    from '@/modules/health/health.module.js';
 
 // Guards globales
-import { TenantThrottlerGuard } from '@/common/guards/tenant-throttler.guard';
+import { TenantThrottlerGuard } from '@/common/guards/tenant-throttler.guard.js';
 
 @Module({
   imports: [
+    createMetricsModule(),
     ConfigModule.forRoot({
       isGlobal: true,
       validate: (config) => {

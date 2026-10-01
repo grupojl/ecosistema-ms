@@ -5,10 +5,10 @@
 import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiSecurity }        from '@nestjs/swagger';
 import { z }                           from 'zod';
-import { InternalApiKeyGuard }         from './internal-api-key.guard.js';
-import { PrismaService }               from '../prisma/prisma.service.js';
-import { ZodValidationPipe }           from '../common/pipes/zod-validation.pipe.js';
-import { MARKETING_THRESHOLDS }        from '../marketing.constants.js';
+import { InternalApiKeyGuard }         from '@/internal/internal-api-key.guard.js';
+import { PrismaService }               from '@/prisma/prisma.service.js';
+import { ZodValidationPipe }           from '@/common/pipes/zod-validation.pipe.js';
+import { MARKETING_THRESHOLDS }        from '@/marketing.constants.js';
 
 const ListCampaignsSchema = z.object({
   ecosystemId:    z.string().optional(),

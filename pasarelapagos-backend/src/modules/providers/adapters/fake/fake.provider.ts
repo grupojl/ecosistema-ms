@@ -7,8 +7,8 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface';
-import { ProviderRegistry } from '@/provider.registry';
+} from '@/provider.interface.js';
+import { ProviderRegistry } from '@/provider.registry.js';
 
 @Injectable()
 export class FakeProvider implements PaymentProvider, OnModuleInit {
@@ -69,7 +69,7 @@ export class FakeProvider implements PaymentProvider, OnModuleInit {
       throw new UnauthorizedException('Firma HMAC inválida');
     }
 
-    let body: any;
+    let body: Record<string, unknown>;
     try {
       body = JSON.parse(raw.toString());
     } catch {

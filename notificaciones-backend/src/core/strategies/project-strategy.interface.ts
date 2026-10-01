@@ -1,5 +1,5 @@
 // notificaciones-backend/src/core/strategies/project-strategy.interface.ts
-import type { NotifProjectContext, OrganizationProfile } from './project-context.interface.js';
+import type { NotifProjectContext, OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 export enum ProjectType {
   WELVER = 'welver', MANZANA = 'manzana', MEXUS = 'mexus', GENERIC = 'generic',

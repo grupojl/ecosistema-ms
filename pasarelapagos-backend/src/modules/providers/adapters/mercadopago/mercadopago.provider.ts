@@ -14,10 +14,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface';
-import { ProviderRegistry } from '@/provider.registry';
-import { CircuitBreakerService } from '@/circuit-breaker.service';
-import { mapMercadoPagoError } from '@/modules/providers/adapters/mercadopago/mercadopago-error.mapper';
+} from '@/provider.interface.js';
+import { ProviderRegistry } from '@/provider.registry.js';
+import { CircuitBreakerService } from '@/circuit-breaker.service.js';
+import { mapMercadoPagoError } from '@/modules/providers/adapters/mercadopago/mercadopago-error.mapper.js';
 
 @Injectable()
 export class MercadoPagoProvider implements PaymentProvider, OnModuleInit {
@@ -60,7 +60,7 @@ export class MercadoPagoProvider implements PaymentProvider, OnModuleInit {
   async createCharge(input: CreateChargeInput): Promise<ProviderChargeResult> {
     return this.cb.execute(`mp:createCharge`, async () => {
       try {
-        const body: any = {
+        const body: Record<string, unknown> = {
           transaction_amount: Number(input.amountMinor) / 100, // MP usa pesos enteros o float
           description:        input.description ?? 'Pago',
           payment_method_id:  this.mapMethod(input.method),
@@ -98,7 +98,7 @@ export class MercadoPagoProvider implements PaymentProvider, OnModuleInit {
           redirectUrl: result.point_of_interaction?.transaction_data?.ticket_url ?? undefined,
           raw:         result,
         };
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (err?.cause?.[0]?.code) {
           mapMercadoPagoError(err.cause[0].code, err.status);
         }
@@ -163,7 +163,7 @@ export class MercadoPagoProvider implements PaymentProvider, OnModuleInit {
       }
     }
 
-    let body: any;
+    let body: Record<string, unknown>;
     try { body = JSON.parse(raw.toString()); } catch { body = {}; }
 
     const mpStatus = body.data?.status ?? body.action?.replace('payment.', '') ?? 'pending';

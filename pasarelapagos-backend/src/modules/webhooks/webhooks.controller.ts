@@ -10,11 +10,11 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '@/prisma/prisma.service';
-import { ProviderRegistry } from '@/providers/provider.registry';
-import { Public } from '@/common/decorators/public.decorator';
-import { QUEUE_WEBHOOKS, JOB_PROCESS_WEBHOOK } from '@/common/constants/queues';
-import { WebhookJobData } from '@/modules/webhooks/webhook.processor';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import { ProviderRegistry } from '@/providers/provider.registry.js';
+import { Public } from '@/common/decorators/public.decorator.js';
+import { QUEUE_WEBHOOKS, JOB_PROCESS_WEBHOOK } from '@/common/constants/queues.js';
+import { WebhookJobData } from '@/modules/webhooks/webhook.processor.js';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('webhooks')
@@ -34,7 +34,7 @@ export class WebhooksController {
   @HttpCode(200)
   async handle(
     @Param('providerId') providerId: string,
-    @Req() req: any,
+    @Req() req: import("express").Request,
     @Headers() headers: Record<string, string>,
   ): Promise<{ received: boolean }> {
     const start = Date.now();
@@ -47,7 +47,7 @@ export class WebhooksController {
         req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {})),
         headers,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       this.logger.warn(`Firma inválida de ${providerId}: ${err.message}`);
       throw new UnauthorizedException('Firma de webhook inválida');
     }
@@ -66,8 +66,8 @@ export class WebhooksController {
       data: {
         providerId,
         externalId: event.externalId,
-        headers:    headers as any // @ecosistema-ms/jsonb-cast,
-        body:       event.raw as any // @ecosistema-ms/jsonb-cast,
+        headers:    headers as import("@prisma/client").Prisma.InputJsonValue,
+        body:       event.raw as import("@prisma/client").Prisma.InputJsonValue,
         status:     'received',
       },
     });

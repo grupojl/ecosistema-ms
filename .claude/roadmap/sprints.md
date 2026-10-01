@@ -179,3 +179,27 @@ El resto del sistema no recibió los cambios.
 2. Parche DT-023 analytics-backend manualmente → +0.8
 3. Refactor handleIncomingMessage → IConversationsRepository → +0.3
 4. Health controller pasarela con SELECT 1 → +0.2
+
+---
+<!-- sprint-2026-10-01 -->
+## Sprint 2026-10-01 — Hardening cerrado ✅
+
+### Completado
+- [x] x.sh: 63 imports relativos → @/ + 417 @/ sin .js → con .js
+- [x] marketing-backend: imports normalizados
+- [x] ZodExceptionFilter, LoggerModule, PrometheusModule, RequestIdMiddleware — 6 servicios
+- [x] CircuitBreakerService en NotificationsModule
+- [x] CircuitOpenError try/catch en AssistantChatService con escalación a humano
+- [x] 6 workflows CI/CD: lint + typecheck + test:cov + Trivy + Cosign + pnpm audit
+- [x] verify.sh: 56/56 ✅ — hardening cerrado
+- [x] .claude actualizado: CLAUDE.md 8.5/10, AUDIT-LAST.md, tasks.md
+
+### Pendiente inmediato
+- [ ] Branch protection GitHub main
+- [ ] pnpm typecheck && pnpm build → 0 errores
+- [ ] DT-023: getAgentMetrics groupBy en DB
+
+### Próximo sprint — Fase 4 Escala
+- RTO/RPO por servicio
+- Health pasarela con SELECT 1 real
+- Domain/Repository: contacts, agents, campaigns, notifications

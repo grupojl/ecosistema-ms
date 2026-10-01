@@ -76,3 +76,11 @@ try {
 - [ ] CB en `OutgoingMessageProcessor` de chatia por `channelType`
 - [ ] `GET /health` expone estado del CB en los 3 MS
 - [ ] Metricas Prometheus: `notif_circuit_breaker_state{channel}` gauge (0/1/2)
+
+---
+<!-- cb-xsh-closado -->
+## Completado por x.sh — 2026-10-01
+
+- [x] GroqCbService inyectado en AssistantChatService
+- [x] CircuitOpenError importado
+- [x] try/catch CircuitOpenError en chat() con escalación a humano

@@ -1,10 +1,10 @@
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Cache } from 'cache-manager';
-import { PrismaService } from '@/prisma/prisma.service';
-import type { PaymentProvider } from '@/modules/providers/provider.interface';
-import { ProviderRegistry } from '@/modules/providers/provider.registry';
-import { CircuitBreakerService } from '@/modules/providers/circuit-breaker.service';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import type { PaymentProvider } from '@/modules/providers/provider.interface.js';
+import { ProviderRegistry } from '@/modules/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/modules/providers/circuit-breaker.service.js';
 
 const CACHE_TTL_MS = 5 * 60 * 1_000; // 5 minutos
 const CACHE_KEY    = (country: string, currency: string, method: string) =>
@@ -40,7 +40,7 @@ export class RoutingService {
 
     if (!providerIds) {
       const routes = await this.prisma.providerRoute.findMany({
-        where:   { country, currency, method: method as any // @ecosistema-ms/enum-cast, active: true },
+        where:   { country, currency, method: method as import("@prisma/client").PaymentMethod, active: true },
         orderBy: { priority: 'desc' },
         select:  { providerId: true },
       });

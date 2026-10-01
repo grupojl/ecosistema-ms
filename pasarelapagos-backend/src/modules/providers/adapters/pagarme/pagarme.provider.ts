@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface';
-import { ProviderRegistry } from '@/provider.registry';
-import { CircuitBreakerService } from '@/circuit-breaker.service';
-import { mapPagarmeError } from '@/modules/providers/adapters/pagarme/pagarme-error.mapper';
+} from '@/provider.interface.js';
+import { ProviderRegistry } from '@/provider.registry.js';
+import { CircuitBreakerService } from '@/circuit-breaker.service.js';
+import { mapPagarmeError } from '@/modules/providers/adapters/pagarme/pagarme-error.mapper.js';
 
 /**
  * Adapter Pagar.me v5 (Brasil).
@@ -63,7 +63,7 @@ export class PagarmeProvider implements PaymentProvider, OnModuleInit {
       try {
         const isPix = input.method === 'pix';
 
-        const body: any = {
+        const body: Record<string, unknown> = {
           items: [{
             amount:   Number(input.amountMinor),
             description: input.description ?? 'Produto',
@@ -124,7 +124,7 @@ export class PagarmeProvider implements PaymentProvider, OnModuleInit {
   async refund(input: RefundInput): Promise<ProviderRefundResult> {
     return this.cb.execute(`pagarme:refund`, async () => {
       try {
-        const body: any = {};
+        const body: Record<string, unknown> = {};
         if (input.amountMinor) body.amount = Number(input.amountMinor);
 
         const { data } = await this.http.post(
@@ -180,7 +180,7 @@ export class PagarmeProvider implements PaymentProvider, OnModuleInit {
       }
     }
 
-    let body: any;
+    let body: Record<string, unknown>;
     try { body = JSON.parse(raw.toString()); } catch { body = {}; }
 
     const charge = body.data?.charges?.[0] ?? body.data ?? {};

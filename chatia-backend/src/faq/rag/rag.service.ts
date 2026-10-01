@@ -1,7 +1,7 @@
 // src/faq/rag/rag.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { GroqService } from '@/groq/groq.service';
-import { FaqQueryService, ChunkResult } from '@/query/faq-query.service';
+import { GroqService } from '@/groq/groq.service.js';
+import { FaqQueryService, ChunkResult } from '@/query/faq-query.service.js';
 
 export interface RagAnswer {
   answer: string;
@@ -56,7 +56,7 @@ Respondé en español, de forma concisa y citando el número de fuente cuando co
         },
       ],
       {
-        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as any // @ecosistema-ms/enum-cast,
+        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as string,
         temperature: options.temperature ?? 0.3,
         maxTokens: options.maxTokens ?? 1024,
       },

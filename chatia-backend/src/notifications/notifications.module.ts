@@ -1,8 +1,8 @@
 // src/notifications/notifications.module.ts
 import { Module } from '@nestjs/common';
-import { NotificationsService } from '@/notifications/notifications.service';
-import { NotificationsController } from '@/notifications/notifications.controller';
-import { EventsModule } from '@/events/events.module';
+import { NotificationsService } from '@/notifications/notifications.service.js';
+import { NotificationsController } from '@/notifications/notifications.controller.js';
+import { EventsModule } from '@/events/events.module.js';
 
 @Module({
   imports: [EventsModule],

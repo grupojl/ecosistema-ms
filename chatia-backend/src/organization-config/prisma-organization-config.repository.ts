@@ -1,12 +1,12 @@
 // chatia-backend/src/organization-config/prisma-organization-config.repository.ts
 // ÚNICO lugar con PrismaService en este módulo.
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service.js';
+import { PrismaService } from '@/prisma/prisma.service.js';
 import type {
   IOrganizationConfigRepository,
   StoredOrgConfig,
   UpsertOrgConfigInput,
-} from './organization-config.repository.interface.js';
+} from '@/organization-config/organization-config.repository.interface.js';
 
 @Injectable()
 export class PrismaOrganizationConfigRepository implements IOrganizationConfigRepository {
@@ -24,8 +24,8 @@ export class PrismaOrganizationConfigRepository implements IOrganizationConfigRe
       where: { ecosystemId_organizationId: { ecosystemId: input.ecosystemId, organizationId: input.organizationId } },
       update: {
         ...(input.plan         && { plan: input.plan }),
-        ...(input.featureFlags && { featureFlags: input.featureFlags as Prisma.InputJsonObject // @ecosistema-ms/jsonb-cast }),
-        ...(input.limits       && { limits: input.limits as Prisma.InputJsonObject // @ecosistema-ms/jsonb-cast }),
+        ...(input.featureFlags && { featureFlags: input.featureFlags as Prisma.InputJsonObject }),
+        ...(input.limits       && { limits: input.limits as Prisma.InputJsonObject }),
         ...(input.timezone     && { timezone: input.timezone }),
         ...(input.locale       && { locale: input.locale }),
       },
@@ -33,8 +33,8 @@ export class PrismaOrganizationConfigRepository implements IOrganizationConfigRe
         ecosystemId:    input.ecosystemId,
         organizationId: input.organizationId,
         plan:           input.plan      ?? 'starter',
-        featureFlags:   (input.featureFlags ?? {}) as Prisma.InputJsonObject // @ecosistema-ms/jsonb-cast,
-        limits:         (input.limits       ?? {}) as Prisma.InputJsonObject // @ecosistema-ms/jsonb-cast,
+        featureFlags:   (input.featureFlags ?? {}) as Prisma.InputJsonObject,
+        limits:         (input.limits       ?? {}) as Prisma.InputJsonObject,
         timezone:       input.timezone  ?? 'America/Buenos_Aires',
         locale:         input.locale    ?? 'es',
       },

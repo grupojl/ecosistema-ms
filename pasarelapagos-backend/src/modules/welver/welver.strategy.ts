@@ -1,16 +1,16 @@
 // pasarelapagos-backend/src/modules/welver/welver.strategy.ts
 // Strategy de pagos para el ecosistema Welver. NUNCA lanza en enrich/after.
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PaymentProjectStrategyRegistry } from '../../core/strategies/project-strategy.registry.js';
-import { PaymentOrgConfigService }        from '../../organization-config/organization-config.service.js';
+import { PaymentProjectStrategyRegistry } from '@/core/strategies/project-strategy.registry.js';
+import { PaymentOrgConfigService }        from '@/organization-config/organization-config.service.js';
 import {
   ProjectType, type PaymentProjectStrategy,
   type PaymentEnrichInput, type ChargeResult,
-} from '../../core/strategies/project-strategy.interface.js';
+} from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE, type PaymentProjectContext, type OrganizationProfile,
-} from '../../core/strategies/project-context.interface.js';
-import type { WelverPaymentData } from './types/context.js';
+} from '@/core/strategies/project-context.interface.js';
+import type { WelverPaymentData } from '@/modules/welver/types/context.js';
 
 @Injectable()
 export class WelverPaymentStrategy implements PaymentProjectStrategy, OnModuleInit {

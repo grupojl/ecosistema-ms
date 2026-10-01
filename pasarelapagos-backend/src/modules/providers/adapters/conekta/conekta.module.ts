@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { ConektaProvider } from '@/modules/providers/adapters/conekta/conekta.provider';
+import { ConektaProvider } from '@/modules/providers/adapters/conekta/conekta.provider.js';
 
 @Module({
   providers: [ConektaProvider],

@@ -2,11 +2,11 @@
 import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue }       from 'bullmq';
-import { PrismaService }    from '@/prisma/prisma.service';
-import { ChannelRegistry }  from '@/channels/channel.registry';
+import { PrismaService }    from '@/prisma/prisma.service.js';
+import { ChannelRegistry }  from '@/channels/channel.registry.js';
 import { ChannelType }      from '@prisma/client';
-import { QUEUES, JOBS }     from '@/queue/queue.constants';
-import type { IncomingMessageJobData } from '@/queue/processors/incoming-message.processor';
+import { QUEUES, JOBS }     from '@/queue/queue.constants.js';
+import type { IncomingMessageJobData } from '@/queue/processors/incoming-message.processor.js';
 
 @Injectable()
 export class WebhooksService {

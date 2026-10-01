@@ -1,6 +1,6 @@
 // notificaciones-backend/src/modules/welver/welver.module.ts
 import { Module } from '@nestjs/common';
-import { WelverNotifStrategy } from './welver.strategy.js';
+import { WelverNotifStrategy } from '@/modules/welver/welver.strategy.js';
 
 @Module({
   providers: [WelverNotifStrategy],

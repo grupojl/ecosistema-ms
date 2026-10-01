@@ -2,8 +2,8 @@
 import {
   Injectable, NotFoundException, ConflictException, Logger,
 } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service';
-import type { CreateProjectInput, UpdateProjectInput } from '@/projects/schemas';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import type { CreateProjectInput, UpdateProjectInput } from '@/projects/schemas.js';
 
 @Injectable()
 export class ProjectsService {

@@ -5,14 +5,14 @@ import {
   Body, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { AssistantChatService }   from '@/assistant/chat/assistant-chat.service';
-import { AssistantConfigService } from '@/assistant/config/assistant-config.service';
-import { TenantGuard }            from '@/common/guards/tenant.guard';
-import { Tenant }                 from '@/common/decorators/tenant.decorator';
-import type { TenantContext }     from '@/common/types/tenant-context';
-import { ZodValidationPipe }      from '@/common/pipes/zod-validation.pipe';
-import { ChatSchema, UpdateAssistantConfigSchema } from '@/assistant/schemas';
-import type { ChatInput, UpdateAssistantConfigInput } from '@/assistant/schemas';
+import { AssistantChatService }   from '@/assistant/chat/assistant-chat.service.js';
+import { AssistantConfigService } from '@/assistant/config/assistant-config.service.js';
+import { TenantGuard }            from '@/common/guards/tenant.guard.js';
+import { Tenant }                 from '@/common/decorators/tenant.decorator.js';
+import type { TenantContext }     from '@/common/types/tenant-context.js';
+import { ZodValidationPipe }      from '@/common/pipes/zod-validation.pipe.js';
+import { ChatSchema, UpdateAssistantConfigSchema } from '@/assistant/schemas.js';
+import type { ChatInput, UpdateAssistantConfigInput } from '@/assistant/schemas.js';
 
 @ApiTags('assistant')
 @ApiBearerAuth()
@@ -50,6 +50,6 @@ export class AssistantController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(UpdateAssistantConfigSchema)) dto: UpdateAssistantConfigInput,
   ) {
-    return this.config.update(projectId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
+    return this.config.update(projectId, tenant.organizationId, dto as import("@prisma/client").Prisma.InputJsonValue);
   }
 }

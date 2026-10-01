@@ -4,7 +4,7 @@
 // TODO(cb): migrar a opossum igual que chatia-backend/pasarelapagos-backend (Fase 2)
 import { Injectable, Logger } from '@nestjs/common';
 import axios                   from 'axios';
-import type { AdPlatformInterface, CampaignSyncResult, DailyMetricData } from './ad-platform.interface.js';
+import type { AdPlatformInterface, CampaignSyncResult, DailyMetricData } from '@/ad-accounts/adapters/ad-platform.interface.js';
 
 const META_GRAPH_API = 'https://graph.facebook.com/v19.0';
 

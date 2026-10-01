@@ -60,7 +60,7 @@ export class ChunkingService {
   ): Promise<string> {
     if (mimeType.includes('pdf')) {
       try {
-        // @ts-expect-error — pdf-parse puede no tener tipos en todos los entornos
+        // @ts-expect-error — pdf-parse carece de tipos en este entorno; agregar @types/pdf-parse o declaración manual en workers-backend/src/types/pdf-parse.d.ts (ADR-007)
         const pdfParse = (await import('pdf-parse')).default as (b: Buffer) => Promise<{ text: string }>;
         return (await pdfParse(buffer)).text;
       } catch {
@@ -69,7 +69,7 @@ export class ChunkingService {
     }
     if (mimeType.includes('wordprocessingml') || (fileName ?? '').endsWith('.docx')) {
       try {
-        // @ts-expect-error — mammoth puede no tener tipos en todos los entornos
+        // @ts-expect-error — mammoth carece de tipos en este entorno; agregar @types/mammoth o declaración manual en workers-backend/src/types/mammoth.d.ts (ADR-007)
         const mammoth = await import('mammoth') as { extractRawText: (o: { buffer: Buffer }) => Promise<{ value: string }> };
         return (await mammoth.extractRawText({ buffer })).value;
       } catch {

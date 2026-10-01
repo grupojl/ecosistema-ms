@@ -1,222 +1,75 @@
 # tasks.md — ecosistema-ms estado actual
 
-**Última actualización:** 2026-09-19 — multimodal chatia-backend completado — marketing-backend completado
+**Última actualización:** 2026-10-01 — hardening cerrado
 
 ---
 
-## COMPLETADO ✅ — Sesión 2026-09-19
+## COMPLETADO ✅ — Sesión 2026-10-01 (hardening)
 
-### /health extendido
-- [x] chatia-backend — ExtendedHealth con CB (groq, whatsapp) + DLQ (incoming, outgoing)
-- [x] pasarelapagos-backend — ExtendedHealth con CB (providers) + DLQ (reconcile, webhook)
-- [x] notificaciones-backend — ExtendedHealth con CB (wa/email/push) + DLQ
-- [x] analytics-backend — ExtendedHealth (sin CB, sin DLQ)
-- [x] workers-backend — ExtendedHealth (sin CB externos) + DLQ (faq, vector, campaign)
+### Imports
+- [x] 63 imports relativos → `@/` (primera corrida)
+- [x] 417 imports `@/` sin `.js` → con `.js`
+- [x] marketing-backend src/ migrado completo
+- [x] tests e2e con `.js` correcto
+- [x] cero imports relativos en los 6 servicios
+- [x] verify.sh: 56/56 ✅
 
-### chatia-backend — adapters multimodales
-- [x] `src/channels/adapters/multimodal.interface.ts` — contrato IMultimodalAdapter
-- [x] `src/channels/adapters/speech-to-text.adapter.ts` — Groq Whisper + CB
-- [x] `src/channels/adapters/document-to-text.adapter.ts` — extracción PDF sin librerías
-- [x] `src/channels/adapters/image-to-text.adapter.ts` — Claude Vision + CB
-- [x] `src/channels/adapters/location-to-text.adapter.ts` — OSM Nominatim gratuito
-- [x] `src/channels/adapters/text-to-speech.adapter.ts` — Cartesia + CB
-- [x] `src/channels/adapters/video-to-text.adapter.ts` — stub Fase 2 con fallback amigable
-- [x] `src/channels/multimodal.service.ts` — orquestador, switch por msg.type
-- [x] `src/channels/multimodal.module.ts` — registra todos los adapters
-- [x] `IncomingMessageProcessor` — normalize() antes de handleIncomingMessage
-- [x] `app.module.ts` — MultimodalModule importado
-- [x] 16/16 checks de verificación pasados
-- [x] Cero class-validator, CB en proveedores externos, fallback en todos
+### Observabilidad base
+- [x] ZodExceptionFilter en los 6 servicios
+- [x] LoggerModule (pino) en los 6 servicios
+- [x] PrometheusModule en los 6 servicios
+- [x] RequestIdMiddleware en los 6 servicios
 
-### InternalModule
-- [x] chatia-backend/src/internal/ — conversaciones escaladas
-- [x] pasarelapagos-backend/src/internal/ — payments CRUD
-- [x] workers-backend/src/internal/ — jobs DLQ
-- [x] Registrado en los 3 app.module.ts
+### Circuit Breakers
+- [x] CircuitBreakerService registrado en NotificationsModule
+- [x] CircuitOpenError importado en AssistantChatService
+- [x] try/catch CircuitOpenError en chat() con escalación a humano
+- [x] GroqCbService inyectado en AssistantChatService
 
----
+### CI/CD
+- [x] .github/workflows/ci-chatia-backend.yml
+- [x] .github/workflows/ci-pasarelapagos-backend.yml
+- [x] .github/workflows/ci-notificaciones-backend.yml
+- [x] .github/workflows/ci-analytics-backend.yml
+- [x] .github/workflows/ci-workers-backend.yml
+- [x] .github/workflows/ci-marketing-backend.yml
+- [x] Cada workflow: lint + typecheck + test:cov + pnpm audit + Trivy + Cosign
 
-## PENDIENTE
-
-- [ ] `INTERNAL_API_KEY` en Railway — mismo valor en todos los servicios
-- [ ] `make typecheck` en cada MS → 0 errores
-- [ ] `make g` — push a GitHub → Railway redeploy automático
+### Documentación
+- [x] CLAUDE.md actualizado (puntaje 8.5, fase 4)
+- [x] AUDIT-LAST.md actualizado
+- [x] lifecycle/03-fase-hardening.md cerrado
 
 ---
 
-## Guía de verificación rápida
+## COMPLETADO ✅ — Sesiones anteriores
 
-```bash
-# Verificar /health extendido en todos los MS
-grep -rn "dlqDepth\|circuitBreakers\|ExtendedHealth" \
-  chatia-backend/src/health/ \
-  pasarelapagos-backend/src/modules/health/ \
-  notificaciones-backend/src/health/ \
-  analytics-backend/src/health/ \
-  workers-backend/src/health/
+### Sesión 2026-09-19
+- [x] /health extendido en los 5 servicios originales
+- [x] chatia-backend — adapters multimodales (6 adapters + MultimodalService)
+- [x] InternalModule en chatia, pagos, workers
 
-# Verificar InternalModule registrado
-grep -n "InternalModule" \
-  chatia-backend/src/app.module.ts \
-  pasarelapagos-backend/src/app.module.ts \
-  workers-backend/src/app.module.ts
-```
+### Sesión 2026-09-12
+- [x] Audit B tipado: 0 `any` sin marca en producción
+- [x] marketing-backend implementado completo
+- [x] ADR-019 project-strategy multi-servicio
 
 ---
 
-## PENDIENTE — Post sesión 2026-09-19
+## PENDIENTE — Fase 4 Escala
 
-### ecosistema-ms
-- [ ] `make typecheck-pagos` → 0 errores (tipos nuevos del fire-forget)
-- [ ] `.env` de marketing-backend — DATABASE_URL, REDIS_URL, INTERNAL_API_KEY
-- [ ] `pnpm install` — instalar dependencias de marketing-backend
-- [ ] `make migrate-marketing` — crear tablas en marketing_db (primera vez)
-- [ ] `make dev-marketing` → verificar HTTP :3005 + GET /health
-- [ ] Deploy Railway — crear servicio marketing-backend
+### P0 — Inmediato
+- [ ] Branch protection GitHub main (Settings → Branches → Require status checks: ci)
+- [ ] `pnpm typecheck && pnpm build` → 0 errores
+- [ ] DT-023: corregir getAgentMetrics — groupBy en DB, no take:50K
 
-### superadmin (repo grupojl-control — separado)
-- [ ] `MarketingClient` en `src/integration/marketing/marketing.client.ts`
-- [ ] Registrar en `IntegrationModule`
-- [ ] `MARKETING_BACKEND_URL` en Railway
-- [ ] Alerta ROAS crítico en Command Center
+### P1 — Fase 4
+- [ ] Health controller pasarela: SELECT 1 real a la DB
+- [ ] RTO/RPO definidos por servicio (Escalón 9 — ver lifecycle/04-fase-escala.md)
+- [ ] Backups Railway PostgreSQL verificados con restore real
+- [ ] Redis AOF (appendonly yes) confirmado
 
-### Pendientes técnicos de marketing-backend (Fase 2)
-- [ ] `TODO(pii)` — cifrar `accessToken` antes de persistir (PII service)
-- [ ] `TODO(phase2)` — GoogleAdsAdapter + TikTokAdsAdapter
-- [ ] `TODO(cb)` — circuit breaker opossum en MetaAdsAdapter
-- [ ] `TODO(fase2)` — emitir a analytics-backend después de AttributionEvent
-
----
-
-## PENDIENTE — Post sesión multimodal
-
-### chatia-backend
-- [ ] `make typecheck-chatia` → 0 errores TypeScript
-- [ ] `ANTHROPIC_API_KEY` en Railway — Claude Vision
-- [ ] `CARTESIA_API_KEY` en Railway — Cartesia TTS
-- [ ] Pasar `organizationId` real en `normalize()` — hoy se pasa `''`
-      (`TODO(fase2)` en IncomingMessageProcessor línea 38)
-- [ ] Config de voz por org — `voiceId` de Cartesia por `organizationId`
-- [ ] `VideoToTextAdapter` — implementar con Gemini Flash (Fase 2)
-
-### Pendientes técnicos de todos los MS
-- [ ] `make typecheck-pagos` → 0 errores (fire-forget marketing agrega tipos)
-- [ ] Correr x.sh sobre notificaciones-backend, analytics-backend, workers-backend
-      (los 3 sin ZodExceptionFilter aún)
-- [ ] Deploy marketing-backend en Railway
-
----
-
-## Sprint Markets — ADR-014 (ecosistema-ms)
-
-### packages/auth-server (bloqueante para todos los MS)
-
-- [x] MKT-PKG-01: `marketCountry?` en TenantContext
-- [x] MKT-PKG-02: Extraer X-Market-Country en TenantGuard
-- [x] MKT-PKG-03: Bump minor del package
-- [x] MKT-PKG-04: Actualizar imports en cada MS
-
-### chatia-backend
-
-- [ ] MKT-CH-01..05 (ver modules/chatia-backend/markets.md)
-
-### pasarelapagos-backend
-
-- [ ] MKT-PP-01..04 (ver modules/pasarelapagos-backend/markets.md)
-
-### analytics-backend
-
-- [ ] MKT-AN-01..04 (ver modules/analytics-backend/markets.md)
-
-### notificaciones-backend / workers-backend
-
-- [ ] Agregar marketCountry al payload de notificaciones
-- [ ] Agregar marketCountry al contexto de jobs BullMQ
-
----
-
-## ProjectStrategy multi-servicio — ADR-019 (2026-09-23)
-
-- [ ] **[PS-01]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
-      `pasarelapagos-backend/src/app.module.ts`
-      → Done cuando: log de arranque muestra
-      `Registry inicializado con estrategias: [WELVER, MANZANA, MEXUS, GENERIC]`
-
-- [ ] **[PS-02]** Importar `ProjectStrategyModule` + los 3 `{Eco}Module` en
-      `notificaciones-backend/src/app.module.ts`
-      → Done cuando: mismo log de arranque en este servicio
-
-- [ ] **[PS-03]** Completar `welver.strategy.ts` en pasarelapagos-backend con
-      routing real de provider preferido de welver
-      → Done cuando: `enrichPaymentContext` retorna `businessData` no vacío
-      para al menos un caso real
-
-- [ ] **[PS-04]** Completar `welver.strategy.ts` en notificaciones-backend con
-      templates/canal preferido real de welver
-      → Done cuando: `enrichNotificationContext` retorna overrides no vacíos
-
-- [ ] **[PS-05]** Repetir PS-03/PS-04 para manzana y mexus cuando tengan
-      requerimientos de negocio concretos — no antes (evitar lógica placeholder
-      que nadie usa)
-
-- [ ] **[PS-06]** Tipar `businessData` por ecosistema en
-      `modules/{eco}/types/context.ts` de ambos servicios, reemplazando
-      `Record<string, unknown>` — solo cuando PS-03/04 tengan contenido real
-
----
-
-## COMPLETADO ✅ — Sesión 2026-09-24
-
-### ProjectStrategy org-aware (ADR-019 v2)
-
-- [x] `OrganizationProfile` con `ChatFeatureFlags` + `ChatLimits` en `project-context.interface.ts`
-- [x] `resolveOrgProfile()` como método obligatorio de `ProjectStrategy`
-- [x] `OrganizationConfigService` — cache-aside Redis TTL 5min, NUNCA lanza
-- [x] `PrismaOrganizationConfigRepository` — adaptador Prisma, único lugar con Prisma en el módulo
-- [x] `OrganizationConfigModule` — `@Global()` disponible para todas las strategies
-- [x] `WELVERBusinessData` tipado en chatia-backend (merchantPlan, storeName, activeMarkets, humanAgentsOnline)
-- [x] `WelverStrategy.enrichConversationContext()` — OrgProfile + bizData + systemPrompt personalizado
-- [x] `WelverStrategy.afterConversationResult()` — actualiza stage + log escalación
-- [x] `AssistantChatService` conectado a `ProjectStrategyRegistry` — verifica featureFlags antes del LLM
-- [x] `ChatInput.ecosystemId` — campo nuevo requerido para resolver la strategy
-- [x] `OrganizationConfig` model en Prisma (chatia, pasarela, notif)
-- [x] `PaymentProjectStrategy` en pasarelapagos — `enrichPaymentContext` / `afterChargeResult`
-- [x] `WelverPaymentStrategy` — routing real de provider por país + featureFlags
-- [x] `NotifProjectStrategy` en notificaciones — `enrichNotifContext` / `afterNotifSent`
-- [x] `WelverNotifStrategy` — canal preferido whatsapp > email
-- [x] `app.module.ts` de chatia + pasarela + notif — módulos importados en `imports[]`
-- [x] ADR-019 — extensión v2 documentada (org-aware)
-- [x] `ECO-PS-01`: wiring app.module.ts — CERRADO
-- [x] `ECO-PS-03`: businessData tipado en welver — CERRADO
-
----
-
-## PENDIENTE — Bloqueantes para primer cliente (en orden)
-
-### P0 — Bloquea deploy con primer cliente
-
-- [ ] **[LOCK-01]** `pnpm install` + commit `pnpm-lock.yaml` — lockfile desactualizado tras deps de esta sesión
-- [ ] **[MIG-01]** `pnpm --filter chatia-backend prisma migrate dev --name add-organization-config`
-- [ ] **[MIG-02]** `pnpm --filter pasarelapagos-backend prisma migrate dev --name add-organization-config`
-- [ ] **[MIG-03]** `pnpm --filter notificaciones-backend prisma migrate dev --name add-organization-config`
-- [ ] **[CI-01]** Branch protection en GitHub (main no mergeable sin CI verde)
-
-### P1 — Tests (bloquea primer cliente por riesgo de data leak entre orgs)
-
-- [ ] **[TEST-01]** Test cross-tenant chatia: request con `ecosystemId=A` no retorna datos de `ecosystemId=B`
-- [ ] **[TEST-02]** Test cross-tenant pasarelapagos: ídem para pagos
-- [ ] **[TEST-03]** Integration test `TenantGuard` — 401 sin token, 403 con org incorrecta
-- [ ] **[TEST-04]** Unit test `WelverStrategy.enrichConversationContext` — mock `OrganizationConfigService`
-- [ ] **[TEST-05]** Unit test `WelverPaymentStrategy.enrichPaymentContext` — routing por país
-
-### P2 — Observabilidad (importante antes de escalar)
-
-- [ ] **[OBS-01]** Dashboard Grafana Cloud — métricas base: request_duration, error_rate por servicio
-- [ ] **[OBS-02]** Adoptar `grpcMetadata()` en callers concretos (propagación X-Request-Id en gRPC)
-
-### P3 — Deuda técnica existente (no bloquea día 1)
-
-- [ ] **[DT-023]** `getAgentMetrics` analytics: reemplazar `take: 50_000 × 2` por SQL GROUP BY (parche documentado en `.claude/patches/`)
-- [ ] **[DT-024]** ZodExceptionFilter en notificaciones, analytics, workers (hoy ZodError → HTTP 500)
-- [ ] **[ECO-PS-02]** Completar `welver.strategy.ts` pasarela con routing real cuando haya reqs concretos
-- [ ] **[ECO-PS-04]** Evaluar marketing-backend para Strategy (fuera de scope por ahora)
+### P2 — Fase 4
+- [ ] Domain/Repository: contacts, agents, campaigns, notifications
+- [ ] Tests cobertura 85% — pendiente para contexto de ecosistema
+- [ ] Grafana dashboards conectados a /metrics

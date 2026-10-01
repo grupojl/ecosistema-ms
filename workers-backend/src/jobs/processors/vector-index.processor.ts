@@ -1,4 +1,4 @@
-import { requireJobId } from '../services/job-id.helper.js';
+import { requireJobId } from '@/jobs/services/job-id.helper.js';
 // workers-backend/src/jobs/processors/vector-index.processor.ts
 //
 // W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
@@ -65,7 +65,7 @@ export class VectorIndexProcessor extends WorkerHost {
 
       // Persistir en chatia via gRPC
       const result = await firstValueFrom(
-        // @ts-expect-error — rxjs interop
+        // @ts-expect-error — rxjs/grpc interop: Observable<T> vs ObservableInput<T> en ClientGrpc.getService (ADR-007)
         this.chatiaClient.upsertChunks({
           documentId,
           organizationId,
@@ -90,7 +90,7 @@ export class VectorIndexProcessor extends WorkerHost {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      output as unknown as Record<string, unknown> // @ecosistema-ms/jsonb-cast,
+        result:      output as import("@prisma/client").Prisma.InputJsonValue,
       });
 
       // SLA check — warning si supera 30s

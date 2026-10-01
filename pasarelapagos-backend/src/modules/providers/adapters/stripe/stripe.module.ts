@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { StripeProvider } from '@/modules/providers/adapters/stripe/stripe.provider';
-import { CircuitBreakerService } from '@/circuit-breaker.service';
+import { StripeProvider } from '@/modules/providers/adapters/stripe/stripe.provider.js';
+import { CircuitBreakerService } from '@/circuit-breaker.service.js';
 
 @Module({
   providers: [StripeProvider, CircuitBreakerService],

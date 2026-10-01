@@ -1,5 +1,5 @@
 // pasarelapagos-backend/src/organization-config/organization-config.repository.interface.ts
-import type { OrganizationProfile } from '../core/strategies/project-context.interface.js';
+import type { OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 export const PAYMENT_ORG_CONFIG_REPO = Symbol('PAYMENT_ORG_CONFIG_REPO');
 

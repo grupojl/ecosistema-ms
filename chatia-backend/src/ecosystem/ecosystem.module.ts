@@ -1,7 +1,7 @@
 // src/ecosystem/ecosystem.module.ts
 import { Module } from '@nestjs/common';
-import { EcosystemService }    from '@/ecosystem/ecosystem.service';
-import { EcosystemController } from '@/ecosystem/ecosystem.controller';
+import { EcosystemService }    from '@/ecosystem/ecosystem.service.js';
+import { EcosystemController } from '@/ecosystem/ecosystem.controller.js';
 
 @Module({
   controllers: [EcosystemController],

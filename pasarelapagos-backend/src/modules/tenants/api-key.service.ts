@@ -7,8 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
-import { PrismaService } from '@/prisma/prisma.service';
-import { AuditService } from '@/audit/audit.service';
+import { PrismaService } from '@/prisma/prisma.service.js';
+import { AuditService } from '@/audit/audit.service.js';
 
 export interface CreateApiKeyResult {
   id:        string;

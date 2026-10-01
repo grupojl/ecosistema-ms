@@ -6,10 +6,10 @@ import {
   ChannelAccountsService,
   CreateChannelAccountDto,
   UpdateChannelAccountDto,
-} from '@/channel-accounts/channel-accounts.service';
-import { TenantGuard } from '@/common/guards/tenant.guard';
-import { Tenant } from '@/common/decorators/tenant.decorator';
-import type { TenantContext } from '@/common/types/tenant-context';
+} from '@/channel-accounts/channel-accounts.service.js';
+import { TenantGuard } from '@/common/guards/tenant.guard.js';
+import { Tenant } from '@/common/decorators/tenant.decorator.js';
+import type { TenantContext } from '@/common/types/tenant-context.js';
 
 @Controller('channel-accounts')
 @UseGuards(TenantGuard)

@@ -11,12 +11,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiHeader } from '@nestjs/swagger';
-import { FirebaseAuthService } from '@/firebase/firebase-auth.service';
-import { AuthGuard } from '@/common/guards/auth.guard';
-import { TenantGuard } from '@/common/guards/tenant.guard';
-import { OrgCtx } from '@/common/decorators/org.decorator';
-import type { OrgContext } from '@/common/interfaces/org-context.interface';
-import { Public } from '@/common/decorators/public.decorator';
+import { FirebaseAuthService } from '@/firebase/firebase-auth.service.js';
+import { AuthGuard } from '@/common/guards/auth.guard.js';
+import { TenantGuard } from '@/common/guards/tenant.guard.js';
+import { OrgCtx } from '@/common/decorators/org.decorator.js';
+import type { OrgContext } from '@/common/interfaces/org-context.interface.js';
+import { Public } from '@/common/decorators/public.decorator.js';
 
 @ApiTags('auth')
 @ApiBearerAuth()

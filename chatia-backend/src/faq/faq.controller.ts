@@ -5,19 +5,19 @@ import {
   Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
-import { KnowledgeBaseService }  from '@/faq/knowledge-base/knowledge-base.service';
-import { KbDocumentService }     from '@/faq/document/kb-document.service';
-import { FaqQueryService }       from '@/faq/query/faq-query.service';
-import { TenantGuard }           from '@/common/guards/tenant.guard';
-import { Tenant }                from '@/common/decorators/tenant.decorator';
-import type { TenantContext }    from '@/common/types/tenant-context';
-import { ZodValidationPipe }     from '@/common/pipes/zod-validation.pipe';
+import { KnowledgeBaseService }  from '@/faq/knowledge-base/knowledge-base.service.js';
+import { KbDocumentService }     from '@/faq/document/kb-document.service.js';
+import { FaqQueryService }       from '@/faq/query/faq-query.service.js';
+import { TenantGuard }           from '@/common/guards/tenant.guard.js';
+import { Tenant }                from '@/common/decorators/tenant.decorator.js';
+import type { TenantContext }    from '@/common/types/tenant-context.js';
+import { ZodValidationPipe }     from '@/common/pipes/zod-validation.pipe.js';
 import {
   CreateKnowledgeBaseSchema, CreateKbDocumentSchema, FaqQuerySchema,
-} from '@/faq/schemas';
+} from '@/faq/schemas.js';
 import type {
   CreateKnowledgeBaseInput, CreateKbDocumentInput, FaqQueryInput,
-} from '@/faq/schemas';
+} from '@/faq/schemas.js';
 
 @ApiTags('faq')
 @ApiBearerAuth()
@@ -38,7 +38,7 @@ export class FaqController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(CreateKnowledgeBaseSchema)) dto: CreateKnowledgeBaseInput,
   ) {
-    return this.kb.create(dto.projectId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
+    return this.kb.create(dto.projectId, tenant.organizationId, dto as import("@prisma/client").Prisma.InputJsonValue);
   }
 
   @Get('knowledge-bases')
@@ -65,7 +65,7 @@ export class FaqController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(CreateKbDocumentSchema)) dto: CreateKbDocumentInput,
   ) {
-    return this.doc.create(kbId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
+    return this.doc.create(kbId, tenant.organizationId, dto as import("@prisma/client").Prisma.InputJsonValue);
   }
 
   @Get('knowledge-bases/:kbId/documents')

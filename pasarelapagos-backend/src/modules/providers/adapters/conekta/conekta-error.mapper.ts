@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog';
-import { PaymentException } from '@/common/errors/payment.exception';
+import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/common/errors/payment.exception.js';
 
 /**
  * Referencia: https://developers.conekta.com/reference/errors
@@ -15,11 +15,12 @@ const CODE_MAP: Record<string, PaymentErrorCode> = {
   'conekta.errors.request.validation.required':         PaymentErrorCode.PROVIDER_UNKNOWN,
 };
 
-export function mapConektaError(error: any): never {
+export function mapConektaError(error: unknown): never {
   if (error?.response?.status >= 500) {
     throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
   }
-  const details: any[] = error?.response?.data?.details ?? [];
+  const axiosErr = error as { response?: { data?: { details?: Array<{ message: string; code?: string; param?: string }> } } };
+  const details = axiosErr?.response?.data?.details ?? [];
   const firstCode = details[0]?.code ?? error?.response?.data?.code ?? '';
   const internalCode = CODE_MAP[firstCode] ?? PaymentErrorCode.PROVIDER_UNKNOWN;
   throw new PaymentException(internalCode, details[0]?.message ?? error?.message);

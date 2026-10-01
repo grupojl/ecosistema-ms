@@ -1,6 +1,7 @@
 // chatia-backend/src/contacts/repository/prisma-contacts.repository.ts
 // Adaptador concreto de IContactsRepository.
 // ÚNICO archivo del módulo contacts que puede importar PrismaService.
+// C5 fix: ecosystemId agregado al where de todas las queries (multi-tenant seguro)
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "@/prisma/prisma.service.js";
 import type {
@@ -15,8 +16,12 @@ import type {
 export class PrismaContactsRepository implements IContactsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(organizationId: string, filters?: ListContactsFilter): Promise<ContactRecord[]> {
-    const where: Record<string, unknown> = { organizationId };
+  async list(
+    organizationId: string,
+    ecosystemId:    string,
+    filters?:       ListContactsFilter,
+  ): Promise<ContactRecord[]> {
+    const where: Record<string, unknown> = { organizationId, ecosystemId };
     if (filters?.status) where["status"] = filters.status;
     if (filters?.search) {
       where["OR"] = [
@@ -27,16 +32,20 @@ export class PrismaContactsRepository implements IContactsRepository {
       ];
     }
     const rows = await this.prisma.contact.findMany({
-      where:   where as never // @ecosistema-ms/jsonb-cast,
+      where:   where as import("@prisma/client").Prisma.InputJsonValue,
       include: { _count: { select: { conversations: true } } },
       orderBy: { lastSeenAt: "desc" },
     });
     return rows as ContactRecord[];
   }
 
-  async findOne(contactId: string, organizationId: string): Promise<ContactWithConversations | null> {
+  async findOne(
+    contactId:      string,
+    organizationId: string,
+    ecosystemId:    string,
+  ): Promise<ContactWithConversations | null> {
     const row = await this.prisma.contact.findFirst({
-      where: { id: contactId, organizationId },
+      where: { id: contactId, organizationId, ecosystemId },
       include: {
         conversations: {
           orderBy: { createdAt: "desc" },
@@ -54,14 +63,22 @@ export class PrismaContactsRepository implements IContactsRepository {
   async update(
     contactId:      string,
     organizationId: string,
+    ecosystemId:    string,
     patch: { name?: string; email?: string; status?: string; tags?: string[]; optedOut?: boolean },
   ): Promise<ContactRecord> {
+    // Verificar ownership antes de actualizar (ecosystemId + organizationId)
+    const existing = await this.prisma.contact.findFirst({
+      where: { id: contactId, organizationId, ecosystemId },
+      select: { id: true },
+    });
+    if (!existing) throw new Error(`Contact ${contactId} not found in org ${organizationId}`);
+
     const row = await this.prisma.contact.update({
       where: { id: contactId },
       data: {
         ...(patch.name     !== undefined && { name:     patch.name }),
         ...(patch.email    !== undefined && { email:    patch.email }),
-        ...(patch.status   !== undefined && { status:   patch.status as never // @ecosistema-ms/jsonb-cast }),
+        ...(patch.status   !== undefined && { status:   patch.status as import("@prisma/client").Prisma.InputJsonValue }),
         ...(patch.tags     !== undefined && { tags:     patch.tags }),
         ...(patch.optedOut !== undefined && { optedOut: patch.optedOut }),
       },
@@ -69,15 +86,15 @@ export class PrismaContactsRepository implements IContactsRepository {
     return row as ContactRecord;
   }
 
-  async getStats(organizationId: string): Promise<ContactStats> {
+  async getStats(organizationId: string, ecosystemId: string): Promise<ContactStats> {
     const [total, byStatus, optedOut] = await Promise.all([
-      this.prisma.contact.count({ where: { organizationId } }),
+      this.prisma.contact.count({ where: { organizationId, ecosystemId } }),
       this.prisma.contact.groupBy({
         by:    ["status"],
-        where: { organizationId },
+        where: { organizationId, ecosystemId },
         _count: true,
       }),
-      this.prisma.contact.count({ where: { organizationId, optedOut: true } }),
+      this.prisma.contact.count({ where: { organizationId, ecosystemId, optedOut: true } }),
     ]);
     return {
       total,

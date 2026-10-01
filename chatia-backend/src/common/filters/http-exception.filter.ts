@@ -19,7 +19,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const message =
       typeof res === 'string'
         ? res
-        : (res as any)?.message // @ecosistema-ms/http-filter ?? exception.message;
+        : (res as { message?: string })?.message ?? exception.message;
 
     const body = {
       success:   false,

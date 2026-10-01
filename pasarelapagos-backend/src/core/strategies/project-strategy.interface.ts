@@ -1,6 +1,6 @@
 // pasarelapagos-backend/src/core/strategies/project-strategy.interface.ts
 // Hooks nombrados con dominio de PAGOS — no copias de chatia.
-import type { PaymentProjectContext, OrganizationProfile } from './project-context.interface.js';
+import type { PaymentProjectContext, OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 export enum ProjectType {
   WELVER  = 'welver',

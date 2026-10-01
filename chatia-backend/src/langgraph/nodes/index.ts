@@ -1,7 +1,7 @@
 // src/langgraph/nodes/index.ts
 import { Logger } from '@nestjs/common';
-import { GroqService, GROQ_MODELS } from '@/groq/groq.service';
-import { GraphState, ClassifyResult, INTENTS } from '@/langgraph.types';
+import { GroqService, GROQ_MODELS } from '@/groq/groq.service.js';
+import { GraphState, ClassifyResult, INTENTS } from '@/langgraph.types.js';
 import { ConversationStage } from '@prisma/client';
 
 const logger = new Logger('LangGraphNodes');
@@ -110,7 +110,7 @@ export async function generateNode(
 
   try {
     const result = await groq.chat(messages, {
-      model: state.groqModel as any // @ecosistema-ms/enum-cast,
+      model: state.groqModel as string,
       temperature: state.temperature,
       maxTokens: state.maxTokens,
     });

@@ -13,7 +13,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '@/channel.interface';
+} from '@/channel.interface.js';
 
 @Injectable()
 export class TikTokChannel implements IChannel {
@@ -47,7 +47,7 @@ export class TikTokChannel implements IChannel {
     }
   }
 
-  parseIncomingWebhook(payload: any): IncomingMessage[] | null {
+  parseIncomingWebhook(payload: unknown): IncomingMessage[] | null {
     try {
       // Estructura TikTok for Business DM webhook
       const event = payload?.event;

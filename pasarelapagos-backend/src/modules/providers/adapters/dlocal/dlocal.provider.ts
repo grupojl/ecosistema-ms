@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface';
-import { ProviderRegistry } from '@/provider.registry';
-import { CircuitBreakerService } from '@/circuit-breaker.service';
-import { mapDlocalError } from '@/modules/providers/adapters/dlocal/dlocal-error.mapper';
+} from '@/provider.interface.js';
+import { ProviderRegistry } from '@/provider.registry.js';
+import { CircuitBreakerService } from '@/circuit-breaker.service.js';
+import { mapDlocalError } from '@/modules/providers/adapters/dlocal/dlocal-error.mapper.js';
 
 /**
  * Adapter dLocal — agregador LATAM.
@@ -117,7 +117,7 @@ export class DlocalProvider implements PaymentProvider, OnModuleInit {
   async refund(input: RefundInput): Promise<ProviderRefundResult> {
     return this.cb.execute(`dlocal:refund`, async () => {
       try {
-        const body: any = {
+        const body: Record<string, unknown> = {
           payment_id: input.externalId,
           notification_url: 'https://example.com/notify',
         };
@@ -171,7 +171,7 @@ export class DlocalProvider implements PaymentProvider, OnModuleInit {
       throw new UnauthorizedException('Firma dLocal inválida');
     }
 
-    let body: any;
+    let body: Record<string, unknown>;
     try { body = JSON.parse(raw.toString()); } catch { body = {}; }
 
     return {

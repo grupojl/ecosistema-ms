@@ -4,13 +4,13 @@ import {
   Param, HttpCode, HttpStatus, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
-import { AiConfigService }   from '@/ai-config/ai-config.service';
-import { TenantGuard }       from '@/common/guards/tenant.guard';
-import { Tenant }            from '@/common/decorators/tenant.decorator';
-import type { TenantContext } from '@/common/types/tenant-context';
-import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe';
-import { UpdateAiConfigSchema, ToggleAiSchema } from '@/ai-config/schemas';
-import type { UpdateAiConfigInput, ToggleAiInput } from '@/ai-config/schemas';
+import { AiConfigService }   from '@/ai-config/ai-config.service.js';
+import { TenantGuard }       from '@/common/guards/tenant.guard.js';
+import { Tenant }            from '@/common/decorators/tenant.decorator.js';
+import type { TenantContext } from '@/common/types/tenant-context.js';
+import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
+import { UpdateAiConfigSchema, ToggleAiSchema } from '@/ai-config/schemas.js';
+import type { UpdateAiConfigInput, ToggleAiInput } from '@/ai-config/schemas.js';
 
 @ApiTags('ai-config')
 @ApiBearerAuth()
@@ -30,7 +30,7 @@ export class AiConfigController {
     @Tenant() tenant: TenantContext,
     @Body(new ZodValidationPipe(UpdateAiConfigSchema)) dto: UpdateAiConfigInput,
   ) {
-    return this.aiConfigService.update(accountId, tenant.organizationId, dto as never // @ecosistema-ms/jsonb-cast);
+    return this.aiConfigService.update(accountId, tenant.organizationId, dto as import("@prisma/client").Prisma.InputJsonValue);
   }
 
   @Patch('toggle')
