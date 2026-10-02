@@ -1,100 +1,89 @@
-import { ProjectStrategyModule }   from '@/core/strategies/project-strategy.module.js';
-import { OrganizationConfigModule } from '@/organization-config/organization-config.module.js';
-import { WelverModule }             from '@/modules/welver/welver.module.js';
-import { ManzanaModule }            from '@/modules/manzana/manzana.module.js';
-import { MexusModule }             from '@/modules/mexus/mexus.module.js';
-
 // chatia-backend/src/app.module.ts
-import { Module }           from '@nestjs/common';
-import { ConfigModule }     from '@nestjs/config';
-import { BullModule }       from '@nestjs/bullmq';
+// Reestructurado por x.sh — arquitectura 10/10
+// Un solo import de módulos de negocio: ChatiaModulesModule
+import {
+  Module, type NestModule, type MiddlewareConsumer, RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule }    from '@nestjs/config';
+import { BullModule }      from '@nestjs/bullmq';
+import { CacheModule }     from '@nestjs/cache-manager';
+import { ScheduleModule }  from '@nestjs/schedule';
+import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 
+// ── Infraestructura ────────────────────────────────────────────────────────
+import { PrismaModule }    from '@/infrastructure/prisma/prisma.module.js';
+import { FirebaseModule }  from '@/infrastructure/firebase/firebase.module.js';
+import { GroqModule }      from '@/infrastructure/groq/groq.module.js';
+import { LangGraphModule } from '@/infrastructure/langgraph/langgraph.module.js';
+import { CommonModule }    from '@/infrastructure/common/common.module.js';
+import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
+import appConfig           from '@/infrastructure/config/app.config.js';
+import { validationSchema } from '@/infrastructure/config/validation.schema.js';
 
-// Analytics events — ADR-003 A-1.4
-import { AnalyticsEventsModule } from '@/analytics-events/analytics-events.module.js';
-// Analytics proxy deprecated (eliminar en semana 6 cuando welver migre)
-import { AnalyticsModule }       from '@/analytics/analytics.module.js';
+// ── Core (bounded contexts sin controllers) ────────────────────────────────
+import { OrganizationConfigModule } from '@/core/organization-config/organization-config.module.js';
+import { EcosystemModule }          from '@/core/ecosystem/ecosystem.module.js';
+import { AnalyticsEventsModule }    from '@/core/analytics-events/analytics-events.module.js';
 
-// Core modules
-import { PrismaModule }         from '@/prisma/prisma.module.js';
-import { HealthModule }         from '@/health/health.module.js';
-import { CommonModule }         from '@/common/common.module.js';
-import { FirebaseModule }       from '@/firebase/firebase.module.js';
-import { GroqModule }           from '@/groq/groq.module.js';
-import { EventsModule }         from '@/events/events.module.js';
-
-// Business modules
-import { EcosystemModule }      from '@/ecosystem/ecosystem.module.js';
-import { OrganizationsModule }  from '@/organizations/organizations.module.js';
-import { AgentsModule }         from '@/agents/agents.module.js';
-import { ContactsModule }       from '@/contacts/contacts.module.js';
-import { ConversationsModule }  from '@/conversations/conversations.module.js';
-import { MessagesModule }       from '@/messages/messages.module.js';
-import { ChannelsModule }        from '@/channels/channel.module.js';
-import { MultimodalModule }      from '@/channels/multimodal.module.js';
+// ── Entry points ──────────────────────────────────────────────────────────
+import { WebhooksModule }        from '@/webhooks/webhooks.module.js';
+import { WidgetModule }          from '@/widget/widget.module.js';
+import { ChannelModule }         from '@/channels/channel.module.js';
+import { QueueModule }           from '@/queue/queue.module.js';
+import { EventsModule }          from '@/events/events.module.js';
+import { HealthModule }          from '@/health/health.module.js';
+import { InternalModule }        from '@/internal/internal.module.js';
 import { ChannelAccountsModule } from '@/channel-accounts/channel-accounts.module.js';
-import { AssistantModule }      from '@/assistant/assistant.module.js';
-import { FaqModule }            from '@/faq/faq.module.js';
-import { WebhooksModule }       from '@/webhooks/webhooks.module.js';
-import { NotificationsModule }  from '@/notifications/notifications.module.js';
-import { WidgetModule }         from '@/widget/widget.module.js';
-import { InternalModule }       from '@/internal/internal.module.js';
-import { QueueModule }          from '@/queue/queue.module.js';
-import { AiConfigModule }       from '@/ai-config/ai-config.module.js';
+import { AgentNotificationsModule } from '@/agent-notifications/agent-notifications.module.js';
+
+// ── Módulos de ecosistema — un solo import ─────────────────────────────────
+import { ChatiaModulesModule } from '@/modules/index.js';
+
+const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
-    createMetricsModule(),
-    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
-    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
-    ConfigModule.forRoot({ isGlobal: true }),
-
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
+    ConfigModule.forRoot({
+      isGlobal: true,
+      load:     [appConfig],
+      validationSchema,
     }),
+    ScheduleModule.forRoot(),
+    BullModule.forRoot({ connection: { url: REDIS_URL } }),
+    CacheModule.register({ isGlobal: true, ttl: 300_000 }),
+    PrometheusModule.register(),
 
     // Infraestructura
     PrismaModule,
     FirebaseModule,
-    CommonModule,
     GroqModule,
-    EventsModule,
-    QueueModule,
+    LangGraphModule,
+    CommonModule,
 
-    // Analytics — ADR-003
-    AnalyticsEventsModule,   // producer de eventos hacia analytics-backend
-    AnalyticsModule,         // proxy deprecated → eliminar cuando welver migre
-
-    // Negocio
-    HealthModule,
+    // Core transversal
+    OrganizationConfigModule,
     EcosystemModule,
-    OrganizationsModule,
-    AgentsModule,
-    ContactsModule,
-    ConversationsModule,
-    MessagesModule,
-    ChannelsModule,
-    MultimodalModule,
-    ChannelAccountsModule,
-    AssistantModule,
-    FaqModule,
+    AnalyticsEventsModule,
+
+    // Entry points
     WebhooksModule,
-    NotificationsModule,
     WidgetModule,
+    ChannelModule,
+    QueueModule,
+    EventsModule,
+    HealthModule,
     InternalModule,
-    AiConfigModule,
+    ChannelAccountsModule,
+    AgentNotificationsModule,
+
+    // Todos los ecosistemas — un solo import
+    ChatiaModulesModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(RequestIdMiddleware)
-      .forRoutes({ path: "*", method: RequestMethod.ALL });
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }

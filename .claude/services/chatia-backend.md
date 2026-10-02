@@ -8,79 +8,78 @@ Proyectos, Contactos, Conversaciones, Mensajes.
 - HTTP público: 3000
 - gRPC interno: 5001
 
+## Arquitectura (reestructurada 2026-10-02)
+
+```
+src/
+├── core/                    ← 14 bounded contexts sin controllers
+│   ├── strategies/          ← ProjectStrategy pattern
+│   ├── conversations/
+│   ├── contacts/
+│   ├── messages/
+│   ├── agents/
+│   ├── projects/
+│   ├── assistant/
+│   ├── faq/
+│   ├── assignment/
+│   ├── analytics-events/
+│   ├── ai-config/
+│   ├── notifications/
+│   ├── ecosystem/
+│   ├── organizations/
+│   ├── organization-config/
+│   └── index.ts
+├── modules/                 ← ÚNICO lugar con controllers HTTP por ecosistema
+│   ├── welver/
+│   ├── manzana/
+│   ├── mexus/
+│   └── index.ts             ← ChatiaModulesModule
+├── infrastructure/
+│   ├── prisma/
+│   ├── firebase/
+│   ├── groq/
+│   ├── langgraph/
+│   ├── common/              ← guards, decorators, pipes, filters, middleware
+│   ├── config/
+│   └── types/
+├── webhooks/                ← entry point canales externos
+├── widget/                  ← chat público embeddable
+├── channel-accounts/        ← gestión de cuentas de canal
+├── agent-notifications/     ← alertas in-app para agentes
+├── channels/                ← adapters de canales (WhatsApp, Instagram, etc.)
+├── queue/                   ← processors BullMQ
+├── events/                  ← WebSocket gateway
+├── health/
+├── internal/
+└── app.module.ts            ← importa ChatiaModulesModule
+```
+
 ## Clasificación de carpetas
 
 ### 🔴 BLOQUEANTES — no modificar sin ADR
 
 | Carpeta | Razón |
-|---------|-------|
-| `src/prisma/` | Infraestructura core — un solo PrismaModule, no duplicar |
-| `src/common/` | Servicios compartidos (CacheService, CircuitBreakerService, EmbeddingService) — cambiar la interface rompe todos los módulos que la usan |
-| `src/firebase/` | Firebase Auth — reimplementar aquí es bypass de `@ecosistema-ms/auth-server` |
-| `src/queue/` | BullMQ queues + processors — la arquitectura de jobs está aquí |
-| `src/events/` | EventEmitter global — cambiar la forma de emitir eventos afecta todos los módulos |
-| `src/health/` | Railway healthcheck — no modificar el endpoint `/health` |
-| `src/core/strategies/` | Patrón Strategy de ecosistemas — la interface `ProjectStrategy` es el contrato que todos los módulos de ecosistema implementan |
-| `src/channels/channel.interface.ts` | Interface de canales — cambiarla rompe todos los adapters de canal |
+|---|---|
+| `src/infrastructure/prisma/` | Infraestructura core — un solo PrismaModule |
+| `src/infrastructure/firebase/` | Firebase Auth — no reimplementar |
+| `src/infrastructure/common/` | Guards, pipes, decorators compartidos |
+| `src/core/strategies/` | Interface ProjectStrategy — contrato con todos los módulos de ecosistema |
+| `src/channels/channel.interface.ts` | Interface de canales — cambiarla rompe todos los adapters |
 | `src/grpc/` | Entry point gRPC — contrato con el exterior |
-| `src/app.module.ts` | Raíz del módulo — no agregar lógica de negocio aquí |
+| `src/queue/` | BullMQ queues + processors |
 
-### 🟡 DINÁMICA CONTROLADA — crecer siguiendo el molde
+### 🟡 DINÁMICA CONTROLADA
 
 | Carpeta | Regla |
-|---------|-------|
-| `src/channels/` (implementaciones) | Nuevos canales siguen `channel.interface.ts`. No se modifica la interface sin ADR. |
-| `src/channels/adapters/` | Nuevos adapters multimodales siguen `IMultimodalAdapter`. Un adapter por tipo de media. CB obligatorio si toca proveedor externo. Fallback explícito siempre. |
-| `src/modules/` (manzana/mexus/welver) | Nuevos ecosistemas siguen el mismo molde (enrich-context). La interface `ProjectStrategy` es BLOQUEANTE. |
-| `src/faq/` (subcarpetas de documento/ingestion/rag) | La arquitectura de RAG es el molde. Nuevas funciones de FAQ siguen la misma estructura. |
+|---|---|
+| `src/channels/` (implementaciones) | Nuevos canales siguen `channel.interface.ts`. No modificar la interface sin ADR. |
+| `src/modules/` | Nuevos ecosistemas siguen el molde. `ProjectStrategy` es BLOQUEANTE. |
+| `src/infrastructure/adapters/` | Nuevos adapters siguen el patrón de inyección por token. |
 
-### 🟢 DINÁMICAS — crecen libremente siguiendo el patrón Domain/Repository
+### 🟢 DINÁMICAS
 
-| Carpeta | Estado actual | Molde a seguir |
-|---------|---------------|----------------|
-| `src/conversations/` | Service → Prisma directo | **MOLDE VIVO** — migrar primero |
-| `src/contacts/` | Service → Prisma directo | conversations/ (post-migración) |
-| `src/messages/` | Service → Prisma directo | conversations/ (post-migración) |
-| `src/projects/` | Service → Prisma directo | conversations/ (post-migración) |
-| `src/agents/` | Service → Prisma directo | conversations/ (post-migración) |
-| `src/webhooks/` | Service → Prisma directo | conversations/ (post-migración) |
-| `src/assistant/` | Lógica compleja de chat IA | conversations/ (post-migración) |
-| `src/analytics/` | Proxy a analytics-backend | Mantener como proxy — no agregar lógica |
-
-## Molde vivo de referencia
-
-`src/conversations/` — será el molde una vez migrado a Domain + Repository.
-Ver `modules/chatia-backend/conversations.md`.
-
----
-
-## Adapters multimodales — implementados (sesión 2026-09-19)
-
-chatia-backend normaliza TODOS los tipos de mensaje de WhatsApp a texto
-antes de enviarlo al LLM. El canal ya soportaba todos los tipos en
-`channel.interface.ts` — los adapters son el puente.
-
-```
-IncomingMessage.type    →   Adapter                →  texto para LLM
-─────────────────────────────────────────────────────────────────────
-text                    →   (directo)               →  msg.content
-audio                   →   SpeechToTextAdapter     →  Groq Whisper
-image                   →   ImageToTextAdapter      →  Claude Vision
-document                →   DocumentToTextAdapter   →  extracción PDF
-location                →   LocationToTextAdapter   →  OSM Nominatim
-video                   →   VideoToTextAdapter      →  stub Fase 2
-sticker                 →   (directo)               →  '[sticker]'
-```
-
-**Invariante:** `MultimodalService.normalize()` siempre retorna texto.
-El LLM nunca recibe un `mediaUrl` de WhatsApp CDN.
-
-**Punto de inserción:** `IncomingMessageProcessor.process()` — antes de
-`ConversationsService.handleIncomingMessage()`.
-
-**Variables de entorno nuevas:**
-- `ANTHROPIC_API_KEY` — Claude Vision
-- `CARTESIA_API_KEY` — Cartesia TTS
-- `GROQ_API_KEY` — ya existía (Groq Whisper STT)
-
-**Referencia:** `.claude/modules/chatia-backend/multimodal-adapters.md`
+| Carpeta | Estado |
+|---|---|
+| `src/core/conversations/` | Domain/Repository implementado — MOLDE VIVO |
+| `src/core/contacts/` | Domain/Repository implementado |
+| `src/core/faq/` | RAG funcionando — extensible |

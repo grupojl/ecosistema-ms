@@ -1,17 +1,9 @@
-import { Module }             from '@nestjs/common';
-import { MetaAdsAdapter }     from '@/ad-accounts/adapters/meta-ads.adapter.js';
-import { AD_PLATFORM_TOKENS } from '@/ad-accounts/adapters/ad-platform.interface.js';
-import { AdAccountsService }  from '@/ad-accounts/ad-accounts.service.js';
-import { AdAccountsController } from '@/ad-accounts/ad-accounts.controller.js';
+import { Module }              from "@nestjs/common";
+import { AdAccountsController } from "@/ad-accounts/ad-accounts.controller.js";
+import { AdAccountsModule as CoreAdAccountsModule } from "@/core/ad-accounts/ad-accounts.module.js";
 
 @Module({
-  providers: [
-    AdAccountsService,
-    { provide: AD_PLATFORM_TOKENS.META, useClass: MetaAdsAdapter },
-    // TODO(phase2): { provide: AD_PLATFORM_TOKENS.GOOGLE, useClass: GoogleAdsAdapter }
-    // TODO(phase2): { provide: AD_PLATFORM_TOKENS.TIKTOK, useClass: TikTokAdsAdapter }
-  ],
+  imports:     [CoreAdAccountsModule],
   controllers: [AdAccountsController],
-  exports: [AdAccountsService, AD_PLATFORM_TOKENS.META],
 })
 export class AdAccountsModule {}

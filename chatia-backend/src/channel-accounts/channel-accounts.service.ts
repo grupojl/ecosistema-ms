@@ -7,18 +7,6 @@ import { PrismaService } from '@/prisma/prisma.service.js';
 import { ChannelType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 
-
-
-
-
-}
-
-  name?: string;
-
-  accessToken?: string;
-
-}
-
 @Injectable()
 export class ChannelAccountsService {
   private readonly logger = new Logger(ChannelAccountsService.name);
@@ -110,3 +98,4 @@ export class ChannelAccountsService {
       data: { webhookVerifyToken: updated.webhookVerifyToken },
     };
   }
+}

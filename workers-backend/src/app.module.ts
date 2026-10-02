@@ -1,84 +1,64 @@
 // workers-backend/src/app.module.ts
-import { join }         from 'path';
-import { Module }       from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { BullModule }   from '@nestjs/bullmq';
+// Reestructurado por x.sh — arquitectura 10/10
+import {
+  Module, type NestModule, type MiddlewareConsumer, RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule }   from '@nestjs/config';
+import { BullModule }     from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ClientsModule, Transport } from '@nestjs/microservices';
 
-import { InternalModule }  from '@/internal/internal.module.js';
-import { PrismaModule }    from '@/prisma/prisma.module.js';
-import { HealthModule }    from '@/health/health.module.js';
-import { MetricsModule }   from '@/metrics/metrics.module.js';
+// ── Infraestructura ────────────────────────────────────────────────────────
+import { PrismaModule }  from '@/infrastructure/prisma/prisma.module.js';
+import { MetricsModule } from '@/infrastructure/metrics/metrics.module.js';
+import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
+
+// ── Core ───────────────────────────────────────────────────────────────────
+import { CampaignsModule as CoreCampaignsModule } from '@/core/campaigns/campaigns.module.js';
+import { JobsModule as CoreJobsModule }            from '@/core/jobs/jobs.module.js';
+
+// ── Queue — processors BullMQ ─────────────────────────────────────────────
+import { QueueModule } from '@/queue/queue.module.js';
+
+// ── Entry points HTTP ─────────────────────────────────────────────────────
+import { CampaignsModule } from '@/campaigns/campaigns.module.js';
 import { JobsModule }      from '@/jobs/jobs.module.js';
 import { DlqModule }       from '@/dlq/dlq.module.js';
 import { GrpcModule }      from '@/grpc/grpc.module.js';
-import { CampaignsModule } from '@/campaigns/campaigns.module.js';
+import { HealthModule }    from '@/health/health.module.js';
+import { InternalModule }  from '@/internal/internal.module.js';
 
-const PROTO_DIR = join(process.cwd(), 'proto');
+const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
-    createMetricsModule(),
-    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
-    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    BullModule.forRoot({ connection: { url: REDIS_URL } }),
 
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
-    }),
-
-    ClientsModule.register([
-      {
-        name:      'CHATIA_GRPC_CLIENT',
-        transport: Transport.GRPC,
-        options: {
-          package:   'chatia',
-          protoPath: join(PROTO_DIR, 'chatia.proto'),
-          url: process.env['CHATIA_GRPC_URL'] ?? 'localhost:5001',
-        },
-      },
-      {
-        name:      'NOTIF_GRPC_CLIENT',
-        transport: Transport.GRPC,
-        options: {
-          package:   'notificaciones',
-          protoPath: join(PROTO_DIR, 'notificaciones.proto'),
-          url: process.env['NOTIF_GRPC_URL'] ?? 'localhost:5003',
-        },
-      },
-      {
-        name:      'ANALYTICS_GRPC_CLIENT',
-        transport: Transport.GRPC,
-        options: {
-          package:   'analytics',
-          protoPath: join(PROTO_DIR, 'analytics.proto'),
-          url: process.env['ANALYTICS_GRPC_URL'] ?? 'localhost:5004',
-        },
-      },
-    ]),
-
-    InternalModule,
+    // Infraestructura
     PrismaModule,
     MetricsModule,
-    HealthModule,
+
+    // Core
+    CoreCampaignsModule,
+    CoreJobsModule,
+
+    // Queue
+    QueueModule,
+
+    // Entry points
+    CampaignsModule,
     JobsModule,
     DlqModule,
     GrpcModule,
-    CampaignsModule,
+    HealthModule,
+    InternalModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(RequestIdMiddleware)
-      .forRoutes({ path: "*", method: RequestMethod.ALL });
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }

@@ -30,3 +30,4 @@ export class ChannelRegistry {
     if (!channel) throw new Error(`Canal no soportado: ${type}`);
     return channel;
   }
+}

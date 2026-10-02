@@ -105,3 +105,4 @@ export class TikTokChannel implements IChannel {
       throw new Error(`TikTok send failed: ${error}`);
     }
   }
+}

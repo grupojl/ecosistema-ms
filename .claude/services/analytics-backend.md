@@ -8,28 +8,49 @@ SSE (Server-Sent Events) para dashboards en tiempo real, exportación.
 - HTTP interno/público: 3003
 - gRPC interno: 5004
 
+## Arquitectura (reestructurada 2026-10-02)
+
+```
+src/
+├── core/
+│   ├── overview/        ← getOverview(), getConversationsByDay()
+│   ├── agents/          ← getAgentMetrics()
+│   ├── events/          ← persistEvent() + events.processor.ts
+│   ├── projections/     ← proyecciones diarias
+│   ├── export/          ← exportación async
+│   └── analytics.constants.ts
+├── modules/             ← ÚNICO lugar con controllers HTTP por ecosistema
+│   ├── welver/
+│   ├── manzana/
+│   ├── mexus/
+│   └── index.ts         ← AnalyticsModulesModule
+├── sse/                 ← streaming SSE — igual para todos los ecosistemas
+├── grpc/
+├── health/
+├── prisma/
+└── common/
+```
+
 ## Clasificación de carpetas
 
 ### 🔴 BLOQUEANTES
 
 | Carpeta | Razón |
-|---------|-------|
+|---|---|
 | `src/prisma/` | Infraestructura core |
-| `src/grpc/` | Entry point gRPC |
+| `src/grpc/` | Entry point gRPC — contrato con el exterior |
 | `src/health/` | Railway healthcheck |
-| `src/analytics/sse/` | SSE es la interfaz de tiempo real — no cambiar el endpoint sin coordinar con los consumers |
-| `src/analytics/processors/` | Procesador de eventos — cambiar cómo se procesan afecta toda la analítica |
+| `src/sse/` | SSE es la interfaz de tiempo real — no cambiar el endpoint sin coordinar consumers |
+| `src/core/events/events.processor.ts` | Procesador de eventos — cambiar afecta toda la analítica |
 
 ### 🟢 DINÁMICAS
 
 | Carpeta | Estado |
-|---------|--------|
-| `src/analytics/` (overview, conversaciones, agentes) | Projections como value objects — Domain/Repository pendiente |
-| `src/analytics/projections/` | Lógica de agregación — candidato a value objects de dominio |
+|---|---|
+| `src/core/overview/` | Un service por responsabilidad — extensible |
+| `src/core/agents/` | getAgentMetrics con GROUP BY en DB (DT-023 resuelto) |
+| `src/modules/{eco}/` | Cada ecosistema expone sus propios endpoints de analytics |
 
 ## Nota sobre Domain en analytics
-
-Las "entidades" de analytics son eventos + proyecciones.
-Los eventos son inmutables (no tienen identidad mutable).
-Las proyecciones son value objects derivados.
+Las "entidades" de analytics son eventos inmutables + proyecciones (value objects).
 El patrón Domain/Repository aplica de forma más ligera que en chatia/pagos.

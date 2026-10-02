@@ -1,132 +1,117 @@
-# Capas por Microservicio
+# Capas por Microservicio — Arquitectura 10/10
 
-## Estructura de carpetas canónica
+> Reestructurado 2026-10-02. Todos los servicios siguen este modelo.
+
+## Estructura canónica
+
 ```
-{servicio}-backend/
-  src/
-    {dominio}/
-      dto/              # Contratos de entrada/salida (class-validator)
-      processors/       # BullMQ workers del dominio
-      adapters/         # Integraciones externas
-      interfaces/       # Tipos internos del dominio
-      {dominio}.controller.ts
-      {dominio}.module.ts
-      {dominio}.service.ts
-      {dominio}.constants.ts
-    grpc/
-      grpc.module.ts
-      {servicio}-grpc.controller.ts   # Surface gRPC interna
-    health/
-      health.controller.ts
-      health.module.ts
-    metrics/
-      metrics.module.ts
-      metrics.service.ts
-    prisma/
-      prisma.module.ts
-      prisma.service.ts
-    app.module.ts
-    main.ts
-  prisma/
-    schema.prisma
-  Dockerfile
-  package.json
-  tsconfig.json
+{servicio}-backend/src/
+
+├── core/                          ← dominio puro — CERO controllers, CERO @Controller
+│   ├── {bounded-context}/
+│   │   ├── domain/                ← entidades, errores de dominio
+│   │   ├── repository/            ← interfaces (nunca implementaciones Prisma)
+│   │   ├── types/
+│   │   ├── {context}.service.ts
+│   │   ├── {context}.module.ts
+│   │   └── index.ts               ← contrato público — lo que los modules pueden consumir
+│   └── index.ts
+│
+├── modules/                       ← ÚNICO lugar con controllers HTTP por ecosistema
+│   ├── welver/
+│   │   ├── welver.controller.ts   ← endpoints específicos de welver
+│   │   ├── welver.module.ts
+│   │   ├── schemas.ts             ← Zod schemas del controller
+│   │   └── index.ts
+│   ├── manzana/  (mismo molde)
+│   ├── mexus/    (mismo molde)
+│   └── index.ts                   ← {Servicio}ModulesModule — agrupa los tres
+│
+├── infrastructure/                ← todo sin lógica de negocio
+│   ├── prisma/                    ← PrismaService, PrismaModule
+│   ├── firebase/                  ← FirebaseModule, FirebaseService
+│   ├── common/                    ← guards, decorators, pipes, filters, middleware
+│   ├── config/                    ← validación de env vars
+│   └── types/                     ← declaraciones .d.ts
+│
+├── queue/                         ← processors BullMQ + constants + module
+│   ├── processors/
+│   └── queue.constants.ts
+│
+├── {entry-point}/                 ← excepción transversal justificada
+│   ├── {entry-point}.controller.ts
+│   └── {entry-point}.module.ts
+│
+├── grpc/                          ← puerto interno inter-servicio
+├── health/                        ← Railway healthcheck
+├── internal/                      ← superadmin (x-internal-api-key)
+├── app.module.ts                  ← importa {Servicio}ModulesModule (1 import de negocio)
+└── main.ts
 ```
+
+## La regla más importante
+
+> `core/` nunca tiene `@Controller`. `modules/` solo tiene controllers por ecosistema.
+> `infrastructure/` nunca tiene lógica de negocio.
+
+## Reglas por zona
+
+### `core/`
+- Servicios, repositorios (solo interfaces), entidades, procesadores de dominio
+- CERO `@Controller`, CERO rutas HTTP, CERO `@GrpcMethod`
+- No sabe que existe HTTP, gRPC ni BullMQ
+- Solo conoce interfaces, tipos y lógica de negocio pura
+- Cada bounded context tiene su `index.ts` que define qué es público
+- Si aparece un `@Controller` en `core/` → bug de arquitectura
+
+### `modules/`
+- ÚNICO lugar con controllers HTTP de negocio
+- Cada ecosistema tiene su carpeta: `welver/`, `manzana/`, `mexus/`
+- `modules/index.ts` exporta `{Servicio}ModulesModule` que agrupa los tres
+- `app.module.ts` importa solo ese módulo — agregar un ecosistema nuevo no toca `app.module.ts`
+- Agregar un ecosistema = crear carpeta en `modules/` + agregar al `index.ts`
+
+### `infrastructure/`
+- Todo lo que no tiene lógica de negocio
+- Las implementaciones concretas de repositorios (Prisma) viven aquí, no en `core/`
+- Binding de DI: `{ provide: TOKEN, useClass: PrismaImpl }` vive en el módulo de infrastructure
+- Circuit breakers, adapters de plataformas externas, clientes HTTP — todos aquí
+
+### Excepciones transversales justificadas
+Tienen controller pero viven fuera de `modules/` porque son iguales para todos los ecosistemas:
+
+| Carpeta | Justificación |
+|---|---|
+| `webhooks/` | Entry point de canales externos — igual para todos |
+| `widget/` | Chat público embeddable — sin auth, sin tenant |
+| `channel-accounts/` | Gestión de cuentas de canal — igual para todos |
+| `agent-notifications/` | Alertas in-app para agentes — igual para todos |
+| `queue/dlq/` | Inspección y retry de jobs — operacional |
+| `health/` | Railway healthcheck |
+| `internal/` | Superadmin protegido por x-internal-api-key |
+| `grpc/` | Puerto interno inter-servicio — no es HTTP público |
+| `ad-accounts/` | OAuth de plataformas — marketing-backend |
+
+La pregunta que decide si algo es excepción:
+> ¿El endpoint varía por ecosistema o tiene lógica distinta por cliente?
+> Si sí → `modules/{eco}/`. Si no → excepción al mismo nivel con justificación.
 
 ## Reglas por capa
 
-### Controller (HTTP)
-- Solo recibe, valida DTO, llama al service, retorna
+### Controller (HTTP en `modules/`)
+- Solo recibe, valida con Zod, llama al service del core, retorna
 - No contiene lógica condicional de negocio
-- Decoradores: `@ApiTags`, `@ApiBearerAuth`, `@UseGuards(AuthGuard, TenantGuard)`
-- Toda ruta autenticada lleva `@UseGuards` — nunca confiar en el orden del módulo
+- Importa ÚNICAMENTE del `core/` vía `index.ts` — nunca internals
 
-### Controller (gRPC)
+### Controller (gRPC en `grpc/`)
 - Solo expone métodos definidos en el `.proto`
-- Prefijo `{Servicio}GrpcController`
-- No reutilizar el mismo controller HTTP — son surfaces distintas
+- Delega al service del core — CERO lógica de negocio
 
-### Service
+### Service (en `core/`)
 - Lógica de dominio, validaciones de negocio, orquestación
-- Puede llamar a otros services del mismo microservicio
-- Para llamar a otro microservicio: via `GrpcClient` inyectado
-- Manejo de errores tipado: nunca `throw new Error('mensaje')` — usar excepciones NestJS
+- Inyecta repositorios por interface (`@Inject(TOKEN)`) — nunca PrismaService directamente
 
-### Processor (BullMQ)
+### Processor (BullMQ en `queue/`)
 - Extiende `WorkerHost`, decora con `@Processor(QUEUE_NAME)`
-- Idempotente: el mismo job corrido N veces produce el mismo resultado
-- Registra `onFailed` con logging estructurado
-- Usa `job.attemptsMade` para lógica de reintentos diferenciada
-
-### Adapter
-- Una clase por proveedor externo
-- Implementa la interface del dominio, no la del proveedor
-- Circuit breaker obligatorio si el proveedor es crítico
-- Nunca exponer tipos del SDK del proveedor fuera del adapter
-
-## marketing-backend — estructura de dominio
-
-```
-marketing-backend/
-  src/
-    ad-accounts/
-      adapters/
-        meta-ads.adapter.ts         # Circuit breaker obligatorio
-        google-ads.adapter.ts       # Circuit breaker obligatorio
-        tiktok-ads.adapter.ts       # Circuit breaker obligatorio
-      interfaces/
-        ad-platform.interface.ts    # Contrato que todos los adapters implementan
-      ad-accounts.controller.ts
-      ad-accounts.service.ts
-      ad-accounts.module.ts
-    campaigns/
-      domain/
-        campaign.entity.ts
-        automation-rule.entity.ts   # { metric, operator, value, windowDays } → acción
-        campaign.errors.ts
-      repository/
-        campaigns.repository.interface.ts
-        prisma-campaigns.repository.ts
-      processors/
-        automation-check.processor.ts   # Queue: campaign-automation
-        sync-metrics.processor.ts       # Queue: campaign-sync
-      campaigns.controller.ts
-      campaigns.service.ts
-      campaigns.module.ts
-    attribution/
-      processors/
-        attribute-conversion.processor.ts  # Queue: marketing-attribution
-      attribution.service.ts
-      attribution.module.ts
-    internal/
-      internal-api-key.guard.ts     # mismo molde que chatia/pagos/workers
-      internal.controller.ts        # /internal/campaigns, /internal/metrics/summary
-      internal.module.ts
-    grpc/
-      marketing-grpc.controller.ts
-    health/
-    metrics/
-    prisma/
-    app.module.ts
-    main.ts
-  prisma/
-    schema.prisma
-  Dockerfile
-  railway.json
-  package.json
-  tsconfig.json
-```
-
-### Adapters — regla de circuit breaker
-
-Todos los adapters de plataformas (Meta, Google, TikTok) tienen circuit breaker
-obligatorio con `opossum`. Si el CB está abierto:
-- `SyncMetricsProcessor` → loguea + emite alerta a notificaciones-backend (fire-forget)
-- `AutomationCheckProcessor` → postpone la revisión 15 min (BullMQ delay)
-- Nunca lanza excepción que bloquee el job principal
-
-### Invariante multi-tenant en marketing-backend
-
-Todo query Prisma lleva `ecosystemId` + `organizationId`.
-`attribution` también: un payment de org-A jamás se atribuye a org-B.
+- Idempotente — el mismo job N veces produce el mismo resultado
+- Puede consumir del `core/` vía sus services

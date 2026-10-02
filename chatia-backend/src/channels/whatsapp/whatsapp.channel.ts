@@ -132,3 +132,4 @@ export class WhatsAppChannel implements IChannel {
   private extractMediaUrl(msg: WhatsAppMessage): string | undefined {
     return msg.image?.id || msg.video?.id || msg.audio?.id || msg.document?.id;
   }
+}

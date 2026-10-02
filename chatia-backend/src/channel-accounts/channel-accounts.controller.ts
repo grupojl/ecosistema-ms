@@ -45,3 +45,4 @@ export class ChannelAccountsController {
   rotateToken(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.svc.rotateToken(id, tenant.organizationId);
   }
+}

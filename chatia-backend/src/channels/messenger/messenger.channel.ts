@@ -103,3 +103,4 @@ export class MessengerChannel implements IChannel {
       throw new Error(`Messenger send failed: ${error}`);
     }
   }
+}

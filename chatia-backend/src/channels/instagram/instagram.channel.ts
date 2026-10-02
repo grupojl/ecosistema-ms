@@ -100,3 +100,4 @@ export class InstagramChannel implements IChannel {
       throw new Error(`Instagram send failed: ${error}`);
     }
   }
+}

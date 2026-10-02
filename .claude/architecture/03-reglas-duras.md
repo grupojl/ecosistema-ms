@@ -143,3 +143,105 @@ Sin checklist (licencia, Scorecard, mantenimiento, dueño) → se mergea solo co
 Un `@types/*` en `dependencies` termina en la imagen de producción.
 → Enforcement: code review
 → Estado: manual
+
+---
+
+## Regla de localidad de controllers <!-- id: controller-localidad -->
+
+> Añadida por x.sh — aplica en todos los microservicios del ecosistema.
+
+### 🔴 Un controller HTTP vive exclusivamente en el módulo al que pertenece su dominio.
+
+Un controller que expone rutas de un dominio ajeno, o que está ubicado fuera
+de la carpeta del módulo al que pertenece, es un **bug de arquitectura**.
+
+**Correcto — controller colocado en su módulo:**
+
+```
+src/payments/payments.controller.ts    → @Controller('payments')
+src/webhooks/webhooks.controller.ts    → @Controller('webhooks')
+src/contacts/contacts.controller.ts    → @Controller('contacts')
+```
+
+**Incorrecto — rutas del dominio A definidas en un módulo B:**
+
+```ts
+// ❌ analytics.controller.ts dentro de chatia-backend
+// Analytics es responsabilidad de analytics-backend.
+// chatia-backend es únicamente producer de eventos via BullMQ.
+@Get('/analytics/overview')   // ← pertenece a analytics-backend, no a chatia
+
+// ❌ controller de pagos fuera de la carpeta payments/
+// src/pagos/pagos.controller.ts  cuando el módulo canónico es payments/
+```
+
+**Excepciones transversales — permitidas por diseño, no por dominio:**
+
+| Controller | Motivo |
+|---|---|
+| `health/health.controller.ts` | Infraestructura — Railway healthcheck |
+| `internal/internal.controller.ts` | API interna superadmin — transversal por definición |
+| `grpc/{servicio}-grpc.controller.ts` | Adaptador de transporte — no es un módulo de dominio |
+| `widget/widget.controller.ts` | Entry point de canal externo — scope propio |
+
+**Verificación rápida:**
+
+```bash
+# Detectar controllers cuyo prefijo @Controller() no coincide con su carpeta
+grep -rn "@Controller(" */src --include="*.controller.ts" \
+  | grep -v "health\|internal\|grpc\|widget" \
+  | awk -F: '{print $1, $3}'
+
+# Ningún resultado debe mostrar un prefijo de otro dominio
+```
+
+**Regla permanente:**
+Un controller de dominio fuera de su carpeta se corrige antes del merge — no con ticket de deuda.
+No hay excepción por "es temporal" ni por "lo movemos después".
+
+---
+
+## Regla de encapsulamiento entre módulos <!-- id: no-cross-import-mismo-servicio -->
+
+> Añadida por x.sh — norte Stripe/Linear: cada módulo es una caja negra.
+
+### 🔴 Un módulo no importa archivos internos de otro módulo del mismo servicio.
+
+Si `payments/` necesita algo de `contacts/`, lo pide a través del **service
+exportado** del módulo — nunca importa un archivo interno de otra carpeta.
+
+**Correcto — comunicación por interfaz pública:**
+
+```ts
+// payments.service.ts
+import { ContactsService } from '../contacts/contacts.service';
+// ContactsService está exportado por ContactsModule → correcto
+```
+
+**Incorrecto — acoplamiento a internos de otro módulo:**
+
+```ts
+// payments.service.ts
+import { PrismaContactsRepository } from '../contacts/repository/prisma-contacts.repository';
+// ← importa un internal de contacts — si contacts refactoriza, payments se rompe
+
+import { ContactNotFoundError } from '../contacts/domain/contact.errors';
+// ← errores de dominio de contacts son privados a contacts
+// payments maneja la HttpException que ContactsService lanza, no el tipo interno
+```
+
+**Única excepción aceptada:** importar tipos puros de `types/` cuando estén
+explícitamente re-exportados desde el `index.ts` del módulo origen.
+
+**Verificación rápida:**
+
+```bash
+# Detectar imports a domain/ o repository/ de otro módulo
+grep -rn "from '\.\./[^']*\/\(domain\|repository\)/" \
+  */src --include="*.ts" | grep -v "\.spec\.ts"
+# → 0 resultados esperados
+```
+
+**Regla permanente:**
+Un import directo a `domain/` o `repository/` de otro módulo se corrige antes
+del merge. Si necesitás el dato, el módulo dueño expone un método en su service.

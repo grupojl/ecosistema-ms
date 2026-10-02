@@ -8,40 +8,64 @@ reconciliación, webhooks de proveedores, gestión de tenants/API keys.
 - HTTP público: 3001
 - gRPC interno: 5002
 
+## Arquitectura (reestructurada 2026-10-02)
+
+```
+src/
+├── core/
+│   ├── strategies/          ← ProjectStrategy pattern
+│   ├── payments/            ← dominio de pagos (sin controller ni processor)
+│   │   ├── domain/
+│   │   ├── repository/      ← solo interface (IPaymentsRepository)
+│   │   ├── payment-state.machine.ts
+│   │   ├── payments.service.ts
+│   │   └── reconciliation.service.ts
+│   ├── routing/             ← reglas de negocio de enrutamiento (no infraestructura)
+│   └── organization-config/
+├── modules/                 ← ÚNICO lugar con controllers HTTP por ecosistema
+│   ├── welver/
+│   ├── manzana/
+│   ├── mexus/
+│   └── index.ts             ← PasarelaModulesModule
+├── infrastructure/
+│   ├── prisma/
+│   │   └── repositories/    ← PrismaPaymentsRepository (implementación concreta)
+│   ├── firebase/
+│   ├── redis/
+│   ├── providers/           ← adapters de plataformas de pago
+│   │   ├── adapters/stripe/, mercadopago/, conekta/, dlocal/, pagarme/, fake/
+│   │   ├── provider.interface.ts
+│   │   ├── provider.registry.ts
+│   │   └── circuit-breaker.service.ts
+│   ├── audit/
+│   ├── metrics/
+│   └── common/
+├── webhooks/                ← recibe confirmaciones de providers externos
+├── tenants/                 ← gestión de API keys
+├── auth/                    ← SSO Firebase
+├── queue/                   ← dlq.processor.ts + reconcile.processor.ts
+├── grpc/
+├── health/
+└── internal/
+```
+
 ## Clasificación de carpetas
 
 ### 🔴 BLOQUEANTES — no modificar sin ADR
 
 | Carpeta | Razón |
-|---------|-------|
-| `src/prisma/` | Infraestructura core |
-| `src/common/` | PII service, shared guards — seguridad y privacidad de datos |
-| `src/modules/firebase/` | Firebase Auth — no reimplementar |
-| `src/modules/audit/` | Auditoría de pagos — obligatoria por compliance, no se omite |
-| `src/modules/metrics/` | Prometheus — observabilidad |
-| `src/modules/redis/` | Cache de infraestructura |
-| `src/modules/queue/` | BullMQ — jobs de reconciliación y webhooks |
-| `src/modules/providers/provider.interface.ts` | Interface de providers — cambiarla rompe todos los adapters |
-| `src/modules/providers/routing.service.ts` | Lógica de routing entre providers — cambiar la estrategia requiere ADR |
-| `src/modules/providers/circuit-breaker.service.ts` | Resiliencia de providers — no duplicar por provider |
-| `src/pagos/` | Entry point gRPC — contrato con el exterior |
-| `src/app.module.ts` | Raíz — no agregar lógica aquí |
+|---|---|
+| `src/infrastructure/prisma/` | Infraestructura core |
+| `src/infrastructure/firebase/` | Firebase Auth — no reimplementar |
+| `src/infrastructure/audit/` | Auditoría de pagos — compliance |
+| `src/infrastructure/providers/provider.interface.ts` | Interface de providers — cambiarla rompe todos los adapters |
+| `src/core/routing/routing.service.ts` | Reglas de negocio de enrutamiento — cambiar requiere ADR |
+| `src/infrastructure/providers/circuit-breaker.service.ts` | Resiliencia de providers |
+| `src/grpc/` | Entry point gRPC — contrato con el exterior |
 
-### 🟡 DINÁMICA CONTROLADA — crecer siguiendo el molde
+### 🟡 DINÁMICA CONTROLADA
 
 | Carpeta | Regla |
-|---------|-------|
-| `src/modules/providers/adapters/` | Nuevos providers siguen `provider.interface.ts`. No se modifica la interface sin ADR. Cada adapter vive en su propia carpeta. |
-
-### 🟢 DINÁMICAS — crecen libremente siguiendo Domain/Repository
-
-| Carpeta | Estado actual | Molde a seguir |
-|---------|---------------|----------------|
-| `src/modules/payments/` | Service → Prisma directo | **MOLDE VIVO** de pagos — migrar primero |
-| `src/modules/webhooks/` | Service → Prisma directo | payments/ (post-migración) |
-| `src/modules/tenants/` | Service → Prisma directo | payments/ (post-migración) |
-
-## Molde vivo de referencia
-
-`src/modules/payments/` — será el molde una vez migrado a Domain + Repository.
-Los estados de pago y sus transiciones son las invariantes de dominio clave.
+|---|---|
+| `src/infrastructure/providers/adapters/` | Nuevos providers siguen `provider.interface.ts`. Cada adapter en su propia carpeta. |
+| `src/modules/` | Nuevos ecosistemas siguen el molde — sin tocar `app.module.ts`. |

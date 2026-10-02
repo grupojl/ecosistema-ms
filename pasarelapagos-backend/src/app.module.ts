@@ -1,118 +1,79 @@
-import { createMetricsModule } from '@ecosistema-ms/metrics';
-import { PaymentProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
-import { PaymentOrgConfigService, REDIS_CLIENT } from '@/organization-config/organization-config.service.js';
-import { WelverPaymentModule }  from '@/modules/welver/welver.module.js';
-import { ManzanaPaymentModule } from '@/modules/manzana/manzana.module.js';
-import { MexusPaymentModule }   from '@/modules/mexus/mexus.module.js';
-// src/app.module.ts
-import { Module, type NestModule, type MiddlewareConsumer, RequestMethod } from '@nestjs/common';
-import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware.js';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
-import { LoggerModule } from 'nestjs-pino';
-import { ThrottlerModule } from '@nestjs/throttler';
-import { ScheduleModule } from '@nestjs/schedule';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { envSchema } from '@/config/env.validation.js';
+// pasarelapagos-backend/src/app.module.ts
+// Reestructurado por x.sh — arquitectura 10/10
+import {
+  Module, type NestModule, type MiddlewareConsumer, RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule }     from '@nestjs/config';
+import { BullModule }       from '@nestjs/bullmq';
+import { CacheModule }      from '@nestjs/cache-manager';
+import { ThrottlerModule }  from '@nestjs/throttler';
 
-// Core
-import { InternalModule } from '@/internal/internal.module.js';
-import { PrismaModule }   from '@/modules/prisma/prisma.module.js';
-import { FirebaseModule }    from '@/modules/firebase/firebase.module.js';
-import { SharedGuardsModule } from '@/common/shared-guards.module.js';
-import { RedisModule }    from '@/modules/redis/redis.module.js';
-import { QueueModule }    from '@/modules/queue/queue.module.js';
-import { AuditModule }    from '@/modules/audit/audit.module.js';
-import { MetricsModule }  from '@/modules/metrics/metrics.module.js';
+// ── Infraestructura ────────────────────────────────────────────────────────
+import { PrismaModule }     from '@/infrastructure/prisma/prisma.module.js';
+import { FirebaseModule }   from '@/infrastructure/firebase/firebase.module.js';
+import { RedisModule }      from '@/infrastructure/redis/redis.module.js';
+import { ProvidersModule }  from '@/infrastructure/providers/providers.module.js';
+import { AuditModule }      from '@/infrastructure/audit/audit.module.js';
+import { MetricsModule }    from '@/infrastructure/metrics/metrics.module.js';
+import { PiiModule }        from '@/infrastructure/common/services/pii.module.js';
+import { SharedGuardsModule } from '@/infrastructure/common/shared-guards.module.js';
+import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
+import envValidation        from '@/infrastructure/config/env.validation.js';
 
-// Business
-    // ProjectStrategy org-aware — ADR-019 v2
-    PaymentProjectStrategyModule,
-    { provide: 'PAYMENT_ORG_CONFIG_SVC', useClass: PaymentOrgConfigService },
-    WelverPaymentModule,
-    ManzanaPaymentModule,
-    MexusPaymentModule,
-import { AuthModule }      from '@/modules/auth/auth.module.js';
-import { PaymentsModule }  from '@/modules/payments/payments.module.js';
-import { WebhooksModule }  from '@/modules/webhooks/webhooks.module.js';
-import { TenantsModule }   from '@/modules/tenants/tenants.module.js';
-import { ProvidersModule } from '@/modules/providers/providers.module.js';
-import { HealthModule }    from '@/modules/health/health.module.js';
+// ── Core ───────────────────────────────────────────────────────────────────
+import { PaymentsModule }           from '@/core/payments/payments.module.js';
+import { RoutingModule }            from '@/core/routing/routing.module.js';
+import { OrganizationConfigModule } from '@/core/organization-config/organization-config.module.js';
+import { ProjectStrategyModule }    from '@/core/strategies/project-strategy.module.js';
 
-// Guards globales
-import { TenantThrottlerGuard } from '@/common/guards/tenant-throttler.guard.js';
+// ── Entry points ──────────────────────────────────────────────────────────
+import { WebhooksModule }  from '@/webhooks/webhooks.module.js';
+import { TenantsModule }   from '@/tenants/tenants.module.js';
+import { AuthModule }      from '@/auth/auth.module.js';
+import { QueueModule }     from '@/queue/queue.module.js';
+import { GrpcModule }      from '@/grpc/grpc.module.js';
+import { HealthModule }    from '@/health/health.module.js';
+import { InternalModule }  from '@/internal/internal.module.js';
+
+// ── Módulos de ecosistema — un solo import ─────────────────────────────────
+import { PasarelaModulesModule } from '@/modules/index.js';
+
+const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
-    createMetricsModule(),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      validate: (config) => {
-        const result = envSchema.safeParse(config);
-        if (!result.success) {
-          throw new Error(
-            `Variables de entorno inválidas:\n${result.error.toString()}`,
-          );
-        }
-        return result.data;
-      },
-    }),
+    ConfigModule.forRoot({ isGlobal: true, validate: envValidation }),
+    BullModule.forRoot({ connection: { url: REDIS_URL } }),
+    CacheModule.register({ isGlobal: true }),
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
 
-    LoggerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        pinoHttp: {
-          level:     config.get<string>('LOG_LEVEL') ?? 'info',
-          transport: config.get<string>('NODE_ENV') !== 'production'
-            ? { target: 'pino-pretty', options: { colorize: true } }
-            : undefined,
-          redact: ['req.headers.authorization', 'req.headers["x-api-key"]'],
-        },
-      }),
-    }),
-
-    ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        throttlers: [{
-          ttl:   config.get<number>('THROTTLE_TTL')   ?? 60,
-          limit: config.get<number>('THROTTLE_LIMIT') ?? 200,
-        }],
-      }),
-    }),
-
-    ScheduleModule.forRoot(),
-    EventEmitterModule.forRoot(),
-
-    // Core
-    InternalModule,
+    // Infraestructura
     PrismaModule,
     FirebaseModule,
-    SharedGuardsModule,
     RedisModule,
-    QueueModule,
+    ProvidersModule,
     AuditModule,
     MetricsModule,
+    PiiModule,
+    SharedGuardsModule,
 
-    // Business
-    // ProjectStrategy org-aware — ADR-019 v2
-    PaymentProjectStrategyModule,
-    { provide: 'PAYMENT_ORG_CONFIG_SVC', useClass: PaymentOrgConfigService },
-    WelverPaymentModule,
-    ManzanaPaymentModule,
-    MexusPaymentModule,
-    AuthModule,
+    // Core
     PaymentsModule,
+    RoutingModule,
+    OrganizationConfigModule,
+    ProjectStrategyModule,
+
+    // Entry points
     WebhooksModule,
     TenantsModule,
-    ProvidersModule,
+    AuthModule,
+    QueueModule,
+    GrpcModule,
     HealthModule,
-  ],
-  providers: [
-    {
-      provide: APP_GUARD,
-      useClass: TenantThrottlerGuard,
-    },
+    InternalModule,
+
+    // Todos los ecosistemas
+    PasarelaModulesModule,
   ],
 })
 export class AppModule implements NestModule {

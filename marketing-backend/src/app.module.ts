@@ -1,64 +1,68 @@
-import { RequestIdMiddleware } from '@/common/middleware/request-id.middleware.js';
 // marketing-backend/src/app.module.ts
-import { Module }           from '@nestjs/common';
-import { ConfigModule }     from '@nestjs/config';
-import { BullModule }       from '@nestjs/bullmq';
-import { ScheduleModule }   from '@nestjs/schedule';
-import { LoggerModule }     from 'nestjs-pino';
-import { PrometheusModule } from '@nestjs-modules/nestjs-prometheus';
+// Reestructurado por x.sh — arquitectura 10/10
+import {
+  Module, type NestModule, type MiddlewareConsumer, RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule }   from '@nestjs/config';
+import { BullModule }     from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 
-import { PrismaModule }      from '@/prisma/prisma.module.js';
-import { HealthModule }      from '@/health/health.module.js';
-import { MetricsModule }     from '@/metrics/metrics.module.js';
-import { InternalModule }    from '@/internal/internal.module.js';
-import { AdAccountsModule }  from '@/ad-accounts/ad-accounts.module.js';
-import { CampaignsModule }   from '@/campaigns/campaigns.module.js';
-import { AttributionModule } from '@/attribution/attribution.module.js';
-import { GrpcModule }        from '@/grpc/grpc.module.js';
-import { MARKETING_QUEUES }  from '@/marketing.constants.js';
+// ── Infraestructura ────────────────────────────────────────────────────────
+import { MetricsModule }   from '@/infrastructure/metrics/metrics.module.js';
+import { AdaptersModule }  from '@/infrastructure/adapters/adapters.module.js';
+import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
+
+// ── Core ───────────────────────────────────────────────────────────────────
+import { CampaignsModule }   from '@/core/campaigns/campaigns.module.js';
+import { AttributionModule } from '@/core/attribution/attribution.module.js';
+import { AdAccountsModule as CoreAdAccountsModule } from '@/core/ad-accounts/ad-accounts.module.js';
+
+// ── Queue ──────────────────────────────────────────────────────────────────
+import { QueueModule } from '@/queue/queue.module.js';
+
+// ── Entry points ──────────────────────────────────────────────────────────
+import { AdAccountsModule } from '@/ad-accounts/ad-accounts.module.js';
+import { GrpcModule }       from '@/grpc/grpc.module.js';
+import { HealthModule }     from '@/health/health.module.js';
+import { InternalModule }   from '@/internal/internal.module.js';
+
+// ── Módulos de ecosistema — un solo import ─────────────────────────────────
+import { MarketingModulesModule } from '@/modules/index.js';
+
+const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
-    createMetricsModule(),
-    LoggerModule.forRoot({
-      pinoHttp: {
-        level: process.env['LOG_LEVEL'] ?? (process.env['NODE_ENV'] !== 'production' ? 'debug' : 'info'),
-        transport: process.env['NODE_ENV'] !== 'production'
-          ? { target: 'pino-pretty', options: { colorize: true } }
-          : undefined,
-      },
-    }),
-    PrometheusModule.register({ path: '/metrics', defaultMetrics: { enabled: true } }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
-    }),
-    // CRÍTICO: mismo Redis que pasarelapagos-backend para marketing-attribution
-    BullModule.registerQueue(
-      { name: MARKETING_QUEUES.CAMPAIGN_SYNC },
-      { name: MARKETING_QUEUES.CAMPAIGN_AUTOMATION },
-      { name: MARKETING_QUEUES.MARKETING_ATTRIBUTION },
-      { name: MARKETING_QUEUES.DLQ },
-    ),
-    PrismaModule,
-    HealthModule,
+    BullModule.forRoot({ connection: { url: REDIS_URL } }),
+
+    // Infraestructura
     MetricsModule,
-    InternalModule,
-    AdAccountsModule,
+    AdaptersModule,
+
+    // Core
     CampaignsModule,
     AttributionModule,
+    CoreAdAccountsModule,
+
+    // Queue
+    QueueModule,
+
+    // Entry points
+    AdAccountsModule,
     GrpcModule,
+    HealthModule,
+    InternalModule,
+
+    // Todos los ecosistemas — un solo import
+    MarketingModulesModule,
   ],
 })
-export class AppModule {}
-
+export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
+    consumer
+      .apply(RequestIdMiddleware)
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
+}

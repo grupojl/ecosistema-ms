@@ -1,52 +1,62 @@
-import { NotifProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
-import { WelverNotifModule }  from '@/modules/welver/welver.module.js';
-import { ManzanaNotifModule } from '@/modules/manzana/manzana.module.js';
-import { MexusNotifModule }   from '@/modules/mexus/mexus.module.js';
 // notificaciones-backend/src/app.module.ts
-import { Module }               from '@nestjs/common';
-import { ConfigModule }         from '@nestjs/config';
-import { BullModule }           from '@nestjs/bullmq';
-import { ScheduleModule }       from '@nestjs/schedule';
-import { PrismaModule }         from '@/prisma/prisma.module.js';
-import { HealthModule }         from '@/health/health.module.js';
-import { NotificationsModule }  from '@/notifications/notifications.module.js';
-import { PreferencesModule }    from '@/preferences/preferences.module.js';
-import { GrpcModule }           from '@/grpc/grpc.module.js';
-import { MetricsModule }        from '@/metrics/metrics.module.js';
+// Reestructurado por x.sh — arquitectura 10/10
+import {
+  Module, type NestModule, type MiddlewareConsumer, RequestMethod,
+} from '@nestjs/common';
+import { ConfigModule }  from '@nestjs/config';
+import { BullModule }    from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
+
+// ── Infraestructura ────────────────────────────────────────────────────────
+import { PrismaModule }    from '@/infrastructure/prisma/prisma.module.js';
+import { MetricsModule }   from '@/infrastructure/metrics/metrics.module.js';
+import { TemplatesModule } from '@/infrastructure/templates/templates.module.js';
+import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
+
+// ── Core ───────────────────────────────────────────────────────────────────
+import { NotificationsModule } from '@/core/notifications/notifications.module.js';
+import { PreferencesModule }   from '@/core/preferences/preferences.module.js';
+import { ProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
+
+// ── Entry points ──────────────────────────────────────────────────────────
+import { QueueModule }  from '@/queue/queue.module.js';
+import { GrpcModule }   from '@/grpc/grpc.module.js';
+import { HealthModule } from '@/health/health.module.js';
+
+// ── Módulos de ecosistema — un solo import ─────────────────────────────────
+import { NotificacionesModulesModule } from '@/modules/index.js';
+
+const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
-    createMetricsModule(),
-    LoggerModule.forRoot({ pinoHttp: { level: process.env["LOG_LEVEL"] ?? (process.env["NODE_ENV"] !== "production" ? "debug" : "info"), transport: process.env["NODE_ENV"] !== "production" ? { target: "pino-pretty", options: { colorize: true } } : undefined } }),
-    PrometheusModule.register({ path: "/metrics", defaultMetrics: { enabled: true } }),
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
-    BullModule.forRootAsync({
-      useFactory: () => ({
-        connection: {
-          host:     process.env['REDIS_HOST']     ?? 'localhost',
-          port:     parseInt(process.env['REDIS_PORT'] ?? '6379', 10),
-          password: process.env['REDIS_PASSWORD'],
-        },
-      }),
-    }),
+    BullModule.forRoot({ connection: { url: REDIS_URL } }),
+
+    // Infraestructura
     PrismaModule,
-    // ProjectStrategy org-aware — ADR-019 v2
-    NotifProjectStrategyModule,
-    WelverNotifModule,
-    ManzanaNotifModule,
-    MexusNotifModule,
     MetricsModule,
-    HealthModule,
+    TemplatesModule,
+
+    // Core
     NotificationsModule,
     PreferencesModule,
+    ProjectStrategyModule,
+
+    // Entry points
+    QueueModule,
     GrpcModule,
+    HealthModule,
+
+    // Todos los ecosistemas — un solo import
+    NotificacionesModulesModule,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(RequestIdMiddleware)
-      .forRoutes({ path: "*", method: RequestMethod.ALL });
+      .forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }
