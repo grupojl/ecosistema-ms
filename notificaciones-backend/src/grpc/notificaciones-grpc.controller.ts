@@ -1,8 +1,8 @@
 // notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts
 import { Controller, Logger }    from '@nestjs/common';
 import { GrpcMethod }            from '@nestjs/microservices';
-import { PreferencesService }  from '@/preferences/preferences.service.js';
-import { NotificationsService }  from '@/notifications/notifications.service.js';
+import { PreferencesService }  from '@/core/preferences/preferences.service.js';
+import { NotificationsService }  from '@/core/notifications/notifications.service.js';
 
 interface SendNotificationRequest {
   ecosystemId:    string;

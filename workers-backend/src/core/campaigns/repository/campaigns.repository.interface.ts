@@ -50,6 +50,7 @@ export interface ICampaignsRepository {
 
   update(id: string, patch: {
     status?:      string;
+    scheduledAt?: Date;
     startedAt?:   Date;
     completedAt?: Date;
   }): Promise<CampaignRecord>;

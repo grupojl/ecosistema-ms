@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService }        from '@/prisma/prisma.service';
-import type { GetMetricsDto }   from '@/internal/schemas';
+import { PrismaService }        from '@/prisma/prisma.service.js';
+import type { GetMetricsDto }   from '@/internal/schemas.js';
 
 @Injectable()
 export class InternalService {

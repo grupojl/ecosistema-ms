@@ -9,6 +9,7 @@
     "dev": "tsc -p tsconfig.json --watch"
   },
   "dependencies": {
+    "@nestjs/common": "catalog:",
     "pino": "catalog:",
     "pino-pretty": "catalog:",
     "nestjs-pino": "catalog:"

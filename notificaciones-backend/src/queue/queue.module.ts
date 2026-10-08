@@ -1,15 +1,11 @@
 // notificaciones-backend/src/queue/queue.module.ts
-import { Module }               from "@nestjs/common";
-import { BullModule }           from "@nestjs/bullmq";
-import { NotificationProcessor } from "@/queue/notification.processor.js";
-import { DlqModule }            from "@/queue/dlq/dlq.module.js";
-import { NOTIFICATIONS_QUEUE }  from "@/core/notifications/notifications.constants.js";
+// Las colas de canal y sus processors los registra NotificationsModule (core).
+// Este módulo expone solo la DLQ + su monitor.
+import { Module }    from "@nestjs/common";
+import { DlqModule } from "@/queue/dlq/dlq.module.js";
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: NOTIFICATIONS_QUEUE }),
-    DlqModule,
-  ],
-  providers: [NotificationProcessor],
+  imports: [DlqModule],
+  exports: [DlqModule],
 })
 export class QueueModule {}

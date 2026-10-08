@@ -9,7 +9,7 @@
 // Prompt base configurable por organizationId vía config
 // Ref: .claude/modules/chatia-backend/multimodal-adapters.md
 import { Injectable, Logger } from '@nestjs/common';
-import { CircuitBreakerService } from '@/common/services/circuit-breaker.service.js';
+import { CircuitBreakerService } from '@/infrastructure/common/services/circuit-breaker.service.js';
 import type { IMultimodalAdapter, MultimodalInput } from '@/channels/adapters/multimodal.interface.js';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';

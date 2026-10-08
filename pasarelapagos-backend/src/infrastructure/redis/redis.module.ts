@@ -33,10 +33,10 @@ class RedisNoopClient {
     {
       provide:    REDIS_CLIENT,
       inject:     [ConfigService],
-      useFactory: (config: ConfigService): Redis | RedisNoopClient => {
+      useFactory: (config: ConfigService): Redis => {
         if (!REDIS_ENABLED) {
           console.warn('[RedisModule] Redis deshabilitado (REDIS_ENABLED != true) — modo no-op');
-          return new RedisNoopClient() as RedisLike;
+          return new RedisNoopClient() as unknown as Redis;
         }
         const url   = config.getOrThrow<string>('REDIS_URL');
         const redis = new Redis(url, {

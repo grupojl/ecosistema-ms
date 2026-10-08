@@ -13,14 +13,15 @@ export const CreatePaymentSchema = z.object({
   method:         PaymentMethodKindEnum,
   description:    z.string().max(500).optional(),
   customerId:     z.string().min(1).optional(),
-  metadata:       z.record(z.string()).default({}),
+  email:          z.string().email().optional(),
+  metadata:       z.record(z.string(), z.string()).default({}),
   returnUrl:      z.string().url().optional(),
   idempotencyKey: z.string().min(1).optional(), // si no viene, el controller genera uno
 });
 
 export const ListPaymentsSchema = z.object({
   status: z.enum([
-    'PENDING', 'AUTHORIZED', 'CAPTURED', 'FAILED', 'CANCELLED', 'REFUNDED',
+    'PENDING', 'AUTHORIZED', 'CAPTURED', 'FAILED', 'CANCELLED', 'REFUNDED', 'PARTIALLY_REFUNDED',
   ]).optional(),
   page:  z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),

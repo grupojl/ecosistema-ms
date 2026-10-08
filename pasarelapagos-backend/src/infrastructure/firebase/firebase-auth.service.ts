@@ -5,8 +5,9 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type * as admin from 'firebase-admin';
-import { FIREBASE_ADMIN } from '@/modules/firebase/firebase.module.js';
+import type { App } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { FIREBASE_ADMIN } from '@/infrastructure/firebase/firebase.module.js';
 
 export interface FirebaseDecodedToken {
   uid: string;
@@ -24,7 +25,7 @@ export class FirebaseAuthService {
 
   constructor(
     @Inject(FIREBASE_ADMIN)
-    private readonly firebase: admin.app.App | null,
+    private readonly firebase: App | null,
   ) {}
 
   get isEnabled(): boolean {
@@ -43,7 +44,7 @@ export class FirebaseAuthService {
     }
 
     try {
-      const decoded = await this.firebase.auth().verifyIdToken(token, true);
+      const decoded = await getAuth(this.firebase).verifyIdToken(token, true);
       return {
         uid:                decoded.uid,
         email:              decoded.email,

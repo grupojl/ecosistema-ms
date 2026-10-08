@@ -6,3 +6,4 @@ import { EventsGateway } from '@/events/events.gateway.js';
   providers: [EventsGateway],
   exports: [EventsGateway],
 })
+export class EventsModule {}

@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { MetricsService } from '@/modules/metrics/metrics.service.js';
+import { MetricsService } from '@/infrastructure/metrics/metrics.service.js';
 
 @Global()
 @Module({

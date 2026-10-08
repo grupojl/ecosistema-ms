@@ -1,18 +1,67 @@
-// chatia-backend/src/conversations/repository/conversations.repository.interface.ts
+// chatia-backend/src/core/conversations/repository/conversations.repository.interface.ts
 // Puerto (interface + símbolo de inyección).
 // El Service inyecta esta interface via @Inject(CONVERSATIONS_REPOSITORY).
 // PrismaConversationsRepository es el único adaptador.
-import type { Conversation, ConversationStatus } from '@/domain/conversation.entity.js';
+import type { Prisma } from '@prisma/client';
+import type { Conversation, ConversationStatus } from '@/core/conversations/domain/conversation.entity.js';
 
 export const CONVERSATIONS_REPOSITORY = Symbol('CONVERSATIONS_REPOSITORY');
 
 export interface ListConversationsFilter {
-  organizationId:   string;
-  status?:          ConversationStatus;
+  organizationId:    string;
+  status?:           ConversationStatus;
   channelAccountId?: string;
-  tag?:             string;
-  archived?:        boolean;  // archived = deletedAt IS NOT NULL
-  page?:            number;
+  tag?:              string;
+  archived?:         boolean;  // archived = deletedAt IS NOT NULL
+  page?:             number;
+}
+
+// ── DT-030: ChannelAccount para handleIncomingMessage ─────────────────────────
+// ConversationsService no importa PrismaService directamente.
+export interface ChannelAccountRecord {
+  id:             string;
+  organizationId: string;
+  ecosystemId:    string;
+  channelType:    string;
+  externalId:     string;
+  accessToken:    string;
+  extraConfig:    Record<string, unknown>;
+}
+
+// ── Read-models con relaciones (lo que devuelve el API HTTP) ──────────────────
+export type ConversationListItem = Prisma.ConversationGetPayload<{
+  include: { contact: true; assignedAgent: true; messages: true };
+}>;
+
+export type ConversationDetail = ConversationListItem;
+
+export interface InboundMessageInput {
+  channelAccountId: string;
+  channelType:      string;
+  organizationId:   string;
+  contact: {
+    externalId: string;
+    name?:      string;
+    phone?:     string;
+  };
+  message: {
+    content:     string;
+    externalId?: string;
+  };
+}
+
+export interface InboundMessageResult {
+  conversationId:      string;
+  contactId:           string;
+  conversationCreated: boolean;
+}
+
+/** Datos necesarios para despachar un mensaje saliente por el canal. */
+export interface OutboundContext {
+  channelType:         string;
+  accessToken:         string;
+  extraConfig:         Prisma.JsonValue;
+  recipientExternalId: string;
 }
 
 export interface IConversationsRepository {
@@ -53,17 +102,37 @@ export interface IConversationsRepository {
     organizationId: string,
     isAiActive:     boolean,
   ): Promise<Conversation>;
-}
 
-// ── DT-030: método para handleIncomingMessage ─────────────────────────────
-// Agrega findChannelAccountById al contrato del repository para que
-// ConversationsService no importe PrismaService directamente.
-export interface ChannelAccountRecord {
-  id:             string;
-  organizationId: string;
-  ecosystemId:    string;
-  channelType:    string;
-  externalId:     string;
-  accessToken:    string;
-  extraConfig:    Record<string, unknown>;
+  findChannelAccountById(channelAccountId: string): Promise<ChannelAccountRecord | null>;
+
+  // ── Casos de uso compuestos (multi-tabla) ───────────────────────────────────
+
+  /** Upsert de contacto + conversación abierta + mensaje entrante, en una transacción. */
+  recordInboundMessage(input: InboundMessageInput): Promise<InboundMessageResult>;
+
+  listWithRelations(filter: ListConversationsFilter): Promise<{
+    data:  ConversationListItem[];
+    total: number;
+    page:  number;
+    pages: number;
+  }>;
+
+  findDetailed(id: string, organizationId: string): Promise<ConversationDetail | null>;
+
+  /** Como findById pero incluye archivadas (restore / verificación de ownership). */
+  findOwned(id: string, organizationId: string): Promise<Conversation | null>;
+
+  getOutboundContext(conversationId: string, organizationId: string): Promise<OutboundContext | null>;
+
+  /** Persiste el mensaje saliente PENDING y actualiza lastMessageAt (atómico). */
+  createOutboundMessage(conversationId: string, content: string): Promise<{ id: string }>;
+
+  /** HUMAN_TAKEOVER + agente asignado + IA desactivada. */
+  takeover(id: string, organizationId: string, agentId: string): Promise<Conversation>;
+
+  /** Vuelve a OPEN, sin agente, IA activa. */
+  release(id: string, organizationId: string): Promise<Conversation>;
+
+  /** RESOLVED + resolvedAt + IA desactivada. */
+  resolve(id: string, organizationId: string): Promise<Conversation>;
 }

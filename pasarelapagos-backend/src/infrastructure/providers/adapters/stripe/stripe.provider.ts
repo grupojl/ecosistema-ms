@@ -8,10 +8,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface.js';
-import { ProviderRegistry } from '@/provider.registry.js';
-import { CircuitBreakerService } from '@/circuit-breaker.service.js';
-import { mapStripeError } from '@/modules/providers/adapters/stripe/stripe-error.mapper.js';
+} from '@/infrastructure/providers/provider.interface.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/infrastructure/providers/circuit-breaker.service.js';
+import { mapStripeError } from '@/infrastructure/providers/adapters/stripe/stripe-error.mapper.js';
 
 // Con moduleResolution: nodenext el namespace Stripe.* no resuelve en stripe@22.
 // Usamos ReturnType para tipar la instancia y strings literales para los enums.
@@ -56,7 +56,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
     }
 
     this.stripe = new Stripe(secretKey, {
-      apiVersion:        '2025-08-27.basil',
+      apiVersion:        '2026-08-26.dahlia', // versión que tipa stripe@22 (ver ADR-018)
       typescript:        true,
       maxNetworkRetries: 2,
       timeout:           10_000,
@@ -90,7 +90,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
         return {
           externalId:  intent.id,
           status:      this.mapIntentStatus(intent.status as PaymentIntentStatus),
-          redirectUrl: (intent.next_action as import("stripe").Stripe.PaymentIntent.NextAction | null)?.redirect_to_url?.url,
+          redirectUrl: intent.next_action?.redirect_to_url?.url ?? undefined,
           raw:         intent,
         };
       } catch (err) {
@@ -154,7 +154,7 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
     const sig = headers['stripe-signature'];
     if (!sig) throw new UnauthorizedException('Falta stripe-signature');
 
-    let event: import("stripe").Stripe.Event;
+    let event: Stripe.Event;
     try {
       event = this.stripe.webhooks.constructEvent(raw, sig, this.webhookSecret);
     } catch (err: unknown) {
@@ -196,9 +196,10 @@ export class StripeProvider implements PaymentProvider, OnModuleInit {
     return map[eventType] ?? 'pending';
   }
 
-  private extractExternalId(event: import("stripe").Stripe.Event): string {
-    const obj = event?.data?.object ?? {};
-    return (obj.payment_intent ?? obj.id ?? 'unknown') as string;
+  private extractExternalId(event: Stripe.Event): string {
+    const obj = (event?.data?.object ?? {}) as { payment_intent?: string | { id: string } | null; id?: string };
+    const pi  = typeof obj.payment_intent === 'string' ? obj.payment_intent : obj.payment_intent?.id;
+    return pi ?? obj.id ?? 'unknown';
   }
 
   private mapRefundReason(reason?: string): RefundReason | undefined {

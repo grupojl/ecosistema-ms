@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build": "nest build",
-    "typecheck": "tsc --noEmit",
+    "build": "prisma generate && nest build && tsc-alias -p tsconfig.build.json",
+    "typecheck": "prisma generate && tsc --noEmit",
     "start": "node dist/main",
     "start:dev": "nest start --watch",
     "start:migrate": "prisma migrate deploy && node dist/main",
@@ -58,6 +58,7 @@
     "supertest": "catalog:",
     "ts-jest": "catalog:",
     "ts-node": "catalog:",
+    "tsc-alias": "catalog:",
     "tsconfig-paths": "catalog:",
     "typescript": "catalog:"
   },
@@ -73,7 +74,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "moduleNameMapper": {
-      "^@\/(.*)$": "<rootDir>/$1"
+      "^@/(.*)$": "<rootDir>/$1"
     },
     "collectCoverageFrom": [
       "**/*.(t|j)s"

@@ -5,13 +5,13 @@
 import { Injectable, Inject, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                                    from '@nestjs/bullmq';
 import { Queue }                                          from 'bullmq';
-import { QUEUES, QUEUE_DEFAULTS }                         from '@/notifications/notifications.constants.js';
-import { buildIdempotencyKey }                            from '@/notifications/dedup/idempotency.helper.js';
+import { QUEUES, QUEUE_DEFAULTS }                         from '@/core/notifications/notifications.constants.js';
+import { buildIdempotencyKey }                            from '@/core/notifications/dedup/idempotency.helper.js';
 import {
   NOTIFICATIONS_REPOSITORY,
   type INotificationsRepository,
   type StatsQuery,
-} from '@/notifications/repository/notifications.repository.interface.js';
+} from '@/core/notifications/repository/notifications.repository.interface.js';
 
 export interface EnqueueNotificationDto {
   ecosystemId:    string;
@@ -38,7 +38,11 @@ export class NotificationsService {
   // ── Enqueue — sin cambios (no usa Prisma) ────────────────────────────────
   async enqueue(dto: EnqueueNotificationDto): Promise<{ jobId: string; channel: string }> {
     const idempotencyKey = dto.idempotencyKey
-      ?? buildIdempotencyKey(dto.ecosystemId, dto.organizationId, dto.contactId, dto.templateKey);
+      ?? buildIdempotencyKey({
+        eventType:      dto.templateKey,
+        contactId:      dto.contactId,
+        organizationId: dto.organizationId,
+      });
 
     const queue = this.getQueue(dto.channel);
 

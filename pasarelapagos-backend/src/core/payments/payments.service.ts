@@ -12,20 +12,20 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService }    from '@/prisma/prisma.service.js';
+import { PrismaService }    from '@/infrastructure/prisma/prisma.service.js';
 import {
   PAYMENTS_REPOSITORY,
-  IPaymentsRepository,
-} from '@/modules/payments/repository/payments.repository.interface.js';
-import { ProviderRegistry } from '@/providers/provider.registry.js';
-import { AuditService }     from '@/audit/audit.service.js';
-import { MetricsService }   from '@/metrics/metrics.service.js';
-import type { CreatePaymentInput } from '@/modules/payments/schemas.js';
-import { assertValidTransition }   from '@/modules/payments/payment-state.machine.js';
-import type { OrgContext }         from '@/common/interfaces/org-context.interface.js';
+  type IPaymentsRepository,
+} from '@/core/payments/repository/payments.repository.interface.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { AuditService }     from '@/infrastructure/audit/audit.service.js';
+import { MetricsService }   from '@/infrastructure/metrics/metrics.service.js';
+import type { CreatePaymentInput } from '@/core/payments/schemas.js';
+import { assertValidTransition }   from '@/core/payments/payment-state.machine.js';
+import type { OrgContext }         from '@/infrastructure/common/interfaces/org-context.interface.js';
 import { PaymentStatus, Prisma }   from '@prisma/client';
 import { PaymentMethodKind as PrismaPaymentMethodKind } from '@prisma/client';
-import type { PaymentMethodKind as ProviderMethodKind } from '@/providers/provider.interface.js';
+import type { PaymentMethodKind as ProviderMethodKind } from '@/infrastructure/providers/provider.interface.js';
 
 // ---------------------------------------------------------------------------
 // Mapper: convierte el value lowercase del provider al ENUM de Prisma
@@ -365,7 +365,6 @@ export class PaymentsService {
     customerId?:     string | null;
     createdAt:       Date;
     updatedAt:       Date;
-    [key: string]:   unknown;
   }) {
     return {
       ...payment,

@@ -24,7 +24,7 @@ export class WelverController {
 
   @Get("overview")
   @ApiOperation({ summary: "Resumen ejecutivo — Welver" })
-  overview(@Query(new ZodValidationPipe(OverviewQuerySchema)) q: OverviewQueryInput) {
+  summary(@Query(new ZodValidationPipe(OverviewQuerySchema)) q: OverviewQueryInput) {
     return this.overview.getOverview({
       ecosystemId:    q.ecosystemId,
       organizationId: q.organizationId,
@@ -65,6 +65,7 @@ export class WelverController {
       from:   new Date(dto.from),
       to:     new Date(dto.to),
       format: dto.format,
+      reportType: dto.reportType,
     });
   }
 

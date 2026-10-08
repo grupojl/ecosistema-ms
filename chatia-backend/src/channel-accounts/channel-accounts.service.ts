@@ -2,8 +2,7 @@
 // src/channel-accounts/channel-accounts.service.ts
 import { Logger, Injectable, NotFoundException } from '@nestjs/common';
 import type { CreateChannelAccountInput, UpdateChannelAccountInput } from '@/channel-accounts/schemas.js';
-import type { CreateChannelAccountInput, UpdateChannelAccountInput } from '@/channel-accounts/schemas.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import { ChannelType, Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 

@@ -2,7 +2,7 @@
 // Alertas in-app para agentes del dashboard — transversal a todos los ecosistemas
 // Consume core/notifications/ — no tiene lógica de dominio propia
 import {
-  Controller, Get, Patch, Param, Query, UseGuards,
+  Controller, Get, Patch, Param, Query, UseGuards, ForbiddenException,
 } from "@nestjs/common";
 import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
 import { TenantGuard }            from "@/infrastructure/common/guards/tenant.guard.js";
@@ -24,11 +24,17 @@ export class AgentNotificationsController {
     @Tenant() tenant: TenantContext,
     @Query(new ZodValidationPipe(ListNotificationsSchema)) q: ListNotificationsInput,
   ) {
-    return this.svc.list(tenant.organizationId, q);
+    return this.svc.list(this.agentIdOf(tenant), q.read === false, q.page, q.limit);
   }
 
   @Patch(":id/read")
   markRead(@Param("id") id: string, @Tenant() tenant: TenantContext) {
-    return this.svc.markRead(id, tenant.organizationId);
+    return this.svc.markRead(id, this.agentIdOf(tenant));
+  }
+
+  /** Las notificaciones son por agente (no por organización). */
+  private agentIdOf(tenant: TenantContext): string {
+    if (!tenant.agentId) throw new ForbiddenException('El usuario no tiene un agente asociado');
+    return tenant.agentId;
   }
 }

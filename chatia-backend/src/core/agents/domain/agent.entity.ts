@@ -1,6 +1,8 @@
 // chatia-backend/src/agents/domain/agent.entity.ts
 // ADR-011 Sprint 2
 
+import { AgentOfflineError, AgentAtCapacityError } from '@/core/agents/domain/agent.errors.js';
+
 export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'BUSY';
 
 export interface Agent {

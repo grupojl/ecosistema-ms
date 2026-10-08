@@ -90,7 +90,9 @@ Response:
 }
 ```
 
-### pasarelapagos-backend — CREAR InternalModule
+### pasarelapagos-backend — InternalModule ✅ implementado (ADR-021)
+
+Mapeo de columnas (anti-corruption, en `InternalService`): `tenantId→ecosystemId`, `amountMinor→amount` (number), `providerId→provider`, `failureMessage→failureReason`. `status` = `PaymentStatus` real (`PENDING·AUTHORIZED·CAPTURED·FAILED·CANCELLED·REFUNDED·PARTIALLY_REFUNDED`). `ecosystemId` es opcional en el filtro (superadmin ve todos).
 
 Copiar molde de chatia-backend: `src/internal/`
 

@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
-import { PaymentException } from '@/common/errors/payment.exception.js';
+import { PaymentErrorCode } from '@/infrastructure/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/infrastructure/common/errors/payment.exception.js';
 
 /**
  * Referencia: https://docs.dlocal.com/reference/payment-error-codes
@@ -20,10 +20,11 @@ const CODE_MAP: Record<number, PaymentErrorCode> = {
 };
 
 export function mapDlocalError(error: unknown): never {
-  if (error?.response?.status >= 500) {
+  const e = error as { response?: { status?: number; data?: { code?: number; message?: string } } };
+  if ((e?.response?.status ?? 0) >= 500) {
     throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
   }
-  const code      = error?.response?.data?.code ?? 500;
+  const code      = e?.response?.data?.code ?? 500;
   const internal  = CODE_MAP[code] ?? PaymentErrorCode.PROVIDER_UNKNOWN;
-  throw new PaymentException(internal, error?.response?.data?.message);
+  throw new PaymentException(internal, e?.response?.data?.message);
 }

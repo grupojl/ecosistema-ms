@@ -1,1 +1,1 @@
-export { WelverModule } from "@/modules/welver/welver.module.js";
+export { WelverPaymentModule } from "@/modules/welver/welver.module.js";

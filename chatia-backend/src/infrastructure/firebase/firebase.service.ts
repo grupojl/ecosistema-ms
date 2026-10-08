@@ -1,11 +1,12 @@
-// src/firebase/firebase.service.ts
+// src/infrastructure/firebase/firebase.service.ts
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert, type App } from 'firebase-admin/app';
+import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 
 @Injectable()
 export class FirebaseService implements OnModuleInit {
   private readonly logger = new Logger(FirebaseService.name);
-  private app: admin.app.App | null = null;
+  private app: App | null = null;
 
   onModuleInit() {
     const projectId   = process.env.FIREBASE_PROJECT_ID;
@@ -21,22 +22,23 @@ export class FirebaseService implements OnModuleInit {
     }
 
     // Evitar inicializar dos veces (hot reload en dev)
-    if (admin.apps.length > 0) {
-      this.app = admin.apps[0]!;
+    const existing = getApps()[0];
+    if (existing) {
+      this.app = existing;
       this.logger.log('Firebase Admin reutilizado');
       return;
     }
 
-    this.app = admin.initializeApp({
-      credential: admin.credential.cert({ projectId, clientEmail, privateKey }),
+    this.app = initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
     });
 
     this.logger.log(`Firebase Admin inicializado — proyecto: ${projectId}`);
   }
 
-  async verifyIdToken(token: string): Promise<admin.auth.DecodedIdToken> {
+  async verifyIdToken(token: string): Promise<DecodedIdToken> {
     if (!this.app) throw new Error('Firebase Admin no inicializado');
-    return admin.auth(this.app).verifyIdToken(token, true);
+    return getAuth(this.app).verifyIdToken(token, true);
   }
 
   get isInitialized(): boolean {

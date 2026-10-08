@@ -6,15 +6,16 @@
 // Esto es necesario porque TenantGuard inyecta EcosystemService y se usa
 // en controllers de múltiples módulos.
 import { Global, Module } from '@nestjs/common';
-import { EmbeddingService } from '@/common/services/embedding.service.js';
-import { CacheService }     from '@/common/services/cache.service.js';
-import { EcosystemModule }  from '@/ecosystem/ecosystem.module.js';
-import { GroqModule }       from '@/groq/groq.module.js';
+import { EmbeddingService } from '@/infrastructure/common/services/embedding.service.js';
+import { CacheService }     from '@/infrastructure/common/services/cache.service.js';
+import { CircuitBreakerService } from '@/infrastructure/common/services/circuit-breaker.service.js';
+import { EcosystemModule }  from '@/core/ecosystem/ecosystem.module.js';
+import { GroqModule }       from '@/infrastructure/groq/groq.module.js';
 
 @Global()
 @Module({
   imports:   [GroqModule, EcosystemModule],
-  providers: [EmbeddingService, CacheService],
-  exports:   [EmbeddingService, CacheService, EcosystemModule],
+  providers: [EmbeddingService, CacheService, CircuitBreakerService],
+  exports:   [EmbeddingService, CacheService, CircuitBreakerService, EcosystemModule],
 })
 export class CommonModule {}

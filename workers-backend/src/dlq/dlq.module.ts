@@ -1,7 +1,7 @@
 // workers-backend/src/dlq/dlq.module.ts
 import { Module }          from '@nestjs/common';
 import { BullModule }      from '@nestjs/bullmq';
-import { WORKER_QUEUES }   from '@/jobs/jobs.constants.js';
+import { WORKER_QUEUES }   from '@/core/jobs/jobs.constants.js';
 import { DlqController }   from '@/dlq/dlq.controller.js';
 import { DlqService }      from '@/dlq/dlq.service.js';
 

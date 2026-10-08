@@ -1,4 +1,4 @@
-import { requireJobId } from '@/jobs/services/job-id.helper.js';
+import { requireJobId } from '@/infrastructure/common/services/job-id.helper.js';
 // workers-backend/src/jobs/processors/vector-index.processor.ts
 //
 // W-2.1: Indexación de vectores en paralelo con límite de concurrencia.
@@ -13,13 +13,13 @@ import type { ClientGrpc } from '@nestjs/microservices';
 import type { Job }              from 'bullmq';
 import { firstValueFrom }        from 'rxjs';
 
-import { WORKER_QUEUES, QUEUE_CONFIG } from '@/jobs.constants.js';
-import { JobsService }                 from '@/jobs.service.js';
-import { EmbeddingService }            from '@/services/embedding.service.js';
+import { WORKER_QUEUES, QUEUE_CONFIG } from '@/core/jobs/jobs.constants.js';
+import { JobsService }                 from '@/core/jobs/jobs.service.js';
+import { EmbeddingService }            from '@/infrastructure/common/services/embedding.service.js';
 import type {
   VectorIndexJobData,
   VectorIndexJobResult,
-}                                      from '@/dto/vector-index-job.dto.js';
+}                                      from '@/core/jobs/job-data.types.js';
 
 const EMBED_CONCURRENCY = 5; // paralelo para generación de embeddings
 
@@ -90,7 +90,7 @@ export class VectorIndexProcessor extends WorkerHost {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      output as import("@prisma/client").Prisma.InputJsonValue,
+        result:      { ...output },
       });
 
       // SLA check — warning si supera 30s

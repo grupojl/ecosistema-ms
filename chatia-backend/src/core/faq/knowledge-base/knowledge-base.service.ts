@@ -1,7 +1,7 @@
 // src/faq/knowledge-base/knowledge-base.service.ts
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import { CreateKnowledgeBaseDto, UpdateKnowledgeBaseDto } from '@/faq/knowledge-base/dto/knowledge-base.dto.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import type { CreateKnowledgeBaseInput, UpdateKnowledgeBaseInput } from '@/core/faq/schemas.js';
 
 @Injectable()
 export class KnowledgeBaseService {
@@ -9,7 +9,7 @@ export class KnowledgeBaseService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(projectId: string, organizationId: string, dto: CreateKnowledgeBaseDto) {
+  async create(projectId: string, organizationId: string, dto: CreateKnowledgeBaseInput) {
     const kb = await this.prisma.knowledgeBase.create({
       data: { ...dto, projectId, organizationId },
     });
@@ -35,7 +35,7 @@ export class KnowledgeBaseService {
     return kb;
   }
 
-  async update(kbId: string, organizationId: string, dto: UpdateKnowledgeBaseDto) {
+  async update(kbId: string, organizationId: string, dto: UpdateKnowledgeBaseInput) {
     await this.findOne(kbId, organizationId);
     return this.prisma.knowledgeBase.update({ where: { id: kbId }, data: dto });
   }

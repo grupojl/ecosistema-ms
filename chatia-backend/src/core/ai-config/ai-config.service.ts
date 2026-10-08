@@ -1,9 +1,8 @@
 // @ecosistema-ms/zod-migrated
 // src/ai-config/ai-config.service.ts
 import { Logger, Injectable, NotFoundException } from '@nestjs/common';
-import type { UpdateAiConfigInput } from '@/ai-config/schemas.js';
-import type { UpdateAiConfigInput } from '@/ai-config/schemas.js';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import type { UpdateAiConfigInput } from '@/core/ai-config/schemas.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 
 const DEFAULT_SYSTEM_PROMPT = `Sos un asistente virtual. Tu objetivo es atender consultas de forma amigable y profesional.
 

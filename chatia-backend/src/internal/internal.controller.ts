@@ -14,9 +14,10 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { InternalApiKeyGuard }              from '@/internal/internal-api-key.guard.js';
-import { PrismaService }                    from '@/prisma/prisma.service.js';
-import { ZodValidationPipe }               from '@/common/pipes/zod-validation.pipe.js';
+import { PrismaService }                    from '@/infrastructure/prisma/prisma.service.js';
+import { ZodValidationPipe }               from '@/infrastructure/common/pipes/zod-validation.pipe.js';
 import { z }                               from 'zod';
+import type { Prisma }                     from '@prisma/client';
 
 // ── Schemas Zod ──────────────────────────────────────────────────────────────
 
@@ -53,21 +54,26 @@ export class InternalController {
 
     // Buscar conversaciones abiertas (OPEN status) con lastMessageAt antes del cutoff
     // La "escalada" en este contexto = abierta y sin respuesta del agente por > N min
+    // Conversation no tiene ecosystemId/organizationId propios: se resuelven por ChannelAccount → Organization
     const convs = await this.prisma.conversation.findMany({
       where: {
-        ...(dto.ecosystemId ? { ecosystemId: dto.ecosystemId } : {}),
-        status:        'OPEN',
-        updatedAt:     { lt: cutoff },
-        assignedAgent: null,          // sin agente asignado = sin atención
+        status:          'OPEN',
+        updatedAt:       { lt: cutoff },
+        assignedAgentId: null,          // sin agente asignado = sin atención
+        ...(dto.ecosystemId
+          ? { channelAccount: { organization: { ecosystemId: dto.ecosystemId } } }
+          : {}),
       },
       select: {
-        id:             true,
-        ecosystemId:    true,
-        organizationId: true,
-        channelType:    true,
-        updatedAt:      true,
-        contact: {
-          select: { name: true },
+        id:        true,
+        updatedAt: true,
+        contact:   { select: { name: true } },
+        channelAccount: {
+          select: {
+            channelType:    true,
+            organizationId: true,
+            organization:   { select: { ecosystemId: true } },
+          },
         },
       },
       orderBy: { updatedAt: 'asc' }, // más antigua primero
@@ -76,9 +82,9 @@ export class InternalController {
 
     return convs.map((c) => ({
       id:             c.id,
-      ecosystemId:    c.ecosystemId,
-      organizationId: c.organizationId,
-      channel:        c.channelType,
+      ecosystemId:    c.channelAccount.organization.ecosystemId,
+      organizationId: c.channelAccount.organizationId,
+      channel:        c.channelAccount.channelType,
       contactName:    c.contact?.name ?? 'Sin nombre',
       agentName:      null,
       lastMessageAt:  c.updatedAt.toISOString(),
@@ -92,8 +98,8 @@ export class InternalController {
   async stats(
     @Query(new ZodValidationPipe(ConvsStatsSchema)) dto: ConvsStatsDto,
   ) {
-    const where = {
-      ecosystemId: dto.ecosystemId,
+    const where: Prisma.ConversationWhereInput = {
+      channelAccount: { organization: { ecosystemId: dto.ecosystemId } },
       ...(dto.from || dto.to ? {
         createdAt: {
           ...(dto.from ? { gte: new Date(dto.from) } : {}),
@@ -108,8 +114,8 @@ export class InternalController {
       this.prisma.conversation.count({
         where: {
           ...where,
-          status:        'OPEN',
-          assignedAgent: null,
+          status:          'OPEN',
+          assignedAgentId: null,
         },
       }),
     ]);

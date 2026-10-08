@@ -2,7 +2,7 @@
 // Strategy de pagos para el ecosistema Welver. NUNCA lanza en enrich/after.
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PaymentProjectStrategyRegistry } from '@/core/strategies/project-strategy.registry.js';
-import { PaymentOrgConfigService }        from '@/organization-config/organization-config.service.js';
+import { PaymentOrgConfigService }        from '@/core/organization-config/organization-config.service.js';
 import {
   ProjectType, type PaymentProjectStrategy,
   type PaymentEnrichInput, type ChargeResult,

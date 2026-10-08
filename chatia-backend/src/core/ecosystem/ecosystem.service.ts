@@ -6,8 +6,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import type { RegisterEcosystemDto } from '@/ecosystem/dto/register-ecosystem.dto.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import type { RegisterEcosystemInput } from '@/core/ecosystem/schemas.js';
 
 @Injectable()
 export class EcosystemService {
@@ -16,7 +16,7 @@ export class EcosystemService {
   constructor(private readonly prisma: PrismaService) {}
 
   // ── Registro de ecosistema nuevo ─────────────────────────────────────────
-  async register(dto: RegisterEcosystemDto) {
+  async register(dto: RegisterEcosystemInput) {
     const existing = await this.prisma.ecosystem.findUnique({
       where: { firebaseProjectId: dto.firebaseProjectId },
     });
@@ -29,7 +29,7 @@ export class EcosystemService {
       data: {
         firebaseProjectId: dto.firebaseProjectId,
         name:   dto.name,
-        config: (dto.config ?? {}) as Prisma.InputJsonValue,
+        config: dto.config as Prisma.InputJsonObject,
       },
     });
     this.logger.log(`Ecosistema registrado: ${ecosystem.name} (${ecosystem.id})`);

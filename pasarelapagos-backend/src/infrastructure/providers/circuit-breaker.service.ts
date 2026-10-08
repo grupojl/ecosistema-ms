@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import CircuitBreaker from 'opossum';
-import { PaymentException } from '@/common/errors/payment.exception.js';
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/infrastructure/common/errors/payment.exception.js';
+import { PaymentErrorCode } from '@/infrastructure/common/errors/payment-error.catalog.js';
 
 export interface CircuitBreakerOptions {
   timeout?: number;       // ms antes de considerar fallido (default: 5000)
@@ -28,11 +28,12 @@ export class CircuitBreakerService implements OnModuleDestroy {
     try {
       return await breaker.fire();
     } catch (err: unknown) {
-      if (err?.code === 'EOPENBREAKER') {
+      const e = err as { code?: string; name?: string };
+      if (e?.code === 'EOPENBREAKER') {
         this.logger.warn(`Circuit breaker ABIERTO para: ${key}`);
         throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
       }
-      if (err?.name === 'TimeoutError') {
+      if (e?.name === 'TimeoutError') {
         throw new PaymentException(PaymentErrorCode.PROVIDER_TIMEOUT);
       }
       throw err;

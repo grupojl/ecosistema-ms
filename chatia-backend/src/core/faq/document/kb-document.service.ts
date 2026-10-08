@@ -2,8 +2,8 @@
 import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
 import { InjectQueue }  from '@nestjs/bullmq';
 import { Queue }        from 'bullmq';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import { CreateKbDocumentDto } from '@/faq/document/dto/kb-document.dto.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import type { CreateKbDocumentInput } from '@/core/faq/schemas.js';
 import { QUEUES, JOBS } from '@/queue/queue.constants.js';
 
 export interface IngestJobData { documentId: string; organizationId: string; }
@@ -17,7 +17,7 @@ export class KbDocumentService {
     @Optional() @InjectQueue(QUEUES.FAQ_INGEST) private readonly ingestQueue: Queue<IngestJobData> | null,
   ) {}
 
-  async create(kbId: string, organizationId: string, dto: CreateKbDocumentDto) {
+  async create(kbId: string, organizationId: string, dto: CreateKbDocumentInput) {
     const kb = await this.prisma.knowledgeBase.findFirst({
       where: { id: kbId, organizationId },
     });

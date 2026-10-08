@@ -23,6 +23,7 @@ WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/proto/package.json        ./packages/proto/
+COPY packages/auth-server/package.json        ./packages/auth-server/
 COPY packages/grpc-client/package.json  ./packages/grpc-client/
 COPY marketing-backend/package.json     ./marketing-backend/
 
@@ -41,8 +42,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules      ./node_modules
 COPY tsconfig.base.json                 ./
 COPY packages/proto/                    ./packages/proto/
+COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/             ./packages/grpc-client/
 COPY marketing-backend/                 ./marketing-backend/
+
+# Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
+# Ref: ADR-020 — los servicios consumen dist/, nunca src/
+RUN pnpm --dir packages/proto       build \
+ && pnpm --dir packages/auth-server build \
+ && pnpm --dir packages/grpc-client build
 
 WORKDIR /app/marketing-backend
 
@@ -65,7 +73,7 @@ COPY --from=build --chown=nestjs:nodejs /app/node_modules                       
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/dist             ./marketing-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/prisma           ./marketing-backend/prisma
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/package.json     ./marketing-backend/package.json
-COPY --from=build --chown=nestjs:nodejs /app/packages/proto/                    ./packages/proto/
+COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs marketing-backend/entrypoint.sh                      ./marketing-backend/entrypoint.sh
 
 USER nestjs

@@ -3,7 +3,8 @@
 import {
   PipeTransform, Injectable, ArgumentMetadata, BadRequestException,
 } from "@nestjs/common";
-import { ZodSchema, ZodError } from "zod";
+import type { ZodSchema } from "zod";
+import { ZodError } from "zod";
 
 @Injectable()
 export class ZodValidationPipe implements PipeTransform {

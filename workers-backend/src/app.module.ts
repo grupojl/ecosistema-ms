@@ -9,6 +9,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 
 // ── Infraestructura ────────────────────────────────────────────────────────
 import { PrismaModule }  from '@/infrastructure/prisma/prisma.module.js';
+import { RedisModule }  from '@/infrastructure/redis/redis.module.js';
 import { MetricsModule } from '@/infrastructure/metrics/metrics.module.js';
 import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
 
@@ -37,6 +38,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
     // Infraestructura
     PrismaModule,
+    RedisModule,
     MetricsModule,
 
     // Core

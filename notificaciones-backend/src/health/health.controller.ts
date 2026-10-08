@@ -5,9 +5,9 @@
 // DLQ: DlqMonitorService.getDlqStats() — ya implementado
 // Sin auth: Railway healthcheck no tiene token
 import { Controller, Get }        from '@nestjs/common';
-import { PrismaService }           from '@/prisma/prisma.service.js';
-import { CircuitBreakerService }   from '@/notifications/circuit-breaker.service.js';
-import { DlqMonitorService }       from '@/notifications/dlq/dlq-monitor.service.js';
+import { PrismaService }           from '@/infrastructure/prisma/prisma.service.js';
+import { CircuitBreakerService }   from '@/infrastructure/common/services/circuit-breaker.service.js';
+import { DlqMonitorService }       from '@/queue/dlq/dlq-monitor.service.js';
 
 interface ExtendedHealth {
   status:          'ok' | 'degraded' | 'down';
@@ -33,17 +33,18 @@ export class HealthController {
       this.prisma.$queryRaw`SELECT 1`,
     ]);
 
-    // CircuitBreakerService tiene getStates() o similar
     // Keys: sendgrid, whatsapp-biz-api, fcm
-    const cbStates = await ((this.cb as CircuitBreaker).getStates)?.().catch(() => ({})) ?? {};
-    const circuitBreakers = Object.entries(cbStates as Record<string, string>).map(
-      ([key, status]) => ({ key, status: status as 'CLOSED' | 'OPEN' | 'HALF_OPEN' }),
-    );
+    const cbKeys = ['sendgrid', 'whatsapp-biz-api', 'fcm'] as const;
+    const stateMap = { closed: 'CLOSED', open: 'OPEN', halfOpen: 'HALF_OPEN' } as const;
+    const circuitBreakers = cbKeys.map((key) => {
+      const state = this.cb.healthOf(key);
+      return { key, status: state === 'unknown' ? 'CLOSED' as const : stateMap[state] };
+    });
 
-    // DlqMonitorService.getDlqStats() ya devuelve { dlqSize, ... }
-    const dlqStats = await this.dlq.getDlqStats().catch(() => ({ dlqSize: 0 }));
+    // DlqMonitorService.getDlqStats() devuelve { failed, waiting }
+    const dlqStats = await this.dlq.getDlqStats().catch(() => ({ failed: 0, waiting: 0 }));
     const dlqDepth: Record<string, number> = {
-      'notification-queue-dlq': dlqStats.dlqSize ?? 0,
+      'notification-queue-dlq': dlqStats.failed,
     };
 
     const dbOk = dbResult.status === 'fulfilled';

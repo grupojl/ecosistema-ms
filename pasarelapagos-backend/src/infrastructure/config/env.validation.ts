@@ -63,3 +63,8 @@ export const envSchema = z.object({
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/** Para ConfigModule.forRoot({ validate }) — falla el arranque si falta una variable requerida. */
+export function validateEnv(config: Record<string, unknown>): Env {
+  return envSchema.parse(config);
+}

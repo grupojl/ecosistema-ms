@@ -9,12 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiSecurity } from '@nestjs/swagger';
-import { CreateApiKeySchema, type CreateApiKeyInput } from '@/modules/tenants/schemas.js';
-import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
-import { Tenant } from '@/common/decorators/tenant.decorator.js';
-import type { TenantContext } from '@/common/decorators/tenant.decorator.js';
-import { ApiKeyGuard } from '@/common/guards/api-key.guard.js';
-import { ApiKeyService } from '@/modules/tenants/api-key.service.js';
+import { CreateApiKeySchema, type CreateApiKeyInput } from '@/tenants/schemas.js';
+import { ZodValidationPipe } from '@/infrastructure/common/pipes/zod-validation.pipe.js';
+import { Tenant } from '@/infrastructure/common/decorators/tenant.decorator.js';
+import type { TenantContext } from '@/infrastructure/common/decorators/tenant.decorator.js';
+import { ApiKeyGuard } from '@/infrastructure/common/guards/api-key.guard.js';
+import { ApiKeyService } from '@/tenants/api-key.service.js';
 
 @ApiTags('tenants')
 @ApiSecurity('x-api-key')

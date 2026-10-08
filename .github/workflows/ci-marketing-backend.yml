@@ -16,6 +16,9 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      # prisma generate (parte de typecheck/build) exige DATABASE_URL aunque no conecte
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     permissions:
       contents: read
       packages: write
@@ -31,6 +34,10 @@ jobs:
         with: { node-version: '22', cache: 'pnpm' }
 
       - run: pnpm install --frozen-lockfile
+
+      # ── Packages compartidos → dist (ADR-020: servicios consumen dist, no src)
+      - name: Build packages
+        run: pnpm build:packages
 
       # ── Calidad ────────────────────────────────────────────────────────────
       - name: Lint

@@ -1,7 +1,7 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
-import { InternalApiKeyGuard }              from '@/internal/internal-api-key.guard';
-import { InternalService }                  from '@/internal/internal.service';
+import { InternalApiKeyGuard }              from '@/internal/internal-api-key.guard.js';
+import { InternalService }                  from '@/internal/internal.service.js';
 
 @ApiTags('internal')
 @ApiHeader({ name: 'x-internal-api-key', required: true })

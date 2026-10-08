@@ -3,7 +3,7 @@ import { Module }              from '@nestjs/common';
 import { BullModule }          from '@nestjs/bullmq';
 import { WebhooksController }  from '@/webhooks/webhooks.controller.js';
 import { WebhooksService }     from '@/webhooks/webhooks.service.js';
-import { ConversationsModule } from '@/conversations/conversations.module.js';
+import { ConversationsModule } from '@/core/conversations/conversations.module.js';
 import { ChannelsModule }      from '@/channels/channel.module.js';
 import { QueueModule }         from '@/queue/queue.module.js';
 import { QUEUES }              from '@/queue/queue.constants.js';

@@ -3,9 +3,9 @@ import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common
 import request from 'supertest';
 import { App } from 'supertest/types';
 import * as crypto from 'crypto';
-import { AppModule } from '../src/app.module.js';
-import { PrismaService } from '../src/modules/prisma/prisma.service.js';
-import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter.js';
+import { AppModule } from '@/app.module.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import { AllExceptionsFilter } from '@/infrastructure/common/filters/all-exceptions.filter.js';
 import * as bcrypt from 'bcryptjs';
 
 /**
@@ -54,6 +54,7 @@ describe('Webhooks (e2e)', () => {
     const p = await prisma.payment.create({
       data: {
         tenantId,
+        organizationId: tenantId,
         idempotencyKey: `wh-test-${Date.now()}`,
         amountMinor: 5000n,
         currency: 'ARS',

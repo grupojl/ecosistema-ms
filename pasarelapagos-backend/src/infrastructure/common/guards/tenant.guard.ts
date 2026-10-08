@@ -23,8 +23,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { OrgContext } from '@/interfaces/org-context.interface.js';
-import { IS_PUBLIC_KEY } from '@/decorators/public.decorator.js';
+import type { OrgContext } from '@/infrastructure/common/interfaces/org-context.interface.js';
+import { IS_PUBLIC_KEY } from '@/infrastructure/common/decorators/public.decorator.js';
 import { Reflector } from '@nestjs/core';
 
 const PRODUCT_KEY = 'payments';
@@ -54,6 +54,7 @@ export class TenantGuard implements CanActivate {
     const isApiKey = req['organizationId'] !== undefined && !req['user'];
     if (isApiKey) {
       const ctx: OrgContext = {
+        tenantId:       req['organizationId'] as string,   // en esta pasarela Tenant.id === organizationId
         organizationId: req['organizationId'] as string,
         userId:         'api-key',
         canRead:        true,
@@ -112,6 +113,7 @@ export class TenantGuard implements CanActivate {
     }
 
     const ctx: OrgContext = {
+      tenantId:       orgIdHeader,
       organizationId: orgIdHeader,
       userId:         user.uid,
       canRead,

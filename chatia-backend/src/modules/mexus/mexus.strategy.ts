@@ -1,7 +1,7 @@
 // chatia-backend/src/modules/mexus/mexus.strategy.ts
 // Placeholder org-aware. Sigue el molde de WelverStrategy.
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { OrganizationConfigService } from '@/organization-config/organization-config.service.js';
+import { OrganizationConfigService } from '@/core/organization-config/organization-config.service.js';
 import { ProjectStrategyRegistry }   from '@/core/strategies/project-strategy.registry.js';
 import {
   ProjectType, type ProjectStrategy,

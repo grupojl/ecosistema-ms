@@ -2,7 +2,7 @@
 import { Injectable, Logger, Optional, UnauthorizedException } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue }       from 'bullmq';
-import { PrismaService }    from '@/prisma/prisma.service.js';
+import { PrismaService }    from '@/infrastructure/prisma/prisma.service.js';
 import { ChannelRegistry }  from '@/channels/channel.registry.js';
 import { ChannelType }      from '@prisma/client';
 import { QUEUES, JOBS }     from '@/queue/queue.constants.js';

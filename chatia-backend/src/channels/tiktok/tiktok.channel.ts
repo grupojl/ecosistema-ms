@@ -13,7 +13,8 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '@/channel.interface.js';
+  TikTokWebhookPayload,
+} from '@/channels/channel.interface.js';
 
 @Injectable()
 export class TikTokChannel implements IChannel {
@@ -50,16 +51,20 @@ export class TikTokChannel implements IChannel {
   parseIncomingWebhook(payload: unknown): IncomingMessage[] | null {
     try {
       // Estructura TikTok for Business DM webhook
-      const event = payload?.event;
+      const body  = payload as TikTokWebhookPayload | null;
+      const event = body?.event;
       if (event !== 'direct_message') return null;
 
-      const dm = payload?.data;
+      const dm = body?.data;
       if (!dm) return null;
+
+      const senderId = dm.from?.open_id ?? dm.from?.user_id;
+      if (!senderId) return null;
 
       return [
         {
           externalId: dm.message_id,
-          senderExternalId: dm.from?.open_id ?? dm.from?.user_id,
+          senderExternalId: senderId,
           senderName: dm.from?.display_name,
           senderAvatarUrl: dm.from?.avatar_url,
           senderUsername: dm.from?.username,
@@ -67,7 +72,7 @@ export class TikTokChannel implements IChannel {
           content: dm.content?.text ?? dm.content?.url ?? '[mensaje]',
           mediaUrl: dm.content?.url,
           timestamp: new Date(dm.create_time * 1000),
-          raw: payload,
+          raw: body ?? {},
         },
       ];
     } catch (err) {

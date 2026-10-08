@@ -4,7 +4,7 @@ import { Injectable, Logger }     from '@nestjs/common';
 import { Cron, CronExpression }   from '@nestjs/schedule';
 import { InjectQueue }             from '@nestjs/bullmq';
 import { Queue }                   from 'bullmq';
-import { PrismaService }           from '@/prisma/prisma.service.js';
+import { PrismaService }           from '@/infrastructure/persistence/prisma.service.js';
 import { MARKETING_QUEUES }        from '@/marketing.constants.js';
 
 @Injectable()

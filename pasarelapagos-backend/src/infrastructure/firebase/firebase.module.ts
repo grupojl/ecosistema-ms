@@ -2,7 +2,7 @@
 // Patrón idéntico al owner-dashboard — mismo FIREBASE_PROJECT_ID compartido.
 import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as admin from 'firebase-admin';
+import { initializeApp, getApps, cert, applicationDefault, type App } from 'firebase-admin/app';
 
 export const FIREBASE_ADMIN = 'FIREBASE_ADMIN';
 
@@ -12,7 +12,7 @@ export const FIREBASE_ADMIN = 'FIREBASE_ADMIN';
     {
       provide: FIREBASE_ADMIN,
       inject: [ConfigService],
-      useFactory: (config: ConfigService): admin.app.App | null => {
+      useFactory: (config: ConfigService): App | null => {
         const logger    = new Logger('FirebaseModule');
         const projectId = config.get<string>('FIREBASE_PROJECT_ID');
 
@@ -22,7 +22,7 @@ export const FIREBASE_ADMIN = 'FIREBASE_ADMIN';
         }
 
         // Evitar inicialización duplicada (hot reload)
-        const existing = admin.apps.find((a) => a?.name === '[DEFAULT]');
+        const existing = getApps().find((a) => a.name === '[DEFAULT]');
         if (existing) return existing;
 
         const clientEmail = config.get<string>('FIREBASE_CLIENT_EMAIL');
@@ -31,11 +31,11 @@ export const FIREBASE_ADMIN = 'FIREBASE_ADMIN';
           ?.replace(/\\n/g, '\n');
 
         try {
-          const app = admin.initializeApp({
+          const app = initializeApp({
             credential:
               clientEmail && privateKey
-                ? admin.credential.cert({ projectId, clientEmail, privateKey })
-                : admin.credential.applicationDefault(),
+                ? cert({ projectId, clientEmail, privateKey })
+                : applicationDefault(),
             projectId,
           });
           logger.log(`Firebase inicializado — proyecto: ${projectId}`);

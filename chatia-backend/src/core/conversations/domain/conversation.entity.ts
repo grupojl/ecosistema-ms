@@ -4,17 +4,17 @@
 // Es el MOLDE VIVO de ecosistema-ms: todos los demás módulos siguen esta estructura.
 //
 // Invariantes de dominio:
-//   - Una conversación CLOSED no puede volver a OPEN
-//   - Solo la conversación OPEN puede transicionar a ASSIGNED o HUMAN_TAKEOVER
+//   - Una conversación EXPIRED es terminal
+//   - Solo la conversación OPEN puede transicionar a HUMAN_TAKEOVER por primera vez
 //   - El soft-delete (deletedAt) no elimina mensajes — solo marca la conversación
 //   - Los tags son un set — no se pueden duplicar
 
+// Espejo del enum ConversationStatus de prisma/schema.prisma
 export type ConversationStatus =
   | 'OPEN'
-  | 'ASSIGNED'
   | 'HUMAN_TAKEOVER'
   | 'RESOLVED'
-  | 'CLOSED';
+  | 'EXPIRED';
 
 export type ConversationStage =
   | 'INITIAL'
@@ -44,14 +44,15 @@ export interface Conversation {
   readonly updatedAt:        Date;
 }
 
+import { ConversationTransitionError } from '@/core/conversations/domain/conversation.errors.js';
+
 // ── Transiciones válidas (invariantes de dominio) ─────────────────────────────
 
 const VALID_TRANSITIONS: Record<ConversationStatus, ConversationStatus[]> = {
-  OPEN:            ['ASSIGNED', 'HUMAN_TAKEOVER', 'RESOLVED'],
-  ASSIGNED:        ['OPEN', 'HUMAN_TAKEOVER', 'RESOLVED'],
-  HUMAN_TAKEOVER:  ['OPEN', 'ASSIGNED', 'RESOLVED'],
+  OPEN:            ['HUMAN_TAKEOVER', 'RESOLVED', 'EXPIRED'],
+  HUMAN_TAKEOVER:  ['OPEN', 'RESOLVED'],
   RESOLVED:        ['OPEN'],
-  CLOSED:          [],   // CLOSED es terminal
+  EXPIRED:         [],   // EXPIRED es terminal
 };
 
 export function assertValidTransition(

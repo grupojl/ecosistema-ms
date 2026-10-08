@@ -23,6 +23,7 @@ WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/proto/package.json        ./packages/proto/
+COPY packages/auth-server/package.json        ./packages/auth-server/
 COPY packages/grpc-client/package.json  ./packages/grpc-client/
 COPY workers-backend/package.json       ./workers-backend/
 
@@ -41,8 +42,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules      ./node_modules
 COPY tsconfig.base.json                 ./
 COPY packages/proto/                    ./packages/proto/
+COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/             ./packages/grpc-client/
 COPY workers-backend/                   ./workers-backend/
+
+# Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
+# Ref: ADR-020 — los servicios consumen dist/, nunca src/
+RUN pnpm --dir packages/proto       build \
+ && pnpm --dir packages/auth-server build \
+ && pnpm --dir packages/grpc-client build
 
 WORKDIR /app/workers-backend
 
@@ -65,7 +73,7 @@ COPY --from=build --chown=nestjs:nodejs /app/node_modules                      .
 COPY --from=build --chown=nestjs:nodejs /app/workers-backend/dist              ./workers-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/workers-backend/prisma            ./workers-backend/prisma
 COPY --from=build --chown=nestjs:nodejs /app/workers-backend/package.json      ./workers-backend/package.json
-COPY --from=build --chown=nestjs:nodejs /app/packages/proto/                   ./packages/proto/
+COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs workers-backend/entrypoint.sh                       ./workers-backend/entrypoint.sh
 
 USER nestjs
@@ -78,4 +86,4 @@ WORKDIR /app/workers-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD exec dumb-init "/app/workers-backend/entrypoint.sh"]
+CMD ["dumb-init", "/app/workers-backend/entrypoint.sh"]

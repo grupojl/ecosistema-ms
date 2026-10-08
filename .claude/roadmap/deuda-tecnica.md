@@ -92,7 +92,9 @@ Sin esto, superadmin recibe 403 en todos los /internal/*.
 Archivo duplicado sin usar. Eliminar:
 `chatia-backend/src/conversations/conversations.service.updated.ts`
 
-### [ECO-MS-03] pnpm prisma generate + pnpm typecheck completo — P1
+### [ECO-MS-03] pnpm prisma generate + pnpm typecheck completo — P1 ✅ RESUELTO 2026-10-08
+> `pnpm typecheck` y `pnpm build` pasan en los 6 servicios (cada script ya corre `prisma generate`). Ver ADR-020 addendum.
+> Los errores no eran solo de `prisma generate`: había archivos truncados, imports rotos por la reestructura y drift schema↔código (corregidos).
 Correr antes del próximo deploy (requiere DB disponible):
 ```bash
 pnpm --filter chatia-backend exec prisma generate
@@ -162,3 +164,25 @@ Una sesión de trabajo. Patrón documentado — solo requiere aplicarlo.
 ### Pendiente
 - [ ] ECO-PS-02: estrategias placeholder → lógica real por ecosistema
 - [ ] ECO-PS-04: evaluar marketing-backend (no urgente)
+
+---
+
+## Post-reestructura 2026-10-08 (ADR-020 / ADR-021)
+
+### Pendiente
+- [ ] **P0** Correr tests: `chatia` y `pasarelapagos` tienen `jest.config.ts` **y** clave `jest` en package.json (jest aborta). `marketing`: 1 spec falla. Specs de pasarela/chatia pueden estar desactualizados.
+- [ ] **P0** Smoke test con DB + Redis reales (nada se ejecutó contra infraestructura; solo carga de `app.module`).
+- [ ] **P0** pasarela: `PAYMENT_ORG_CONFIG_REPO` no tiene provider → DI falla al arrancar. Falta `PrismaPaymentOrgConfigRepository` + binding en `OrganizationConfigModule`.
+- [ ] **P1** Prisma `output` por servicio (hoy el cliente de `node_modules` lo pisa el último `generate`; mitigado con scripts en serie). Ver ADR-020 addendum.
+- [ ] **P1** `nest start --watch` (`start:dev`): los alias `@/` no se resuelven sin `tsc-alias`; verificar flujo de dev.
+- [ ] **P1** `pnpm prisma migrate deploy` en workers (enum `CANCELLED`) y revisar migraciones de los demás servicios (no se probó ninguna).
+- [ ] **P1** marketing: adapters Google/TikTok son stubs; `AttributionService` no existe (solo el processor); decidir qué `TENANT_PRODUCT_KEY`/claims emite el sass-back.
+- [ ] **P2** Duplicados post-reestructura: `chatia-backend/src/<modulo>/_deprecated/*.bak`, specs en carpetas viejas (`src/ai-config`, `src/contacts`…), `*.bak` varios. Limpiar o mover specs a `core/`.
+- [ ] **P2** Controllers de agents/webhooks acceden a Prisma directo (agents.controller) — viola capa; pasar a service/repository.
+- [ ] **P2** Endpoint `POST /assistant/chat` ahora autenticado: confirmar con el frontend/dashboard que envía Bearer + `x-organization-id`.
+
+### Cerrado hoy
+- [x] ECO-MS-03 typecheck/build completos en 0 errores.
+- [x] DT-023 `getAgentMetrics` ya usaba `GROUP BY` en DB (había un método viejo duplicado y truncado; eliminado).
+- [x] DT-031 health de pasarela: `SELECT 1` + `PING` Redis reales.
+- [x] Domain/Repository **contacts** y **conversations** (chatia) completos.

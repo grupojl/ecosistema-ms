@@ -1,12 +1,13 @@
 // workers-backend/src/campaigns/repository/prisma-campaigns.repository.ts
 // Adaptador concreto — ÚNICO lugar con PrismaService en el módulo campaigns.
 import { Injectable } from "@nestjs/common";
-import { PrismaService } from "@/prisma/prisma.service.js";
+import type { CampaignStatus } from "@prisma/client";
+import { PrismaService } from "@/infrastructure/prisma/prisma.service.js";
 import type {
   ICampaignsRepository,
   CampaignRecord,
   CampaignRecipientRecord,
-} from "@/campaigns/repository/campaigns.repository.interface.js";
+} from "@/core/campaigns/repository/campaigns.repository.interface.js";
 
 @Injectable()
 export class PrismaCampaignsRepository implements ICampaignsRepository {
@@ -24,7 +25,7 @@ export class PrismaCampaignsRepository implements ICampaignsRepository {
     const rows = await this.prisma.campaign.findMany({
       where: {
         organizationId,
-        ...(status ? { status: status as import("@prisma/client").Prisma.InputJsonValue } : {}),
+        ...(status ? { status: status as CampaignStatus } : {}),
       },
       include: { _count: { select: { recipients: true } } },
       orderBy: { createdAt: "desc" },
@@ -47,18 +48,19 @@ export class PrismaCampaignsRepository implements ICampaignsRepository {
     templateKey:    string;
     scheduledAt?:   Date;
   }): Promise<CampaignRecord> {
-    const row = await this.prisma.campaign.create({ data: data as import("@prisma/client").Prisma.InputJsonValue });
+    const row = await this.prisma.campaign.create({ data });
     return row as CampaignRecord;
   }
 
   async update(id: string, patch: {
     status?:      string;
+    scheduledAt?: Date;
     startedAt?:   Date;
     completedAt?: Date;
   }): Promise<CampaignRecord> {
     const row = await this.prisma.campaign.update({
       where: { id },
-      data:  patch as import("@prisma/client").Prisma.InputJsonValue,
+      data:  { ...patch, status: patch.status as CampaignStatus | undefined },
     });
     return row as CampaignRecord;
   }

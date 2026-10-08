@@ -1,7 +1,7 @@
 // analytics-backend/src/grpc/analytics-grpc.controller.ts
 import { Controller, Logger } from '@nestjs/common';
 import { GrpcMethod }         from '@nestjs/microservices';
-import { AnalyticsService }   from '@/analytics/analytics.service.js';
+import { OverviewService }    from '@/core/overview/overview.service.js';
 
 interface TrackEventRequest {
   ecosystem_id:    string;
@@ -38,7 +38,7 @@ interface ConvByDayRequest {
 export class AnalyticsGrpcController {
   private readonly logger = new Logger(AnalyticsGrpcController.name);
 
-  constructor(private readonly svc: AnalyticsService) {}
+  constructor(private readonly svc: OverviewService) {}
 
   @GrpcMethod('AnalyticsService', 'TrackEvent')
   async trackEvent(data: TrackEventRequest) {
@@ -78,6 +78,7 @@ export class AnalyticsGrpcController {
   async getConversationsByDay(data: ConvByDayRequest) {
     return this.svc.getConversationsByDay(
       data.organization_id,
+      data.ecosystem_id,
       new Date(data.from_unix * 1_000),
       new Date(data.to_unix   * 1_000),
     );

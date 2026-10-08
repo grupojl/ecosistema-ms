@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { DlocalProvider } from '@/modules/providers/adapters/dlocal/dlocal.provider.js';
+import { DlocalProvider } from '@/infrastructure/providers/adapters/dlocal/dlocal.provider.js';
 
 @Module({
   providers: [DlocalProvider],

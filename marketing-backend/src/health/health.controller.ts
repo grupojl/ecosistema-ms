@@ -3,7 +3,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { InjectQueue }      from '@nestjs/bullmq';
 import type { Queue }       from 'bullmq';
-import { PrismaService }    from '@/prisma/prisma.service.js';
+import { PrismaService }    from '@/infrastructure/persistence/prisma.service.js';
 import { MARKETING_QUEUES } from '@/marketing.constants.js';
 
 @Controller('health')

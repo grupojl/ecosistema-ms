@@ -1,3 +1,5 @@
+import type { DynamicModule } from '@nestjs/common';
+import type { IncomingMessage } from 'http';
 import { LoggerModule } from 'nestjs-pino';
 import type { Params } from 'nestjs-pino';
 
@@ -10,25 +12,25 @@ const pinoParams: Params = {
       ? { target: 'pino-pretty', options: { colorize: true, singleLine: false } }
       : undefined,
     serializers: {
-      req(req: Record<string, unknown>) {
+      req(req: IncomingMessage & { id?: unknown }) {
         return {
-          method:    req['method'],
-          url:       req['url'],
-          requestId: req['id'],
+          method:    req.method,
+          url:       req.url,
+          requestId: req.id,
         };
       },
     },
-    customProps(req: Record<string, unknown>) {
+    customProps(req: IncomingMessage) {
       return {
         service:     process.env['SERVICE_NAME'] ?? 'ecosistema-ms',
-        requestId:   (req['headers'] as Record<string, string>)?.['x-request-id'],
-        ecosystemId: (req['headers'] as Record<string, string>)?.['x-ecosystem-id'],
+        requestId:   req.headers['x-request-id'],
+        ecosystemId: req.headers['x-ecosystem-id'],
       };
     },
   },
 };
 
-export function createLoggerModule() {
+export function createLoggerModule(): DynamicModule {
   return LoggerModule.forRoot(pinoParams);
 }
 

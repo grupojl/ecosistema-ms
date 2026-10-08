@@ -2,10 +2,10 @@
 import { Module }                      from "@nestjs/common";
 import { BullModule }                  from "@nestjs/bullmq";
 import { CampaignsController }         from "@/campaigns/campaigns.controller.js";
-import { CampaignsService }            from "@/campaigns/campaigns.service.js";
-import { PrismaCampaignsRepository }   from "@/campaigns/repository/prisma-campaigns.repository.js";
-import { CAMPAIGNS_REPOSITORY }        from "@/campaigns/repository/campaigns.repository.interface.js";
-import { WORKER_QUEUES }               from "@/jobs/jobs.constants.js";
+import { CampaignsService }            from "@/core/campaigns/campaigns.service.js";
+import { PrismaCampaignsRepository }   from "@/core/campaigns/repository/prisma-campaigns.repository.js";
+import { CAMPAIGNS_REPOSITORY }        from "@/core/campaigns/repository/campaigns.repository.interface.js";
+import { WORKER_QUEUES }               from "@/core/jobs/jobs.constants.js";
 
 @Module({
   imports: [

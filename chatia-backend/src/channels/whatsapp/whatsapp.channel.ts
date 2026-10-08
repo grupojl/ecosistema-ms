@@ -6,7 +6,10 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '@/channel.interface.js';
+  WhatsAppMessage,
+  WhatsAppWebhookValue,
+  WhatsAppWebhookPayload,
+} from '@/channels/channel.interface.js';
 
 @Injectable()
 export class WhatsAppChannel implements IChannel {
@@ -44,14 +47,13 @@ export class WhatsAppChannel implements IChannel {
 
   parseIncomingWebhook(payload: unknown): IncomingMessage[] | null {
     try {
-      const entry = payload?.entry?.[0];
-      const changes = entry?.changes?.[0];
-      const value = changes?.value;
+      const entry = (payload as WhatsAppWebhookPayload | null)?.entry?.[0];
+      const value = entry?.changes?.[0]?.value;
 
       if (!value?.messages?.length) return null;
 
-      return (value as WhatsAppWebhookValue).messages.map((msg): IncomingMessage => {
-        const contact = (value as WhatsAppWebhookValue).contacts?.find((c) => c.wa_id === msg.from);
+      return value.messages.map((msg): IncomingMessage => {
+        const contact = value.contacts?.find((c) => c.wa_id === msg.from);
         return {
           externalId: msg.id,
           senderExternalId: msg.from,

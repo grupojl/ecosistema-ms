@@ -1,14 +1,14 @@
 // src/assistant/chat/assistant-chat.service.spec.ts
 import { Test, TestingModule } from '@nestjs/testing';
-import { AssistantChatService } from '@/assistant/chat/assistant-chat.service';
-import { AssistantConfigService } from '@/config/assistant-config.service';
-import { AssistantSessionService } from '@/session/assistant-session.service';
-import { GroqService } from '@/groq/groq.service';
-import { EventsGateway } from '@/events/events.gateway';
-import { PrismaService } from '@/prisma/prisma.service';
+import { AssistantChatService } from '@/core/assistant/chat/assistant-chat.service.js';
+import { AssistantConfigService } from '@/core/assistant/config/assistant-config.service.js';
+import { AssistantSessionService } from '@/core/assistant/session/assistant-session.service.js';
+import { GroqService } from '@/infrastructure/groq/groq.service.js';
+import { EventsGateway } from '@/events/events.gateway.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 
 const mockConfig = {
-  id: 'config-1', projectId: 'proj-1', organizationId: 'org-1',
+  id: 'config-1', projectId: 'proj-1', organizationId: 'org-1', ecosystemId: 'eco-1',
   personaName: 'Sofía', systemPrompt: 'Sos un asistente de prueba.',
   groqModel: 'llama-3.3-70b-versatile', temperature: 0.7, maxTokens: 1024,
   contextWindow: 10, welcomeMessage: null,
@@ -18,7 +18,7 @@ const mockConfig = {
 };
 
 const mockSession = {
-  id: 'session-1', assistantConfigId: 'config-1', organizationId: 'org-1',
+  id: 'session-1', assistantConfigId: 'config-1', organizationId: 'org-1', ecosystemId: 'eco-1',
   externalUserId: 'user-123', channel: 'api', history: [], metadata: {},
   createdAt: new Date(), updatedAt: new Date(), lastMessageAt: null,
 };
@@ -74,7 +74,7 @@ describe('AssistantChatService', () => {
 
   it('retorna respuesta de Groq correctamente', async () => {
     const result = await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1',
+      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
       userId: 'user-123', message: 'Hola', channel: 'api',
     });
     expect(result.response).toBe('Hola, soy Sofía. ¿En qué puedo ayudarte?');
@@ -85,7 +85,7 @@ describe('AssistantChatService', () => {
 
   it('crea sesión nueva cuando no existe', async () => {
     await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1',
+      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
       userId: 'new-user', message: 'Hola',
     });
     expect(mockSessionSvc.getOrCreate).toHaveBeenCalledWith(
@@ -95,7 +95,7 @@ describe('AssistantChatService', () => {
 
   it('respeta contextWindow al armar historial', async () => {
     await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1',
+      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
       userId: 'user-123', message: 'test',
     });
     expect(mockSessionSvc.getHistory).toHaveBeenCalledWith('session-1', 10);
@@ -106,7 +106,7 @@ describe('AssistantChatService', () => {
       ...mockConfig, isEnabled: false, fallbackMessage: 'Fuera de servicio',
     });
     const result = await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1',
+      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
       userId: 'user-123', message: 'Hola',
     });
     expect(result.response).toBe('Fuera de servicio');
@@ -122,7 +122,7 @@ describe('AssistantChatService', () => {
       tokensUsed: 10, model: 'llama-3.3-70b-versatile',
     });
     const result = await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1',
+      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
       userId: 'user-123', message: '¿Precio del depto?',
     });
     expect(result.usedFaqFallback).toBe(true);

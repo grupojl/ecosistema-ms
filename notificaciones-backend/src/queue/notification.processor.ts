@@ -7,12 +7,12 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Injectable, Logger }    from '@nestjs/common';
 import type { Job }              from 'bullmq';
-import { PrismaService }         from '@/prisma/prisma.service.js';
-import { WhatsappAdapter }       from '@/channels/whatsapp/whatsapp.adapter.js';
-import { EmailAdapter }          from '@/channels/email/email.adapter.js';
-import { PushAdapter }           from '@/channels/push/push.adapter.js';
-import type { INotificationChannel, SendPayload } from '@/interfaces/notification-channel.interface.js';
-import { QUEUES }                from '@/notifications.constants.js';
+import { PrismaService }         from '@/infrastructure/prisma/prisma.service.js';
+import { WhatsappAdapter }       from '@/infrastructure/channels/whatsapp/whatsapp.adapter.js';
+import { EmailAdapter }          from '@/infrastructure/channels/email/email.adapter.js';
+import { PushAdapter }           from '@/infrastructure/channels/push/push.adapter.js';
+import type { INotificationChannel, SendPayload } from '@/core/notifications/interfaces/notification-channel.interface.js';
+import { QUEUES }                from '@/core/notifications/notifications.constants.js';
 
 export interface NotificationJobData {
   ecosystemId:    string;

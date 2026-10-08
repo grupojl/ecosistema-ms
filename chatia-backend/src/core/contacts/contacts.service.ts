@@ -1,6 +1,6 @@
-// chatia-backend/src/contacts/contacts.service.ts
-// FIX-02: refactorizado para usar IContactsRepository via @Inject.
-// C5 fix: ecosystemId agregado a todas las operaciones para aislamiento multi-tenant.
+// chatia-backend/src/core/contacts/contacts.service.ts
+// FIX-02: usa IContactsRepository via @Inject.
+// C5 fix: ecosystemId en todas las operaciones para aislamiento multi-tenant.
 import {
   Inject,
   Injectable,
@@ -10,30 +10,33 @@ import {
 import {
   CONTACTS_REPOSITORY,
   type IContactsRepository,
-} from '@/contacts/repository/contacts.repository.interface.js';
-import { assertNoDuplicateTags, ContactNotFoundError } from '@/contacts/domain/contact.errors.js';
-import type { UpdateContactDto }   from '@/contacts/dto/update-contact.dto.js';
-import type { ListContactsFilter } from '@/contacts/repository/contacts.repository.interface.js';
+  type ListContactsFilter,
+} from '@/core/contacts/repository/contacts.repository.interface.js';
+import { assertNoDuplicateTags } from '@/core/contacts/domain/contact.entity.js';
+import { ContactInvalidTagsError, ContactNotFoundError } from '@/core/contacts/domain/contact.errors.js';
+import type { UpdateContactInput } from '@/core/contacts/schemas.js';
 
 @Injectable()
 export class ContactsService {
-  private readonly logger = new Logger(ContactsService.name);
   constructor(
     @Inject(CONTACTS_REPOSITORY)
     private readonly contactsRepository: IContactsRepository,
   ) {}
 
   async list(organizationId: string, ecosystemId: string, filters?: ListContactsFilter) {
-    const contacts = await this.contactsRepository.list(organizationId, ecosystemId, filters);
-    return { success: true, data: contacts };
+    const { data, total, page, limit } =
+      await this.contactsRepository.list(organizationId, ecosystemId, filters);
+    return {
+      success: true,
+      data,
+      meta: { total, page, limit, pages: Math.ceil(total / limit) },
+    };
   }
 
-  async getOne(contactId: string, organizationId: string, ecosystemId: string) {
+  async findOne(contactId: string, organizationId: string, ecosystemId: string) {
     const contact = await this.contactsRepository.findOne(contactId, organizationId, ecosystemId);
     if (!contact) {
-      throw new NotFoundException(
-        new ContactNotFoundError(contactId, organizationId).message,
-      );
+      throw new NotFoundException(new ContactNotFoundError(contactId, organizationId).message);
     }
     return { success: true, data: contact };
   }
@@ -42,25 +45,23 @@ export class ContactsService {
     contactId:      string,
     organizationId: string,
     ecosystemId:    string,
-    dto: UpdateContactDto,
+    dto:            UpdateContactInput,
   ) {
     if (dto.tags) {
       try {
         assertNoDuplicateTags(dto.tags);
       } catch (err) {
-        throw new UnprocessableEntityException(
-          err instanceof Error ? err.message : 'Tags inválidos',
-        );
+        if (err instanceof ContactInvalidTagsError) {
+          throw new UnprocessableEntityException(err.message);
+        }
+        throw err;
       }
     }
 
-    const updated = await this.contactsRepository.update(contactId, organizationId, ecosystemId, {
-      ...(dto.name     !== undefined && { name:     dto.name }),
-      ...(dto.email    !== undefined && { email:    dto.email }),
-      ...(dto.status   !== undefined && { status:   dto.status }),
-      ...(dto.tags     !== undefined && { tags:     dto.tags }),
-      ...(dto.optedOut !== undefined && { optedOut: dto.optedOut }),
-    });
+    const updated = await this.contactsRepository.update(contactId, organizationId, ecosystemId, dto);
+    if (!updated) {
+      throw new NotFoundException(new ContactNotFoundError(contactId, organizationId).message);
+    }
     return { success: true, data: updated };
   }
 

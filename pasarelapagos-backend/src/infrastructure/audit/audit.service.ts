@@ -2,7 +2,7 @@
 // Audit log inmutable (append-only).
 // Nunca se borran ni modifican registros — compliance PCI-DSS.
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import { Prisma } from '@prisma/client';
 
 export type AuditAction =

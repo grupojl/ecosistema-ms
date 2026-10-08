@@ -18,13 +18,13 @@ import { MetricsModule }    from '@/infrastructure/metrics/metrics.module.js';
 import { PiiModule }        from '@/infrastructure/common/services/pii.module.js';
 import { SharedGuardsModule } from '@/infrastructure/common/shared-guards.module.js';
 import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
-import envValidation        from '@/infrastructure/config/env.validation.js';
+import { validateEnv }      from '@/infrastructure/config/env.validation.js';
 
 // ── Core ───────────────────────────────────────────────────────────────────
 import { PaymentsModule }           from '@/core/payments/payments.module.js';
 import { RoutingModule }            from '@/core/routing/routing.module.js';
 import { OrganizationConfigModule } from '@/core/organization-config/organization-config.module.js';
-import { ProjectStrategyModule }    from '@/core/strategies/project-strategy.module.js';
+import { PaymentProjectStrategyModule }    from '@/core/strategies/project-strategy.module.js';
 
 // ── Entry points ──────────────────────────────────────────────────────────
 import { WebhooksModule }  from '@/webhooks/webhooks.module.js';
@@ -42,7 +42,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true, validate: envValidation }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
     CacheModule.register({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),
@@ -61,7 +61,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     PaymentsModule,
     RoutingModule,
     OrganizationConfigModule,
-    ProjectStrategyModule,
+    PaymentProjectStrategyModule,
 
     // Entry points
     WebhooksModule,

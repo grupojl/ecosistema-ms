@@ -1,7 +1,7 @@
 import { Controller, Get, Post, Delete, Param, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth }  from '@nestjs/swagger';
 import { z }                       from 'zod';
-import { AdAccountsService }       from '@/ad-accounts/ad-accounts.service.js';
+import { AdAccountsService }       from '@/core/ad-accounts/ad-accounts.service.js';
 import { ZodValidationPipe }       from '@/common/pipes/zod-validation.pipe.js';
 import { TenantGuard, Tenant }     from '@ecosistema-ms/auth-server';
 import type { TenantContext }      from '@ecosistema-ms/auth-server';

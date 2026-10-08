@@ -6,7 +6,7 @@ import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiSecurity }        from '@nestjs/swagger';
 import { z }                           from 'zod';
 import { InternalApiKeyGuard }         from '@/internal/internal-api-key.guard.js';
-import { PrismaService }               from '@/prisma/prisma.service.js';
+import { PrismaService }               from '@/infrastructure/persistence/prisma.service.js';
 import { ZodValidationPipe }           from '@/common/pipes/zod-validation.pipe.js';
 import { MARKETING_THRESHOLDS }        from '@/marketing.constants.js';
 
@@ -147,7 +147,7 @@ export class InternalController {
     const byPlatform = new Map<string, { spend: number; revenue: number; conversions: number }>();
     let totalSpend = 0, totalRevenue = 0, totalConversions = 0;
 
-    for (const row of metricsByPlatform) {
+    for (const row of metricsByCampaign) {
       const platform = platformByCampaign.get(row.campaignId) ?? 'UNKNOWN';
       const spend    = Number(row._sum.spend    ?? 0);
       const revenue  = Number(row._sum.revenue  ?? 0);

@@ -9,7 +9,7 @@ import {
 import { Observable, tap } from 'rxjs';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
-import { REDIS_CLIENT } from '@/modules/redis/redis.module.js';
+import { REDIS_CLIENT } from '@/infrastructure/redis/redis.module.js';
 
 const TTL_SECONDS = 86_400; // 24h
 

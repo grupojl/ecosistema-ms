@@ -20,6 +20,7 @@ export const ExportSchema = z.object({
   from:           z.string().datetime(),
   to:             z.string().datetime(),
   format:         z.enum(["csv", "json"]).default("csv"),
+  reportType:     z.string().min(1).default("overview"),
 });
 
 export type OverviewQueryInput = z.infer<typeof OverviewQuerySchema>;

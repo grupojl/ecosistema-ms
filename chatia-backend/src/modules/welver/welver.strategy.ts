@@ -1,8 +1,9 @@
 // chatia-backend/src/modules/welver/welver.strategy.ts
 // Strategy org-aware de Welver. NUNCA lanza en enrich/after.
+import type { ConversationStage } from '@prisma/client';
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaService }             from '@/prisma/prisma.service.js';
-import { OrganizationConfigService } from '@/organization-config/organization-config.service.js';
+import { PrismaService }             from '@/infrastructure/prisma/prisma.service.js';
+import { OrganizationConfigService } from '@/core/organization-config/organization-config.service.js';
 import { ProjectStrategyRegistry }   from '@/core/strategies/project-strategy.registry.js';
 import {
   ProjectType, type ProjectStrategy,
@@ -71,8 +72,8 @@ export class WelverStrategy implements ProjectStrategy, OnModuleInit {
       }
       if (result.newStage && result.newStage !== 'INITIAL') {
         await this.prisma.conversation.updateMany({
-          where: { id: result.conversationId, organizationId: result.organizationId },
-          data:  { stage: result.newStage as import("@prisma/client").Prisma.InputJsonValue },
+          where: { id: result.conversationId, contact: { organizationId: result.organizationId } },
+          data:  { stage: result.newStage as ConversationStage },
         });
       }
     } catch (err: unknown) {

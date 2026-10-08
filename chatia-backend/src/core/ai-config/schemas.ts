@@ -12,6 +12,7 @@ export const UpdateAiConfigSchema = z.object({
   autoResolveAfterHours:  z.number().int().min(1).max(168).optional(),
   welcomeMessage:         z.string().max(500).optional(),
   offlineMessage:         z.string().max(500).optional(),
+  isEnabled:              z.boolean().optional(),
 });
 
 export const ToggleAiSchema = z.object({

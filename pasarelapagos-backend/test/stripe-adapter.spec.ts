@@ -5,11 +5,11 @@
  */
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { StripeProvider } from '../src/modules/providers/adapters/stripe/stripe.provider.js';
-import { ProviderRegistry } from '../src/modules/providers/provider.registry.js';
-import { CircuitBreakerService } from '../src/modules/providers/circuit-breaker.service.js';
-import { PaymentException } from '../src/common/errors/payment.exception.js';
-import { PaymentErrorCode } from '../src/common/errors/payment-error.catalog.js';
+import { StripeProvider } from '@/infrastructure/providers/adapters/stripe/stripe.provider.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/infrastructure/providers/circuit-breaker.service.js';
+import { PaymentException } from '@/infrastructure/common/errors/payment.exception.js';
+import { PaymentErrorCode } from '@/infrastructure/common/errors/payment-error.catalog.js';
 import Stripe from 'stripe';
 
 // Mock de la librería stripe
@@ -25,7 +25,7 @@ const mockWebhook  = jest.fn();
   paymentIntents: { create: mockCreate, capture: mockCapture, retrieve: mockRetrieve },
   refunds:        { create: mockRefund },
   webhooks:       { constructEvent: mockWebhook },
-} as Partial<import('stripe').Stripe.Event>));
+} as unknown as Stripe));
 
 describe('StripeProvider (contrato)', () => {
   let provider: StripeProvider;
@@ -110,7 +110,7 @@ describe('StripeProvider (contrato)', () => {
         message: 'No funds',
         doc_url: '',
         param: '',
-      } as Partial<import('stripe').Stripe.Charge>);
+      } as ConstructorParameters<typeof Stripe.errors.StripeCardError>[0]);
       mockCreate.mockRejectedValue(stripeErr);
 
       await expect(
@@ -135,13 +135,13 @@ describe('StripeProvider (contrato)', () => {
         });
       } catch (e: unknown) {
         expect((e as Error & { code?: string }).code).toBe(PaymentErrorCode.INSUFFICIENT_FUNDS);
-        expect(e.retryable).toBe(false);
+        expect((e as { retryable?: boolean }).retryable).toBe(false);
       }
     });
 
     it('mapea StripeConnectionError → PROVIDER_UNAVAILABLE (retryable)', async () => {
       mockCreate.mockRejectedValue(
-        new Stripe.errors.StripeConnectionError({ message: 'ECONNREFUSED', type: 'api_connection_error' } as Partial<import('stripe').Stripe.Charge>),
+        new Stripe.errors.StripeConnectionError({ message: 'ECONNREFUSED', type: 'api_error', code: 'ECONNREFUSED' }),
       );
 
       try {
@@ -155,7 +155,7 @@ describe('StripeProvider (contrato)', () => {
         });
       } catch (e: unknown) {
         expect((e as Error & { code?: string }).code).toBe(PaymentErrorCode.PROVIDER_UNAVAILABLE);
-        expect(e.retryable).toBe(true);
+        expect((e as { retryable?: boolean }).retryable).toBe(true);
       }
     });
   });

@@ -9,16 +9,23 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface.js';
-import { ProviderRegistry } from '@/provider.registry.js';
-import { CircuitBreakerService } from '@/circuit-breaker.service.js';
-import { mapConektaError } from '@/modules/providers/adapters/conekta/conekta-error.mapper.js';
+} from '@/infrastructure/providers/provider.interface.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/infrastructure/providers/circuit-breaker.service.js';
+import { mapConektaError } from '@/infrastructure/providers/adapters/conekta/conekta-error.mapper.js';
 
 /**
  * Adapter Conekta v2 (México).
  * Soporta: tarjeta de crédito/débito + OXXO Pay (cash voucher).
  * Docs: https://developers.conekta.com/reference/introduccion
  */
+type ConektaCharge = { id?: string; status?: string };
+
+type ConektaWebhookBody = {
+  type?: string;
+  data?: { object?: { id?: string; payment_status?: string; charges?: { data?: ConektaCharge[] } } };
+};
+
 @Injectable()
 export class ConektaProvider implements PaymentProvider, OnModuleInit {
   private readonly logger = new Logger(ConektaProvider.name);
@@ -166,8 +173,8 @@ export class ConektaProvider implements PaymentProvider, OnModuleInit {
       }
     }
 
-    let body: Record<string, unknown>;
-    try { body = JSON.parse(raw.toString()); } catch { body = {}; }
+    let body: ConektaWebhookBody;
+    try { body = JSON.parse(raw.toString()) as ConektaWebhookBody; } catch { body = {}; }
 
     const order   = body.data?.object ?? {};
     const charges = order.charges?.data ?? [];

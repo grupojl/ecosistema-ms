@@ -10,11 +10,11 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import { ProviderRegistry } from '@/providers/provider.registry.js';
-import { Public } from '@/common/decorators/public.decorator.js';
-import { QUEUE_WEBHOOKS, JOB_PROCESS_WEBHOOK } from '@/common/constants/queues.js';
-import { WebhookJobData } from '@/modules/webhooks/webhook.processor.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { Public } from '@/infrastructure/common/decorators/public.decorator.js';
+import { QUEUE_WEBHOOKS, JOB_PROCESS_WEBHOOK } from '@/infrastructure/common/constants/queues.js';
+import { WebhookJobData } from '@/webhooks/webhook.processor.js';
 import { ApiTags } from '@nestjs/swagger';
 
 @ApiTags('webhooks')
@@ -34,7 +34,7 @@ export class WebhooksController {
   @HttpCode(200)
   async handle(
     @Param('providerId') providerId: string,
-    @Req() req: import("express").Request,
+    @Req() req: import("express").Request & { rawBody?: Buffer },
     @Headers() headers: Record<string, string>,
   ): Promise<{ received: boolean }> {
     const start = Date.now();
@@ -48,7 +48,7 @@ export class WebhooksController {
         headers,
       );
     } catch (err: unknown) {
-      this.logger.warn(`Firma inválida de ${providerId}: ${err.message}`);
+      this.logger.warn(`Firma inválida de ${providerId}: ${err instanceof Error ? err.message : String(err)}`);
       throw new UnauthorizedException('Firma de webhook inválida');
     }
 

@@ -4,15 +4,15 @@
 import { Injectable, Logger }    from '@nestjs/common';
 import { InjectQueue }           from '@nestjs/bullmq';
 import { Queue }                 from 'bullmq';
-import { QUEUES }                from '@/queue.constants.js';
+import { QUEUES }                from '@/queue/queue.constants.js';
 
 @Injectable()
 export class DlqService {
   private readonly logger = new Logger(DlqService.name);
 
   constructor(
-    @InjectQueue(QUEUES.INCOMING_MESSAGES) private readonly incomingQueue: Queue,
-    @InjectQueue(QUEUES.OUTGOING_MESSAGES) private readonly outgoingQueue: Queue,
+    @InjectQueue(QUEUES.INCOMING_MESSAGE) private readonly incomingQueue: Queue,
+    @InjectQueue(QUEUES.OUTGOING_MESSAGE) private readonly outgoingQueue: Queue,
   ) {}
 
   async getStats() {

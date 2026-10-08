@@ -44,6 +44,12 @@ COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/               ./packages/grpc-client/
 COPY notificaciones-backend/              ./notificaciones-backend/
 
+# Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
+# Ref: ADR-020 — los servicios consumen dist/, nunca src/
+RUN pnpm --dir packages/proto       build \
+ && pnpm --dir packages/auth-server build \
+ && pnpm --dir packages/grpc-client build
+
 WORKDIR /app/notificaciones-backend
 
 RUN pnpm prisma generate
@@ -65,7 +71,7 @@ COPY --from=build --chown=nestjs:nodejs /app/node_modules                       
 COPY --from=build --chown=nestjs:nodejs /app/notificaciones-backend/dist            ./notificaciones-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/notificaciones-backend/prisma          ./notificaciones-backend/prisma
 COPY --from=build --chown=nestjs:nodejs /app/notificaciones-backend/package.json    ./notificaciones-backend/package.json
-COPY --from=build --chown=nestjs:nodejs /app/packages/proto/                        ./packages/proto/
+COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs notificaciones-backend/entrypoint.sh                     ./notificaciones-backend/entrypoint.sh
 
 USER nestjs
@@ -78,4 +84,4 @@ WORKDIR /app/notificaciones-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD exec dumb-init "/app/notificaciones-backend/entrypoint.sh"]
+CMD ["dumb-init", "/app/notificaciones-backend/entrypoint.sh"]

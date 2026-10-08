@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PaymentProvider } from '@/modules/providers/provider.interface.js';
+import { PaymentProvider } from '@/infrastructure/providers/provider.interface.js';
 
 /**
  * Registro en memoria. Cada adapter se registra en su onModuleInit.

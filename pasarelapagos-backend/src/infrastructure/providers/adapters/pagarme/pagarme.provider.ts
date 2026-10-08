@@ -9,16 +9,24 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface.js';
-import { ProviderRegistry } from '@/provider.registry.js';
-import { CircuitBreakerService } from '@/circuit-breaker.service.js';
-import { mapPagarmeError } from '@/modules/providers/adapters/pagarme/pagarme-error.mapper.js';
+} from '@/infrastructure/providers/provider.interface.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/infrastructure/providers/circuit-breaker.service.js';
+import { mapPagarmeError } from '@/infrastructure/providers/adapters/pagarme/pagarme-error.mapper.js';
 
 /**
  * Adapter Pagar.me v5 (Brasil).
  * Soporta: card (crédito/débito) + PIX nativo.
  * Docs: https://docs.pagar.me/reference/introducao
  */
+type PagarmeCharge = { id?: string; status?: string };
+
+type PagarmeWebhookBody = {
+  id?: string;
+  type?: string;
+  data?: PagarmeCharge & { charges?: PagarmeCharge[] };
+};
+
 @Injectable()
 export class PagarmeProvider implements PaymentProvider, OnModuleInit {
   private readonly logger = new Logger(PagarmeProvider.name);
@@ -180,8 +188,8 @@ export class PagarmeProvider implements PaymentProvider, OnModuleInit {
       }
     }
 
-    let body: Record<string, unknown>;
-    try { body = JSON.parse(raw.toString()); } catch { body = {}; }
+    let body: PagarmeWebhookBody;
+    try { body = JSON.parse(raw.toString()) as PagarmeWebhookBody; } catch { body = {}; }
 
     const charge = body.data?.charges?.[0] ?? body.data ?? {};
 

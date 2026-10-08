@@ -245,3 +245,21 @@ grep -rn "from '\.\./[^']*\/\(domain\|repository\)/" \
 **Regla permanente:**
 Un import directo a `domain/` o `repository/` de otro módulo se corrige antes
 del merge. Si necesitás el dato, el módulo dueño expone un método en su service.
+
+---
+
+## Packages compartidos (ADR-020) <!-- id: packages-dist -->
+
+### 🔴 Los servicios consumen `dist/` de `packages/*`, nunca `src/`
+
+- `main`, `types` y `exports` de todo package apuntan a `./dist/...`.
+- `build` de un package es `tsc -p tsconfig.json` (+ `tsc-alias` si usa `@/`). Nunca un `echo`.
+- Prohibido `@ecosistema-ms/<pkg>/src/...` y `paths` a `packages/*/src`.
+- Dockerfile: compilar los packages en el stage `build` y copiar `packages/` con `dist/` al `runtime`.
+
+**Verificación rápida:**
+
+```bash
+grep -n '"main"\|"types"' packages/*/package.json | grep src   # → 0 resultados
+grep -rn "ecosistema-ms/[a-z-]*/src" */src --include="*.ts"     # → 0 resultados
+```

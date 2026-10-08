@@ -2,9 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe, VersioningType } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
-import { AppModule } from '../src/app.module.js';
-import { PrismaService } from '../src/modules/prisma/prisma.service.js';
-import { AllExceptionsFilter } from '../src/common/filters/all-exceptions.filter.js';
+import { AppModule } from '@/app.module.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import { AllExceptionsFilter } from '@/infrastructure/common/filters/all-exceptions.filter.js';
 import * as bcrypt from 'bcryptjs';
 
 /**

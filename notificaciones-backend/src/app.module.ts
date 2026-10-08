@@ -16,7 +16,7 @@ import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-
 // ── Core ───────────────────────────────────────────────────────────────────
 import { NotificationsModule } from '@/core/notifications/notifications.module.js';
 import { PreferencesModule }   from '@/core/preferences/preferences.module.js';
-import { ProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
+import { NotifProjectStrategyModule } from '@/core/strategies/project-strategy.module.js';
 
 // ── Entry points ──────────────────────────────────────────────────────────
 import { QueueModule }  from '@/queue/queue.module.js';
@@ -42,7 +42,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     // Core
     NotificationsModule,
     PreferencesModule,
-    ProjectStrategyModule,
+    NotifProjectStrategyModule,
 
     // Entry points
     QueueModule,

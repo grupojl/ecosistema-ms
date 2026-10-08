@@ -6,7 +6,8 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
-} from '@/channel.interface.js';
+  MetaMessagingPayload,
+} from '@/channels/channel.interface.js';
 
 // Messenger e Instagram comparten la misma Send API y formato de webhook.
 // La diferencia es que Messenger usa pages, Instagram usa IG accounts.
@@ -49,7 +50,7 @@ export class MessengerChannel implements IChannel {
     try {
       const entries: IncomingMessage[] = [];
 
-      for (const entry of payload?.entry ?? []) {
+      for (const entry of (payload as MetaMessagingPayload | null)?.entry ?? []) {
         for (const messaging of entry?.messaging ?? []) {
           if (!messaging.message) continue;
 

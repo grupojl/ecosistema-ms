@@ -42,6 +42,14 @@ export class CircuitBreakerService implements OnModuleDestroy {
     }
   }
 
+  /** Estado de todos los breakers registrados (para /health extendido). */
+  getAll(): Promise<Record<string, 'CLOSED' | 'OPEN' | 'HALF_OPEN'>> {
+    const map = { closed: 'CLOSED', open: 'OPEN', halfOpen: 'HALF_OPEN', unknown: 'CLOSED' } as const;
+    const out: Record<string, 'CLOSED' | 'OPEN' | 'HALF_OPEN'> = {};
+    for (const key of this.breakers.keys()) out[key] = map[this.healthOf(key)];
+    return Promise.resolve(out);
+  }
+
   healthOf(key: string): 'closed' | 'open' | 'halfOpen' | 'unknown' {
     const b = this.breakers.get(key);
     if (!b)          return 'unknown';

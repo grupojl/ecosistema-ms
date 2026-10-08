@@ -15,18 +15,23 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectQueue }                            from '@nestjs/bullmq';
 import { Cron }                                   from '@nestjs/schedule';
-import { InjectRedis }                            from '@nestjs-modules/ioredis';
 import { Inject }                                 from '@nestjs/common';
 import { Queue }                                  from 'bullmq';
-import Redis                                      from 'ioredis';
-import { PrismaService }                          from '@/prisma/prisma.service.js';
-import { WORKER_QUEUES }                          from '@/jobs/jobs.constants.js';
+import type { Redis }                             from 'ioredis';
+import { REDIS_CLIENT }                           from '@/infrastructure/redis/redis.module.js';
+import { PrismaService }                          from '@/infrastructure/prisma/prisma.service.js';
+import { WORKER_QUEUES }                          from '@/core/jobs/jobs.constants.js';
 import {
   CAMPAIGNS_REPOSITORY,
   type ICampaignsRepository,
-} from '@/campaigns/repository/campaigns.repository.interface.js';
-import { assertValidCampaignTransition } from '@/campaigns/domain/campaign.errors.js';
-import type { CreateCampaignDto, PatchCampaignDto } from '@/campaigns/dto/campaign.dto.js';
+} from '@/core/campaigns/repository/campaigns.repository.interface.js';
+import { assertValidCampaignTransition, type CampaignStatus } from '@/core/campaigns/domain/campaign.entity.js';
+import type { CreateCampaignInput } from '@/campaigns/schemas.js';
+
+export interface PatchCampaignInput {
+  status?:      'PAUSED' | 'CANCELLED';
+  scheduledAt?: Date;
+}
 
 const SCHEDULER_LOCK_KEY = 'workers:scheduler:campaigns';
 const SCHEDULER_LOCK_TTL = 55;
@@ -42,12 +47,12 @@ export class CampaignsService {
     @Inject(CAMPAIGNS_REPOSITORY)
     private readonly campaignsRepository: ICampaignsRepository,
     @InjectQueue(WORKER_QUEUES.CAMPAIGN_EMAIL) private readonly queue: Queue,
-    @InjectRedis() private readonly redis: Redis,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
   // ── CRUD — via repository ─────────────────────────────────────────────────
 
-  async create(dto: CreateCampaignDto) {
+  async create(dto: CreateCampaignInput) {
     return this.campaignsRepository.create({
       ecosystemId:    dto.ecosystemId,
       organizationId: dto.organizationId,
@@ -66,7 +71,7 @@ export class CampaignsService {
     return campaign;
   }
 
-  async patch(id: string, organizationId: string, dto: PatchCampaignDto) {
+  async patch(id: string, organizationId: string, dto: PatchCampaignInput) {
     await this.findOne(id, organizationId); // throws si no existe
     return this.campaignsRepository.update(id, {
       status:      dto.status,
@@ -76,7 +81,7 @@ export class CampaignsService {
 
   async cancel(id: string, organizationId: string) {
     const campaign = await this.findOne(id, organizationId);
-    assertValidCampaignTransition(campaign.status as import("@prisma/client").Prisma.InputJsonValue, 'CANCELLED');
+    assertValidCampaignTransition(campaign.status as CampaignStatus, 'CANCELLED');
 
     // Cancelar jobs pendientes en BullMQ
     const jobs = await this.queue.getJobs(['waiting', 'delayed']);
@@ -105,6 +110,13 @@ export class CampaignsService {
     } finally {
       await this.redis.del(SCHEDULER_LOCK_KEY).catch(() => {});
     }
+  }
+
+  async dispatch(id: string, organizationId: string): Promise<{ campaignId: string; status: 'queued' }> {
+    const campaign = await this.findOne(id, organizationId);
+    assertValidCampaignTransition(campaign.status as CampaignStatus, 'RUNNING');
+    await this.dispatchCampaign(id);
+    return { campaignId: id, status: 'queued' };
   }
 
   // Excepción: usa PrismaService — multi-tabla sin tx explícita

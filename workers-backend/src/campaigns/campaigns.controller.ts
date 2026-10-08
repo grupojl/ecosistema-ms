@@ -5,8 +5,8 @@ import {
   Param, Body, Query, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
-import { CampaignsService }  from '@/campaigns/campaigns.service.js';
-import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
+import { CampaignsService }  from '@/core/campaigns/campaigns.service.js';
+import { ZodValidationPipe } from '@/infrastructure/common/pipes/zod-validation.pipe.js';
 import { CreateCampaignSchema } from '@/campaigns/schemas.js';
 import type { CreateCampaignInput } from '@/campaigns/schemas.js';
 import { z } from 'zod';
@@ -63,7 +63,6 @@ export class CampaignsController {
     @Param('id') id: string,
     @Query('organizationId') organizationId: string,
   ) {
-    void this.svc.findOne(id, organizationId);
     return this.svc.dispatch(id, organizationId);
   }
 }

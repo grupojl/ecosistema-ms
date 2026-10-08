@@ -2,9 +2,9 @@
 import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation }    from '@nestjs/swagger';
 import { DlqService }                              from '@/queue/dlq/dlq.service.js';
-import { TenantGuard }                             from '@/common/guards/tenant.guard.js';
-import { RolesGuard }                              from '@/common/guards/roles.guard.js';
-import { Roles }                                   from '@/common/decorators/roles.decorator.js';
+import { TenantGuard }                             from '@/infrastructure/common/guards/tenant.guard.js';
+import { RolesGuard }                              from '@/infrastructure/common/guards/roles.guard.js';
+import { Roles }                                   from '@/infrastructure/common/decorators/roles.decorator.js';
 
 @ApiTags('dlq')
 @ApiBearerAuth()

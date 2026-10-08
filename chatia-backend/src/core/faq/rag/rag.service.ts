@@ -1,7 +1,7 @@
 // src/faq/rag/rag.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { GroqService } from '@/groq/groq.service.js';
-import { FaqQueryService, ChunkResult } from '@/query/faq-query.service.js';
+import { GroqService, type GroqModel } from '@/infrastructure/groq/groq.service.js';
+import { FaqQueryService, ChunkResult } from '@/core/faq/query/faq-query.service.js';
 
 export interface RagAnswer {
   answer: string;
@@ -22,10 +22,10 @@ export class RagService {
   async answer(
     kbId: string,
     question: string,
-    options: { groqModel?: string; temperature?: number; maxTokens?: number } = {},
+    options: { groqModel?: string; temperature?: number; maxTokens?: number; topK?: number } = {},
   ): Promise<RagAnswer> {
     // 1. Recuperar chunks relevantes
-    const chunks = await this.faqQuery.search(kbId, question, 5);
+    const chunks = await this.faqQuery.search(kbId, question, options.topK ?? 5);
 
     if (!chunks.length) {
       return {
@@ -56,7 +56,7 @@ Respondé en español, de forma concisa y citando el número de fuente cuando co
         },
       ],
       {
-        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as string,
+        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as GroqModel,
         temperature: options.temperature ?? 0.3,
         maxTokens: options.maxTokens ?? 1024,
       },

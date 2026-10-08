@@ -9,7 +9,7 @@ export const EnqueueNotificationSchema = z.object({
   contactId:      z.string().min(1),
   channel:        ChannelSchema,
   templateKey:    z.string().min(1),
-  payload:        z.record(z.unknown()),
+  payload:        z.record(z.string(), z.unknown()),
   idempotencyKey: z.string().optional(),
 });
 

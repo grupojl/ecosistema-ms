@@ -3,8 +3,8 @@
 // Si Groq cae: CircuitOpenError → fallback a AssistantConfig.fallbackMessage.
 // El AssistantChatService debe capturar CircuitOpenError y devolver el fallback.
 import { Injectable, Logger }         from '@nestjs/common';
-import { GroqService, GroqMessage }   from '@/groq/groq.service.js';
-import { CircuitBreakerService, CircuitOpenError } from '@/common/services/circuit-breaker.service.js';
+import { GroqService, type GroqMessage, type GroqResponse } from '@/infrastructure/groq/groq.service.js';
+import { CircuitBreakerService, CircuitOpenError } from '@/infrastructure/common/services/circuit-breaker.service.js';
 
 const CB_KEY     = 'groq-llm';
 // LLM es el componente mas fragil — timeout alto, threshold bajo, recuperacion lenta
@@ -26,10 +26,13 @@ export class GroqCbService {
    * Lanza CircuitOpenError si el breaker esta abierto.
    * El caller (AssistantChatService) captura el error y devuelve fallbackMessage.
    */
-  async chat(messages: GroqMessage[], model?: string, temperature?: number): Promise<string> {
+  async chat(
+    messages: GroqMessage[],
+    options?: Parameters<GroqService['chat']>[1],
+  ): Promise<GroqResponse> {
     return this.cb.execute(
       CB_KEY,
-      () => this.groq.chat(messages, model, temperature),
+      () => this.groq.chat(messages, options),
       CB_OPTIONS,
     );
   }

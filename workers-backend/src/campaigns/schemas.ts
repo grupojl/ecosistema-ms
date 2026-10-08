@@ -8,9 +8,9 @@ export const CreateCampaignSchema = z.object({
   organizationId: z.string().min(1),
   templateKey:    z.string().min(1),
   channel:        z.enum(['WHATSAPP', 'EMAIL', 'PUSH']),
-  segmentFilter:  z.record(z.unknown()).default({}),
+  segmentFilter:  z.record(z.string(), z.unknown()).default({}),
   scheduledAt:    z.coerce.date().optional(),
-  metadata:       z.record(z.unknown()).default({}),
+  metadata:       z.record(z.string(), z.unknown()).default({}),
 });
 
 export type CreateCampaignInput = z.infer<typeof CreateCampaignSchema>;

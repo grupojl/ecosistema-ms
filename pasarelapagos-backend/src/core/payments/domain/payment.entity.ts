@@ -4,7 +4,7 @@
 // Los estados de pago son invariantes de dominio críticos.
 //
 // Invariantes:
-//   - COMPLETED es terminal — no puede transicionar a ningún otro estado
+//   - REFUNDED/FAILED/CANCELLED son terminales — no puede transicionar a ningún otro estado
 //   - Solo PENDING puede ir a AUTHORIZED
 //   - Solo AUTHORIZED puede ir a CAPTURED o FAILED
 //   - Solo CAPTURED puede ir a REFUNDED
@@ -15,7 +15,8 @@ export type PaymentStatus =
   | 'CAPTURED'
   | 'FAILED'
   | 'CANCELLED'
-  | 'REFUNDED';
+  | 'REFUNDED'
+  | 'PARTIALLY_REFUNDED';
 
 export type PaymentMethodKind =
   | 'card'
@@ -51,7 +52,8 @@ export interface Payment {
 const VALID_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
   PENDING:    ['AUTHORIZED', 'FAILED', 'CANCELLED'],
   AUTHORIZED: ['CAPTURED', 'FAILED', 'CANCELLED'],
-  CAPTURED:   ['REFUNDED'],
+  CAPTURED:   ['REFUNDED', 'PARTIALLY_REFUNDED'],
+  PARTIALLY_REFUNDED: ['REFUNDED'],
   FAILED:     [],
   CANCELLED:  [],
   REFUNDED:   [],

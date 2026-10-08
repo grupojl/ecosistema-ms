@@ -44,6 +44,12 @@ COPY packages/auth-server/              ./packages/auth-server/
 COPY packages/grpc-client/              ./packages/grpc-client/
 COPY chatia-backend/                    ./chatia-backend/
 
+# Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
+# Ref: ADR-020 — los servicios consumen dist/, nunca src/
+RUN pnpm --dir packages/proto       build \
+ && pnpm --dir packages/auth-server build \
+ && pnpm --dir packages/grpc-client build
+
 WORKDIR /app/chatia-backend
 
 RUN pnpm prisma generate
@@ -65,7 +71,7 @@ COPY --from=build --chown=nestjs:nodejs /app/node_modules                    ./n
 COPY --from=build --chown=nestjs:nodejs /app/chatia-backend/dist             ./chatia-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/chatia-backend/prisma           ./chatia-backend/prisma
 COPY --from=build --chown=nestjs:nodejs /app/chatia-backend/package.json     ./chatia-backend/package.json
-COPY --from=build --chown=nestjs:nodejs /app/packages/proto/                 ./packages/proto/
+COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs chatia-backend/entrypoint.sh                      ./chatia-backend/entrypoint.sh
 
 USER nestjs
@@ -78,4 +84,4 @@ WORKDIR /app/chatia-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD exec dumb-init "/app/chatia-backend/entrypoint.sh"]
+CMD ["dumb-init", "/app/chatia-backend/entrypoint.sh"]

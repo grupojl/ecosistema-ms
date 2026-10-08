@@ -5,16 +5,16 @@
 
 import { Module }                from '@nestjs/common';
 import { BullModule }            from '@nestjs/bullmq';
-import { FaqController }         from '@/faq/faq.controller.js';
-import { KnowledgeBaseService }  from '@/faq/knowledge-base/knowledge-base.service.js';
-import { KbDocumentService }     from '@/faq/document/kb-document.service.js';
-import { FaqIngestionService }   from '@/faq/ingestion/faq-ingestion.service.js';
-import { FaqIngestionProcessor } from '@/faq/ingestion/faq-ingestion.processor.js';
-import { FaqQueryService }       from '@/faq/query/faq-query.service.js';
-import { RagService }            from '@/faq/rag/rag.service.js';
-import { EmbeddingService }      from '@/common/services/embedding.service.js';
-import { CacheService }          from '@/common/services/cache.service.js';
-import { GroqModule }            from '@/groq/groq.module.js';
+import { FaqController }         from '@/core/faq/faq.controller.js';
+import { KnowledgeBaseService }  from '@/core/faq/knowledge-base/knowledge-base.service.js';
+import { KbDocumentService }     from '@/core/faq/document/kb-document.service.js';
+import { FaqIngestionService }   from '@/core/faq/ingestion/faq-ingestion.service.js';
+import { FaqIngestionProcessor } from '@/core/faq/ingestion/faq-ingestion.processor.js';
+import { FaqQueryService }       from '@/core/faq/query/faq-query.service.js';
+import { RagService }            from '@/core/faq/rag/rag.service.js';
+import { EmbeddingService }      from '@/infrastructure/common/services/embedding.service.js';
+import { CacheService }          from '@/infrastructure/common/services/cache.service.js';
+import { GroqModule }            from '@/infrastructure/groq/groq.module.js';
 import { QUEUES }                from '@/queue/queue.constants.js';
 
 // Queue de workers-backend — chatia solo encola aquí (producer puro)

@@ -1,5 +1,5 @@
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
-import { PaymentException } from '@/common/errors/payment.exception.js';
+import { PaymentErrorCode } from '@/infrastructure/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/infrastructure/common/errors/payment.exception.js';
 
 /**
  * Referencia: https://docs.pagar.me/reference/erros-da-api
@@ -19,11 +19,12 @@ const CODE_MAP: Record<string, PaymentErrorCode> = {
 };
 
 export function mapPagarmeError(error: unknown): never {
-  if (error?.response?.status >= 500) {
+  const e = error as { response?: { status?: number } };
+  if ((e?.response?.status ?? 0) >= 500) {
     throw new PaymentException(PaymentErrorCode.PROVIDER_UNAVAILABLE);
   }
 
-  const pagarmeErr = error as { response?: { data?: { errors?: Array<{ message: string; type?: string }> } } };
+  const pagarmeErr = error as { response?: { data?: { errors?: Array<{ message: string; type?: string; code?: string }> } } };
   const errors = pagarmeErr?.response?.data?.errors ?? [];
   const firstCode = errors[0]?.code ?? '';
   const internalCode = CODE_MAP[firstCode] ?? PaymentErrorCode.PROVIDER_UNKNOWN;

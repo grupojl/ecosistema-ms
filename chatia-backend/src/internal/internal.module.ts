@@ -2,7 +2,7 @@
 import { Module }             from '@nestjs/common';
 import { InternalApiKeyGuard } from '@/internal/internal-api-key.guard.js';
 import { InternalController }  from '@/internal/internal.controller.js';
-import { PrismaModule }        from '@/prisma/prisma.module.js';
+import { PrismaModule }        from '@/infrastructure/prisma/prisma.module.js';
 
 @Module({
   imports:     [PrismaModule],

@@ -1,1 +1,1 @@
-export { MexusModule } from "@/modules/mexus/mexus.module.js";
+export { MexusPaymentModule } from "@/modules/mexus/mexus.module.js";

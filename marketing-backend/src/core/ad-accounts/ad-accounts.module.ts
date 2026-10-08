@@ -1,7 +1,7 @@
 import { Module }             from '@nestjs/common';
-import { MetaAdsAdapter }     from '@/ad-accounts/adapters/meta-ads.adapter.js';
+import { MetaAdsAdapter }     from '@/infrastructure/adapters/meta/meta-ads.adapter.js';
 import { AD_PLATFORM_TOKENS } from '@/ad-accounts/adapters/ad-platform.interface.js';
-import { AdAccountsService }  from '@/ad-accounts/ad-accounts.service.js';
+import { AdAccountsService }  from '@/core/ad-accounts/ad-accounts.service.js';
 import { AdAccountsController } from '@/ad-accounts/ad-accounts.controller.js';
 
 @Module({

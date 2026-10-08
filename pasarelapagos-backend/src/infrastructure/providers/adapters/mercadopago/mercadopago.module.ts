@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { MercadoPagoProvider } from '@/modules/providers/adapters/mercadopago/mercadopago.provider.js';
+import { MercadoPagoProvider } from '@/infrastructure/providers/adapters/mercadopago/mercadopago.provider.js';
 
 @Module({
   providers: [MercadoPagoProvider],

@@ -165,6 +165,7 @@ module.exports = {
 | pnpm workspaces + catalog completo | ✅ |
 | packages/ con roles explícitos (5 packages) | ✅ |
 | Build order correcto (packages → servicios) | ✅ |
+| Servicios consumen `dist/` de packages (ADR-020) | ✅ |
 | path filters en CI (6 workflows) | ✅ |
 | pnpm store cacheado en CI (config) | ✅ |
 | Lockfile actualizado | ⏳ `pnpm install` pendiente |
@@ -179,6 +180,7 @@ module.exports = {
 
 🔴 Nunca mergear con lockfile desactualizado.
 🔴 Ningún servicio importa de otro servicio — solo de packages/*.
+🔴 Los servicios consumen `dist/` de packages/*, nunca `src/` (ADR-020).
 🔴 Ningún servicio reimplementa Firebase directamente — usar @ecosistema-ms/auth-server.
 🔴 Toda dep nueva va primero al catalog de pnpm-workspace.yaml.
 🟡 Versiones de @nestjs/* alineadas con welver.

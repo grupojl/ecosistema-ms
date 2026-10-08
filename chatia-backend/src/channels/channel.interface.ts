@@ -63,3 +63,53 @@ export interface ChannelAccountConfig {
   extraConfig: Record<string, unknown>;
   webhookVerifyToken: string;
 }
+// ── Payloads de webhook por canal (boundary: payload entrante es `unknown`) ────
+// type (no interface) para que sean asignables a Record<string, unknown> (IncomingMessage.raw).
+
+/** Formato Meta Messaging — compartido por Messenger e Instagram. */
+export type MetaMessagingEvent = {
+  sender:     { id: string };
+  timestamp:  number;
+  message?: {
+    mid:          string;
+    text?:        string;
+    attachments?: Array<{ type?: string; payload?: { url?: string } }>;
+  };
+};
+
+export type MetaMessagingPayload = {
+  entry?: Array<{ messaging?: MetaMessagingEvent[] }>;
+};
+
+export type WhatsAppMessage = {
+  id:        string;
+  from:      string;
+  timestamp: string;
+  type:      string;
+  text?:     { body?: string };
+  image?:    { id?: string; caption?: string };
+  audio?:    { id?: string };
+  video?:    { id?: string; caption?: string };
+  document?: { id?: string; filename?: string };
+  location?: { latitude?: number; longitude?: number };
+};
+
+export type WhatsAppWebhookValue = {
+  messages:  WhatsAppMessage[];
+  contacts?: Array<{ wa_id: string; profile?: { name?: string } }>;
+};
+
+export type WhatsAppWebhookPayload = {
+  entry?: Array<{ changes?: Array<{ value?: Partial<WhatsAppWebhookValue> }> }>;
+};
+
+export type TikTokWebhookPayload = {
+  event?: string;
+  data?: {
+    message_id:   string;
+    message_type?: string;
+    create_time:  number;
+    from?: { open_id?: string; user_id?: string; display_name?: string; avatar_url?: string; username?: string };
+    content?: { text?: string; url?: string };
+  };
+};

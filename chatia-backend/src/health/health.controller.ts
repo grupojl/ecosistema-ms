@@ -10,8 +10,8 @@
 import { Controller, Get }         from '@nestjs/common';
 import { InjectQueue }              from '@nestjs/bullmq';
 import type { Queue }               from 'bullmq';
-import { PrismaService }            from '@/prisma/prisma.service.js';
-import { CircuitBreakerService }    from '@/common/services/circuit-breaker.service.js';
+import { PrismaService }            from '@/infrastructure/prisma/prisma.service.js';
+import { CircuitBreakerService }    from '@/infrastructure/common/services/circuit-breaker.service.js';
 import { QUEUES }                   from '@/queue/queue.constants.js';
 
 interface ExtendedHealth {
@@ -29,8 +29,8 @@ export class HealthController {
   constructor(
     private readonly prisma:    PrismaService,
     private readonly cbService: CircuitBreakerService,
-    @InjectQueue(QUEUES.INCOMING_MESSAGES)  private readonly incomingQueue: Queue,
-    @InjectQueue(QUEUES.OUTGOING_MESSAGES)  private readonly outgoingQueue: Queue,
+    @InjectQueue(QUEUES.INCOMING_MESSAGE)  private readonly incomingQueue: Queue,
+    @InjectQueue(QUEUES.OUTGOING_MESSAGE)  private readonly outgoingQueue: Queue,
   ) {}
 
   @Get()

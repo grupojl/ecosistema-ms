@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService }                  from '@/prisma/prisma.service.js';
+import { PrismaService }                  from '@/infrastructure/persistence/prisma.service.js';
+import type { Prisma }                  from '@prisma/client';
 
 @Injectable()
 export class CampaignsService {
@@ -51,7 +52,7 @@ export class CampaignsService {
     return this.prisma.automationRule.findMany({ where: { campaignId } });
   }
 
-  async createAutomationRule(campaignId: string, organizationId: string, data: { name: string; condition: unknown; action: unknown }) {
+  async createAutomationRule(campaignId: string, organizationId: string, data: { name: string; condition: Prisma.InputJsonValue; action: Prisma.InputJsonValue }) {
     await this.findOne(campaignId, organizationId);
     return this.prisma.automationRule.create({ data: { campaignId, name: data.name, condition: data.condition, action: data.action } });
   }

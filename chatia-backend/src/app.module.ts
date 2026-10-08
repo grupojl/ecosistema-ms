@@ -17,8 +17,8 @@ import { GroqModule }      from '@/infrastructure/groq/groq.module.js';
 import { LangGraphModule } from '@/infrastructure/langgraph/langgraph.module.js';
 import { CommonModule }    from '@/infrastructure/common/common.module.js';
 import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
-import appConfig           from '@/infrastructure/config/app.config.js';
-import { validationSchema } from '@/infrastructure/config/validation.schema.js';
+import { appConfig }       from '@/infrastructure/config/app.config.js';
+import { validateEnv }     from '@/infrastructure/config/validation.schema.js';
 
 // ── Core (bounded contexts sin controllers) ────────────────────────────────
 import { OrganizationConfigModule } from '@/core/organization-config/organization-config.module.js';
@@ -28,7 +28,7 @@ import { AnalyticsEventsModule }    from '@/core/analytics-events/analytics-even
 // ── Entry points ──────────────────────────────────────────────────────────
 import { WebhooksModule }        from '@/webhooks/webhooks.module.js';
 import { WidgetModule }          from '@/widget/widget.module.js';
-import { ChannelModule }         from '@/channels/channel.module.js';
+import { ChannelsModule }        from '@/channels/channel.module.js';
 import { QueueModule }           from '@/queue/queue.module.js';
 import { EventsModule }          from '@/events/events.module.js';
 import { HealthModule }          from '@/health/health.module.js';
@@ -46,7 +46,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     ConfigModule.forRoot({
       isGlobal: true,
       load:     [appConfig],
-      validationSchema,
+      validate: validateEnv,
     }),
     ScheduleModule.forRoot(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
@@ -68,7 +68,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     // Entry points
     WebhooksModule,
     WidgetModule,
-    ChannelModule,
+    ChannelsModule,
     QueueModule,
     EventsModule,
     HealthModule,

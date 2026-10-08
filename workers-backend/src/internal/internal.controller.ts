@@ -15,7 +15,7 @@ import {
 import { ApiTags, ApiOperation, ApiHeader } from '@nestjs/swagger';
 import { InternalApiKeyGuard }              from '@/internal/internal-api-key.guard.js';
 import { DlqService }                       from '@/dlq/dlq.service.js';
-import { ZodValidationPipe }                from '@/common/pipes/zod-validation.pipe.js';
+import { ZodValidationPipe }                from '@/infrastructure/common/pipes/zod-validation.pipe.js';
 import { z }                                from 'zod';
 
 const ListDlqSchema = z.object({
@@ -44,7 +44,7 @@ export class InternalController {
     // DlqService.listAll() devuelve todos los jobs fallidos
     const all = await this.dlq.listAll();
     const filtered = dto.queue
-      ? all.filter((j) => j.queueName === dto.queue)
+      ? all.filter((j) => j.queue === dto.queue)
       : all;
     return filtered.slice(0, dto.limit);
   }
@@ -57,7 +57,7 @@ export class InternalController {
     @Param('jobId') jobId: string,
     @Body(new ZodValidationPipe(RetryJobSchema)) dto: RetryJobDto,
   ) {
-    await this.dlq.retry(queue, jobId);
+    await this.dlq.retryJob(queue, jobId);
     return { jobId, status: 'queued', reason: dto.reason };
   }
 }

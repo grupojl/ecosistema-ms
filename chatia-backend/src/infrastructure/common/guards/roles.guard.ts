@@ -3,8 +3,8 @@ import {
   Injectable, CanActivate, ExecutionContext, ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ROLES_KEY } from '@/decorators/roles.decorator.js';
-import type { TenantContext } from '@/types/tenant-context.js';
+import { ROLES_KEY } from '@/infrastructure/common/decorators/roles.decorator.js';
+import type { TenantContext } from '@/infrastructure/common/types/tenant-context.js';
 
 const ROLE_HIERARCHY: Record<string, number> = {
   VIEWER: 0, MEMBER: 1, ADMIN: 2, OWNER: 3,

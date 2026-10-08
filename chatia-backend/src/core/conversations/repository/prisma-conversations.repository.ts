@@ -8,17 +8,30 @@ import { z } from 'zod';
 // MOLDE VIVO — todos los repositorios del ecosistema-ms siguen este patrón.
 
 import { Injectable }  from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import {
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import type {
   IConversationsRepository,
   ListConversationsFilter,
-} from '@/conversations/repository/conversations.repository.interface.js';
+  ChannelAccountRecord,
+  ConversationDetail,
+  ConversationListItem,
+  InboundMessageInput,
+  InboundMessageResult,
+  OutboundContext,
+} from '@/core/conversations/repository/conversations.repository.interface.js';
 import type {
   Conversation,
   ConversationStatus,
   ConversationStage,
-} from '@/domain/conversation.entity.js';
-import type { Conversation as PrismaConversation } from '@prisma/client';
+} from '@/core/conversations/domain/conversation.entity.js';
+import {
+  ChannelType,
+  ConversationStatus as PrismaConversationStatus,
+  MessageDirection,
+  MessageStatus,
+  MessageType,
+  type Conversation as PrismaConversation,
+} from '@prisma/client';
 
 @Injectable()
 export class PrismaConversationsRepository implements IConversationsRepository {
@@ -41,7 +54,7 @@ export class PrismaConversationsRepository implements IConversationsRepository {
       assignedAgentId:  row.assignedAgentId,
       detectedIntent:   row.detectedIntent,
       // Zod parse: campo Json de Prisma — validar shape en el boundary del repository
-      extractedEntities: z.record(z.string()).catch({}).parse(row.extractedEntities ?? {}),
+      extractedEntities: z.record(z.string(), z.string()).catch({}).parse(row.extractedEntities ?? {}),
       summary:          row.summary,
       tags:             row.tags,
       lastMessageAt:    row.lastMessageAt,
@@ -165,13 +178,12 @@ export class PrismaConversationsRepository implements IConversationsRepository {
         include: { contact: { select: { organizationId: true } } },
       });
       return this.toEntity({ ...row, organizationId });
-    }
   }
 
   // ── DT-030: elimina this.prisma.channelAccount en ConversationsService ──
   async findChannelAccountById(
     channelAccountId: string,
-  ): Promise<import('./conversations.repository.interface.js').ChannelAccountRecord | null> {
+  ): Promise<ChannelAccountRecord | null> {
     const account = await this.prisma.channelAccount.findUnique({
       where:   { id: channelAccountId },
       include: { organization: { select: { ecosystemId: true } } },
@@ -187,3 +199,155 @@ export class PrismaConversationsRepository implements IConversationsRepository {
       extraConfig:    (account.extraConfig ?? {}) as Record<string, unknown>,
     };
   }
+
+  // ── Casos de uso compuestos ────────────────────────────────────────────────
+
+  async recordInboundMessage(input: InboundMessageInput): Promise<InboundMessageResult> {
+    const { channelAccountId, organizationId, contact: c, message: m } = input;
+    const channelType = input.channelType as ChannelType;
+
+    return this.prisma.$transaction(async (tx) => {
+      const contact = await tx.contact.upsert({
+        where: {
+          organizationId_channelType_externalId: {
+            organizationId, channelType, externalId: c.externalId,
+          },
+        },
+        update: { lastSeenAt: new Date() },
+        create: { organizationId, channelType, externalId: c.externalId, name: c.name, phone: c.phone },
+      });
+
+      let conv = await tx.conversation.findFirst({
+        where: {
+          channelAccountId,
+          contactId: contact.id,
+          status:    { in: [PrismaConversationStatus.OPEN, PrismaConversationStatus.HUMAN_TAKEOVER] },
+          deletedAt: null,
+        },
+      });
+      const conversationCreated = !conv;
+      if (!conv) {
+        conv = await tx.conversation.create({
+          data: { channelAccountId, contactId: contact.id, lastMessageAt: new Date() },
+        });
+      }
+
+      // Message solo tiene createdAt (no sentAt)
+      await tx.message.create({
+        data: {
+          conversationId: conv.id,
+          direction:  MessageDirection.INBOUND,
+          type:       MessageType.TEXT,
+          status:     MessageStatus.DELIVERED,
+          content:    m.content,
+          externalId: m.externalId,
+        },
+      });
+
+      return { conversationId: conv.id, contactId: contact.id, conversationCreated };
+    });
+  }
+
+  async listWithRelations(filter: ListConversationsFilter): Promise<{
+    data: ConversationListItem[]; total: number; page: number; pages: number;
+  }> {
+    const { organizationId, status, channelAccountId, tag, archived, page = 1 } = filter;
+    const take = 20;
+    const skip = (page - 1) * take;
+
+    const where = {
+      channelAccount: { organizationId },
+      deletedAt:      archived ? { not: null } : null,
+      ...(status           ? { status }           : {}),
+      ...(channelAccountId ? { channelAccountId } : {}),
+      ...(tag              ? { tags: { has: tag } } : {}),
+    };
+
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.conversation.findMany({
+        where,
+        include: {
+          contact:       true,
+          assignedAgent: true,
+          messages: { take: 1, orderBy: { createdAt: 'desc' } },
+        },
+        orderBy: { lastMessageAt: 'desc' },
+        take,
+        skip,
+      }),
+      this.prisma.conversation.count({ where }),
+    ]);
+
+    return { data, total, page, pages: Math.ceil(total / take) };
+  }
+
+  async findDetailed(id: string, organizationId: string): Promise<ConversationDetail | null> {
+    return this.prisma.conversation.findFirst({
+      where:   { id, channelAccount: { organizationId } },
+      include: { contact: true, assignedAgent: true, messages: { orderBy: { createdAt: 'asc' } } },
+    });
+  }
+
+  async findOwned(id: string, organizationId: string): Promise<Conversation | null> {
+    const row = await this.prisma.conversation.findFirst({
+      where:   { id, channelAccount: { organizationId } },
+    });
+    return row ? this.toEntity({ ...row, organizationId }) : null;
+  }
+
+  async getOutboundContext(conversationId: string, organizationId: string): Promise<OutboundContext | null> {
+    const conv = await this.prisma.conversation.findFirst({
+      where:   { id: conversationId, channelAccount: { organizationId } },
+      include: { channelAccount: true, contact: true },
+    });
+    if (!conv) return null;
+    return {
+      channelType:         conv.channelAccount.channelType,
+      accessToken:         conv.channelAccount.accessToken,
+      extraConfig:         conv.channelAccount.extraConfig,
+      recipientExternalId: conv.contact.externalId,
+    };
+  }
+
+  async createOutboundMessage(conversationId: string, content: string): Promise<{ id: string }> {
+    return this.prisma.$transaction(async (tx) => {
+      const msg = await tx.message.create({
+        data: {
+          conversationId,
+          direction:     MessageDirection.OUTBOUND,
+          type:          MessageType.TEXT,
+          status:        MessageStatus.PENDING,
+          content,
+          isAiGenerated: false,
+        },
+        select: { id: true },
+      });
+      await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date() } });
+      return msg;
+    });
+  }
+
+  async takeover(id: string, organizationId: string, agentId: string): Promise<Conversation> {
+    const row = await this.prisma.conversation.update({
+      where: { id },
+      data:  { status: PrismaConversationStatus.HUMAN_TAKEOVER, assignedAgentId: agentId, isAiActive: false },
+    });
+    return this.toEntity({ ...row, organizationId });
+  }
+
+  async release(id: string, organizationId: string): Promise<Conversation> {
+    const row = await this.prisma.conversation.update({
+      where: { id },
+      data:  { status: PrismaConversationStatus.OPEN, assignedAgentId: null, isAiActive: true },
+    });
+    return this.toEntity({ ...row, organizationId });
+  }
+
+  async resolve(id: string, organizationId: string): Promise<Conversation> {
+    const row = await this.prisma.conversation.update({
+      where: { id },
+      data:  { status: PrismaConversationStatus.RESOLVED, resolvedAt: new Date(), isAiActive: false },
+    });
+    return this.toEntity({ ...row, organizationId });
+  }
+}

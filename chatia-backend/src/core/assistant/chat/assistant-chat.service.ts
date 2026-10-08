@@ -1,12 +1,12 @@
-import { GroqCbService, CircuitOpenError } from '@/groq/groq-cb.service.js';
+import { GroqCbService, CircuitOpenError } from '@/infrastructure/groq/groq-cb.service.js';
 // chatia-backend/src/assistant/chat/assistant-chat.service.ts
 // ADR-019 v2: ProjectStrategyRegistry conectado — enriquece contexto por org antes del LLM.
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import { GroqService, GroqMessage }      from '@/groq/groq.service.js';
+import { GroqService, type GroqMessage, type GroqModel } from '@/infrastructure/groq/groq.service.js';
 import { EventsGateway }                 from '@/events/events.gateway.js';
-import { PrismaService }                 from '@/prisma/prisma.service.js';
-import { AssistantConfigService }        from '@/config/assistant-config.service.js';
-import { AssistantSessionService }       from '@/session/assistant-session.service.js';
+import { PrismaService }                 from '@/infrastructure/prisma/prisma.service.js';
+import { AssistantConfigService }        from '@/core/assistant/config/assistant-config.service.js';
+import { AssistantSessionService }       from '@/core/assistant/session/assistant-session.service.js';
 import { ProjectStrategyRegistry }       from '@/core/strategies/project-strategy.registry.js';
 
 export type RagServiceLike = {
@@ -45,6 +45,7 @@ export class AssistantChatService {
     private readonly sessionService:  AssistantSessionService,
     private readonly strategyRegistry: ProjectStrategyRegistry,
     @Optional() private readonly ragService?: RagServiceLike,
+    @Optional() private readonly groqCb?: GroqCbService,
   ) {}
 
   async chat(input: ChatInput): Promise<ChatOutput> {
@@ -103,7 +104,7 @@ export class AssistantChatService {
     try {
       const groqRunner = this.groqCb ?? this.groq;
       const result = await groqRunner.chat(messages, {
-        model:       modelToUse as string,
+        model:       modelToUse as GroqModel,
         temperature: config.temperature,
         maxTokens:   config.maxTokens,
       });

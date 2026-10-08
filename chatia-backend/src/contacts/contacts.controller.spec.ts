@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ContactsController } from '@/contacts/contacts.controller';
-import { ContactsService } from '@/contacts/contacts.service';
+import { ContactsController } from '@/core/contacts/contacts.controller.js';
+import { ContactsService } from '@/core/contacts/contacts.service.js';
 
 describe('ContactsController', () => {
   let controller: ContactsController;

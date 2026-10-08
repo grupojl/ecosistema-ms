@@ -7,7 +7,7 @@ export const EnrichContextSchema = z.object({
   conversationId: z.string().min(1),
   organizationId: z.string().min(1),
   ecosystemId:    z.string().min(1),
-  context:        z.record(z.unknown()).default({}),
+  context:        z.record(z.string(), z.unknown()).default({}),
   // TODO: agregar campos específicos de MANZANABusinessData
 });
 

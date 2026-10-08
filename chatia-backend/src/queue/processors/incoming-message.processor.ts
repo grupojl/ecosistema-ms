@@ -2,8 +2,8 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUES, JOBS } from '@/queue.constants.js';
-import { ConversationsService } from '@/conversations/conversations.service.js';
+import { QUEUES, JOBS } from '@/queue/queue.constants.js';
+import { ConversationsService } from '@/core/conversations/conversations.service.js';
 import { MultimodalService } from '@/channels/multimodal.service.js';
 import { ChannelType } from '@prisma/client';
 import { IncomingMessage } from '@/channels/channel.interface.js';

@@ -1,20 +1,20 @@
-// chatia-backend/src/conversations/conversations.service.ts
-// Versión limpia — usa solo métodos y campos que existen en el schema real.
-// Ver: chatia-backend/prisma/schema.prisma para la definición de Message, Conversation, etc.
+// chatia-backend/src/core/conversations/conversations.service.ts
+// Todo acceso a DB va por IConversationsRepository (ADR-002) — este service no conoce Prisma.
 import {
-  Injectable, NotFoundException, Logger, Optional,
+  Injectable, NotFoundException, Logger, Optional, Inject,
 } from '@nestjs/common';
-import { InjectQueue }        from '@nestjs/bullmq';
-import { Queue }              from 'bullmq';
-import { Inject } from '@nestjs/common';
-import { CONVERSATIONS_REPOSITORY, IConversationsRepository } from '@/conversations/repository/conversations.repository.interface.js';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue }       from 'bullmq';
 import {
-  ConversationStatus, ChannelType,
-  MessageDirection, MessageType, MessageStatus,
-} from '@prisma/client';
-import type { IncomingMessage }       from '@/channels/channel.interface.js';
-import { QUEUES, JOBS }               from '@/queue/queue.constants.js';
-import { AnalyticsEventsService }     from '@/analytics-events/analytics-events.service.js';
+  CONVERSATIONS_REPOSITORY,
+  type IConversationsRepository,
+  type ListConversationsFilter,
+} from '@/core/conversations/repository/conversations.repository.interface.js';
+import type { Conversation } from '@/core/conversations/domain/conversation.entity.js';
+import { addTag, removeTag } from '@/core/conversations/domain/conversation.entity.js';
+import type { IncomingMessage }   from '@/channels/channel.interface.js';
+import { QUEUES, JOBS }           from '@/queue/queue.constants.js';
+import { AnalyticsEventsService } from '@/core/analytics-events/analytics-events.service.js';
 
 @Injectable()
 export class ConversationsService {
@@ -22,7 +22,7 @@ export class ConversationsService {
 
   constructor(
     @Inject(CONVERSATIONS_REPOSITORY) private readonly conversationsRepo: IConversationsRepository,
-    @InjectQueue(QUEUES.OUTGOING_MESSAGE ?? 'outgoing-message') private readonly outQueue: Queue,
+    @InjectQueue(QUEUES.OUTGOING_MESSAGE) private readonly outQueue: Queue,
     @Optional() private readonly analyticsEvents?: AnalyticsEventsService,
   ) {}
 
@@ -30,67 +30,34 @@ export class ConversationsService {
 
   async handleIncomingMessage(
     channelAccountId: string,
-    channelType: ChannelType,
+    channelType: string,
     msg: IncomingMessage,
   ): Promise<void> {
-    const account = await this.conversationsRepository.findChannelAccountById(channelAccountId);
+    const account = await this.conversationsRepo.findChannelAccountById(channelAccountId);
     if (!account) throw new NotFoundException(`ChannelAccount ${channelAccountId} no encontrada`);
 
-    const organizationId = account.organizationId;
-    const ecosystemId    = account.ecosystemId;
+    const { organizationId, ecosystemId } = account;
 
-    // Upsert contacto
-    const contact = await this.prisma.contact.upsert({
-      where: {
-        organizationId_channelType_externalId: {
-          organizationId, channelType, externalId: msg.senderExternalId,
-        },
-      },
-      update: { lastSeenAt: new Date() },
-      create: {
-        organizationId, channelType,
-        externalId: msg.senderExternalId,
-        name:       msg.senderName,
-        phone:      msg.senderPhone,
-      },
+    const result = await this.conversationsRepo.recordInboundMessage({
+      channelAccountId,
+      channelType,
+      organizationId,
+      contact: { externalId: msg.senderExternalId, name: msg.senderName, phone: msg.senderPhone },
+      message: { content: msg.content, externalId: msg.externalId },
     });
 
-    // Buscar o crear conversación
-    let conv = await this.prisma.conversation.findFirst({
-      where: {
-        channelAccountId, contactId: contact.id,
-        status:    { in: [ConversationStatus.OPEN, ConversationStatus.HUMAN_TAKEOVER] },
-        deletedAt: null,
-      },
-    });
-
-    if (!conv) {
-      conv = await this.prisma.conversation.create({
-        data: { channelAccountId, contactId: contact.id, lastMessageAt: new Date() },
-      });
+    if (result.conversationCreated) {
       this.analyticsEvents?.trackConversationCreated({
         ecosystemId, organizationId,
-        conversationId: conv.id,
-        channel: channelType,
-        contactId: contact.id,
+        conversationId: result.conversationId,
+        channel:        channelType,
+        contactId:      result.contactId,
       });
     }
 
-    // Persistir mensaje — Message solo tiene createdAt, NO sentAt
-    await this.prisma.message.create({
-      data: {
-        conversationId: conv.id,
-        direction:  MessageDirection.INBOUND,
-        type:       MessageType.TEXT,
-        status:     MessageStatus.DELIVERED,
-        content:    msg.content,
-        externalId: msg.externalId,
-      },
-    });
-
     this.analyticsEvents?.trackMessageSent({
       ecosystemId, organizationId,
-      conversationId: conv.id,
+      conversationId: result.conversationId,
       direction:      'INBOUND',
       isAiGenerated:  false,
     });
@@ -98,48 +65,12 @@ export class ConversationsService {
 
   // ── Listado y detalle ─────────────────────────────────────────────────────
 
-  async list(organizationId: string, filters: {
-    status?:           ConversationStatus;
-    channelAccountId?: string;
-    tag?:              string;
-    archived?:         boolean;
-    page?:             number;
-  }) {
-    const page = filters.page ?? 1;
-    const take = 20;
-    const skip = (page - 1) * take;
-
-    const where: Record<string, unknown> = {
-      channelAccount: { organizationId },
-      deletedAt: filters.archived ? { not: null } : null,
-    };
-    if (filters.status)           where['status']           = filters.status;
-    if (filters.channelAccountId) where['channelAccountId'] = filters.channelAccountId;
-    if (filters.tag)              where['tags']              = { has: filters.tag };
-
-    const [data, total] = await Promise.all([
-      this.prisma.conversation.findMany({
-        where,
-        include: {
-          contact:       true,
-          assignedAgent: true,
-          messages: { take: 1, orderBy: { createdAt: 'desc' } },
-        },
-        orderBy: { lastMessageAt: 'desc' },
-        take,
-        skip,
-      }),
-      this.prisma.conversation.count({ where }),
-    ]);
-
-    return { data, total, page, pages: Math.ceil(total / take) };
+  list(organizationId: string, filters: Omit<ListConversationsFilter, 'organizationId'>) {
+    return this.conversationsRepo.listWithRelations({ ...filters, organizationId });
   }
 
   async findOne(conversationId: string, organizationId: string) {
-    const conv = await this.prisma.conversation.findFirst({
-      where:   { id: conversationId, channelAccount: { organizationId } },
-      include: { contact: true, assignedAgent: true, messages: { orderBy: { createdAt: 'asc' } } },
-    });
+    const conv = await this.conversationsRepo.findDetailed(conversationId, organizationId);
     if (!conv) throw new NotFoundException(`Conversación ${conversationId} no encontrada`);
     return conv;
   }
@@ -147,52 +78,33 @@ export class ConversationsService {
   // ── Acciones ──────────────────────────────────────────────────────────────
 
   async sendManualMessage(conversationId: string, organizationId: string, text: string) {
-    const conv    = await this.verifyOwnership(conversationId, organizationId);
-    const acct    = await this.prisma.channelAccount.findUniqueOrThrow({ where: { id: conv.channelAccountId } });
-    const contact = await this.prisma.contact.findUniqueOrThrow({ where: { id: conv.contactId } });
+    await this.verifyOwnership(conversationId, organizationId);
 
-    // Message NO tiene sentAt — solo createdAt (automático)
-    const msg = await this.prisma.message.create({
-      data: {
-        conversationId,
-        direction:     MessageDirection.OUTBOUND,
-        type:          MessageType.TEXT,
-        status:        MessageStatus.PENDING,
-        content:       text,
-        isAiGenerated: false,
-      },
-    });
+    const ctx = await this.conversationsRepo.getOutboundContext(conversationId, organizationId);
+    if (!ctx) throw new NotFoundException(`Conversación ${conversationId} no encontrada`);
 
-    // JOBS.SEND_MESSAGE existe en queue.constants, no SEND_OUTGOING_MESSAGE
+    const msg = await this.conversationsRepo.createOutboundMessage(conversationId, text);
+
     await this.outQueue.add(JOBS.SEND_MESSAGE, {
       messageId:           msg.id,
       conversationId,
       organizationId,
-      channelType:         acct.channelType,
-      recipientExternalId: contact.externalId,
+      channelType:         ctx.channelType,
+      recipientExternalId: ctx.recipientExternalId,
       text,
-      accessToken:         acct.accessToken,
-      extraConfig:         acct.extraConfig,
-    });
-
-    await this.prisma.conversation.update({
-      where: { id: conversationId },
-      data:  { lastMessageAt: new Date() },
+      accessToken:         ctx.accessToken,
+      extraConfig:         ctx.extraConfig,
     });
   }
 
   async takeover(conversationId: string, organizationId: string, agentId: string) {
-    await this.verifyOwnership(conversationId, organizationId);
-    const updated = await this.prisma.conversation.update({
-      where: { id: conversationId },
-      data:  { status: ConversationStatus.HUMAN_TAKEOVER, assignedAgentId: agentId, isAiActive: false },
-    });
-    const acct = await this.prisma.channelAccount.findUnique({
-      where: { id: updated.channelAccountId }, include: { organization: true },
-    });
-    if (acct) {
+    const conv    = await this.verifyOwnership(conversationId, organizationId);
+    const updated = await this.conversationsRepo.takeover(conversationId, organizationId, agentId);
+
+    const account = await this.conversationsRepo.findChannelAccountById(conv.channelAccountId);
+    if (account) {
       this.analyticsEvents?.trackConversationAssigned({
-        ecosystemId: acct.organization.ecosystemId, organizationId, conversationId, agentId,
+        ecosystemId: account.ecosystemId, organizationId, conversationId, agentId,
       });
     }
     return updated;
@@ -200,24 +112,17 @@ export class ConversationsService {
 
   async release(conversationId: string, organizationId: string) {
     await this.verifyOwnership(conversationId, organizationId);
-    return this.prisma.conversation.update({
-      where: { id: conversationId },
-      data:  { status: ConversationStatus.OPEN, assignedAgentId: null, isAiActive: true },
-    });
+    return this.conversationsRepo.release(conversationId, organizationId);
   }
 
   async resolve(conversationId: string, organizationId: string) {
     const conv    = await this.verifyOwnership(conversationId, organizationId);
-    const updated = await this.prisma.conversation.update({
-      where: { id: conversationId },
-      data:  { status: ConversationStatus.RESOLVED, resolvedAt: new Date(), isAiActive: false },
-    });
-    const acct = await this.prisma.channelAccount.findUnique({
-      where: { id: conv.channelAccountId }, include: { organization: true },
-    });
-    if (acct) {
+    const updated = await this.conversationsRepo.resolve(conversationId, organizationId);
+
+    const account = await this.conversationsRepo.findChannelAccountById(conv.channelAccountId);
+    if (account) {
       this.analyticsEvents?.trackConversationResolved({
-        ecosystemId: acct.organization.ecosystemId, organizationId, conversationId,
+        ecosystemId: account.ecosystemId, organizationId, conversationId,
         agentId: conv.assignedAgentId ?? undefined,
       });
     }
@@ -226,36 +131,28 @@ export class ConversationsService {
 
   async softDelete(conversationId: string, organizationId: string) {
     await this.verifyOwnership(conversationId, organizationId);
-    return this.prisma.conversation.update({
-      where: { id: conversationId }, data: { deletedAt: new Date() },
-    });
+    return this.conversationsRepo.softDelete(conversationId, organizationId);
   }
 
   async restore(conversationId: string, organizationId: string) {
     await this.verifyOwnership(conversationId, organizationId);
-    return this.prisma.conversation.update({
-      where: { id: conversationId }, data: { deletedAt: null },
-    });
+    return this.conversationsRepo.restore(conversationId, organizationId);
   }
 
   async addTag(conversationId: string, organizationId: string, tag: string) {
     const conv = await this.verifyOwnership(conversationId, organizationId);
-    const tags = [...new Set([...conv.tags, tag])];
-    return this.prisma.conversation.update({ where: { id: conversationId }, data: { tags } });
+    return this.conversationsRepo.updateTags(conversationId, organizationId, addTag(conv, tag));
   }
 
   async removeTag(conversationId: string, organizationId: string, tag: string) {
     const conv = await this.verifyOwnership(conversationId, organizationId);
-    const tags = conv.tags.filter((t: string) => t !== tag);
-    return this.prisma.conversation.update({ where: { id: conversationId }, data: { tags } });
+    return this.conversationsRepo.updateTags(conversationId, organizationId, removeTag(conv, tag));
   }
 
   // ── Helper ────────────────────────────────────────────────────────────────
 
-  private async verifyOwnership(conversationId: string, organizationId: string) {
-    const conv = await this.prisma.conversation.findFirst({
-      where: { id: conversationId, channelAccount: { organizationId } },
-    });
+  private async verifyOwnership(conversationId: string, organizationId: string): Promise<Conversation> {
+    const conv = await this.conversationsRepo.findOwned(conversationId, organizationId);
     if (!conv) throw new NotFoundException(`Conversación ${conversationId} no encontrada`);
     return conv;
   }

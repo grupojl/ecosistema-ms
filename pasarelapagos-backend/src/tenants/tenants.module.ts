@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ApiKeyService } from '@/modules/tenants/api-key.service.js';
-import { TenantsController } from '@/modules/tenants/tenants.controller.js';
+import { ApiKeyService } from '@/tenants/api-key.service.js';
+import { TenantsController } from '@/tenants/tenants.controller.js';
 
 @Module({
   providers:   [ApiKeyService],

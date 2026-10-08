@@ -8,8 +8,8 @@ const CACHE_TTL_5MIN  = 5 * 60 * 1_000;
 const CACHE_TTL_10MIN = 10 * 60 * 1_000;
 
 @Injectable()
-export class AnalyticsService {
-  private readonly logger = new Logger(AnalyticsService.name);
+export class OverviewService {
+  private readonly logger = new Logger(OverviewService.name);
 
   constructor(
     private readonly prisma: PrismaService,
@@ -92,53 +92,6 @@ export class AnalyticsService {
     }
 
     await this.cache.set(cacheKey, result, CACHE_TTL_5MIN);
-    return result;
-  }
-
-    const { organizationId, ecosystemId, from, to } = params;
-    const limit  = Math.min(params.limit  ?? 20, 100);
-    const offset = ((params.page ?? 1) - 1) * limit;
-
-    const cacheKey = `analytics:agents:${organizationId}:${from.toISOString()}:${to.toISOString()}:${offset}:${limit}`;
-    const cached = await this.cache.get<{ agents: unknown[]; total: number }>(cacheKey);
-    if (cached) return cached;
-
-    const [assigned, resolved] = await Promise.all([
-      this.prisma.analyticsEvent.findMany({
-        where: { organizationId, ecosystemId, eventType: 'conversation.assigned', occurredAt: { gte: from, lte: to } },
-        select: { payload: true },
-        take: 50_000,
-      }),
-      this.prisma.analyticsEvent.findMany({
-        where: { organizationId, ecosystemId, eventType: 'conversation.resolved_by_agent', occurredAt: { gte: from, lte: to } },
-        select: { payload: true },
-        take: 50_000,
-      }),
-    ]);
-
-    const agentMap = new Map<string, { assigned: number; resolved: number }>();
-
-    for (const e of assigned) {
-      const p = e.payload as Record<string, unknown>;
-      const agentId = String(p['agentId'] ?? '');
-      if (!agentId) continue;
-      const cur = agentMap.get(agentId) ?? { assigned: 0, resolved: 0 };
-      agentMap.set(agentId, { ...cur, assigned: cur.assigned + 1 });
-    }
-    for (const e of resolved) {
-      const p = e.payload as Record<string, unknown>;
-      const agentId = String(p['agentId'] ?? '');
-      if (!agentId) continue;
-      const cur = agentMap.get(agentId) ?? { assigned: 0, resolved: 0 };
-      agentMap.set(agentId, { ...cur, resolved: cur.resolved + 1 });
-    }
-
-    const all = [...agentMap.entries()]
-      .map(([agentId, data]) => ({ agentId, ...data }))
-      .sort((a, b) => b.assigned - a.assigned);
-
-    const result = { agents: all.slice(offset, offset + limit), total: all.length };
-    await this.cache.set(cacheKey, result, CACHE_TTL_10MIN);
     return result;
   }
 

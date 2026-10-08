@@ -1,6 +1,6 @@
 // src/organizations/organizations.module.ts
 import { Global, Module } from '@nestjs/common';
-import { OrganizationsService } from '@/organizations/organizations.service.js';
+import { OrganizationsService } from '@/core/organizations/organizations.service.js';
 
 @Global() // Global para que TenantGuard lo pueda inyectar en cualquier módulo
 @Module({

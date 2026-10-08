@@ -15,9 +15,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '@/decorators/public.decorator.js';
-import { FirebaseAuthService } from '@/modules/firebase/firebase-auth.service.js';
-import { ApiKeyService } from '@/modules/tenants/api-key.service.js';
+import { IS_PUBLIC_KEY } from '@/infrastructure/common/decorators/public.decorator.js';
+import { FirebaseAuthService } from '@/infrastructure/firebase/firebase-auth.service.js';
+import { ApiKeyService } from '@/tenants/api-key.service.js';
 
 @Injectable()
 export class AuthGuard implements CanActivate {

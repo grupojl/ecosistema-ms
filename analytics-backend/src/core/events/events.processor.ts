@@ -1,13 +1,13 @@
 import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { AnalyticsService } from "@/analytics.service.js";
-import { ANALYTICS_EVENTS_QUEUE } from "@/analytics.constants.js";
+import { OverviewService } from "@/core/overview/overview.service.js";
+import { ANALYTICS_EVENTS_QUEUE } from "@/core/analytics.constants.js";
 export interface AnalyticsEventJobData { ecosystemId: string; organizationId: string; eventType: string; payload: Record<string, unknown>; occurredAt: string; }
 @Processor(ANALYTICS_EVENTS_QUEUE, { concurrency: parseInt(process.env["ANALYTICS_EVENTS_CONCURRENCY"] ?? "10") })
 export class AnalyticsEventProcessor extends WorkerHost {
   private readonly logger = new Logger(AnalyticsEventProcessor.name);
-  constructor(private readonly svc: AnalyticsService) { super(); }
+  constructor(private readonly svc: OverviewService) { super(); }
   async process(job: Job<AnalyticsEventJobData>) {
     await this.svc.persistEvent({ ecosystemId: job.data.ecosystemId, organizationId: job.data.organizationId, eventType: job.data.eventType, payload: job.data.payload, occurredAt: new Date(job.data.occurredAt) });
   }

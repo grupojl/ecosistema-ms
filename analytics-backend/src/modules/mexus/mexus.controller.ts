@@ -11,7 +11,7 @@ export class MexusController {
 
   @Get("overview")
   @ApiOperation({ summary: "Resumen ejecutivo — Mexus" })
-  overview(@Query(new ZodValidationPipe(OverviewQuerySchema)) q: OverviewQueryInput) {
+  summary(@Query(new ZodValidationPipe(OverviewQuerySchema)) q: OverviewQueryInput) {
     return this.overview.getOverview({
       ecosystemId:    q.ecosystemId,
       organizationId: q.organizationId,

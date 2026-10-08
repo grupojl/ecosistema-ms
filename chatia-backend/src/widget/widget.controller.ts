@@ -4,12 +4,13 @@ import {
   HttpCode, HttpStatus, NotFoundException,
 } from '@nestjs/common';
 import { WidgetChatSchema, type WidgetChatInput } from '@/widget/schemas.js';
-import { ZodValidationPipe } from '@/common/pipes/zod-validation.pipe.js';
+import { ZodValidationPipe } from '@/infrastructure/common/pipes/zod-validation.pipe.js';
+import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import { AssistantChatService } from '@/assistant/chat/assistant-chat.service.js';
-import { AssistantSessionService } from '@/assistant/session/assistant-session.service.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import { AssistantChatService } from '@/core/assistant/chat/assistant-chat.service.js';
+import { AssistantSessionService } from '@/core/assistant/session/assistant-session.service.js';
 
 @ApiTags('Widget (público)')
 @Controller('widget')
@@ -46,7 +47,8 @@ export class WidgetController {
     return this.chatService.chat({
       projectSlug: slug,
       organizationId: config.organizationId,
-      userId: dto.userId,
+      ecosystemId: config.ecosystemId,
+      userId: dto.userId ?? dto.sessionId ?? `anon-${randomUUID()}`,
       message: dto.message,
       channel: 'widget',
     });
@@ -92,13 +94,13 @@ export class WidgetController {
   private async resolveConfig(slug: string) {
     const project = await this.prisma.project.findFirst({
       where: { slug, isActive: true },
-      include: { assistantConfigs: true },
+      include: { assistantConfigs: true, organization: { select: { ecosystemId: true } } },
     });
     if (!project) throw new NotFoundException(`Proyecto "${slug}" no encontrado`);
     const config = project.assistantConfigs[0];
     if (!config) throw new NotFoundException('Este proyecto no tiene asistente configurado');
     if (!config.isEnabled) throw new NotFoundException('El asistente no está disponible');
-    return config;
+    return { ...config, ecosystemId: project.organization.ecosystemId };
   }
 
   // ── Snippet JS ────────────────────────────────────────────────────────────

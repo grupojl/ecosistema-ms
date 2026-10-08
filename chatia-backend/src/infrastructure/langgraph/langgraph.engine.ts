@@ -1,15 +1,15 @@
 // src/langgraph/langgraph.engine.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
-import { GroqService } from '@/groq/groq.service.js';
-import { GraphState } from '@/langgraph/langgraph.types.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import { GroqService } from '@/infrastructure/groq/groq.service.js';
+import { GraphState } from '@/infrastructure/langgraph/langgraph.types.js';
 import {
   classifyNode,
   retrieveContextNode,
   generateNode,
   validateNode,
   humanTakeoverNode,
-} from '@/langgraph/nodes.js';
+} from '@/infrastructure/langgraph/nodes/index.js';
 import { ConversationStage } from '@prisma/client';
 
 export interface RunGraphInput {
@@ -154,3 +154,5 @@ export class LangGraphEngine {
       },
     });
   }
+
+}

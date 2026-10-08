@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
-import { PaymentErrorCode } from '@/common/errors/payment-error.catalog.js';
-import { PaymentException } from '@/common/errors/payment.exception.js';
+import { PaymentErrorCode } from '@/infrastructure/common/errors/payment-error.catalog.js';
+import { PaymentException } from '@/infrastructure/common/errors/payment.exception.js';
 
 const CARD_CODE_MAP: Record<string, PaymentErrorCode> = {
   insufficient_funds:         PaymentErrorCode.INSUFFICIENT_FUNDS,

@@ -70,7 +70,10 @@ export class GroqService {
       throw new Error(`Groq API error: ${res.status}`);
     }
 
-    const data = await res.json() as Record<string, unknown>;
+    const data = await res.json() as {
+      choices?: Array<{ message?: { content?: string } }>;
+      usage?:   { total_tokens?: number };
+    };
     const choice = data.choices?.[0];
 
     return {
@@ -92,3 +95,5 @@ export class GroqService {
       throw new Error(`Groq devolvió JSON inválido: ${response.content}`);
     }
   }
+
+}

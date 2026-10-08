@@ -7,7 +7,7 @@ import {
   ForbiddenException,
   Injectable,
 } from '@nestjs/common';
-import type { OrgContext } from '@/interfaces/org-context.interface.js';
+import type { OrgContext } from '@/infrastructure/common/interfaces/org-context.interface.js';
 
 @Injectable()
 export class WriteGuard implements CanActivate {

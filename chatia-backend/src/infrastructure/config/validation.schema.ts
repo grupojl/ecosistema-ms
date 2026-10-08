@@ -13,3 +13,8 @@ export const configValidationSchema = z.object({
 });
 
 export type ConfigSchema = z.infer<typeof configValidationSchema>;
+
+/** Para ConfigModule.forRoot({ validate }) — falla el arranque si falta una variable requerida. */
+export function validateEnv(config: Record<string, unknown>): ConfigSchema {
+  return configValidationSchema.parse(config);
+}

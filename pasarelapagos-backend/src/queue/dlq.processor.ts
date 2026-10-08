@@ -1,7 +1,7 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUE_DLQ } from '@/common/constants/queues.js';
+import { QUEUE_DLQ } from '@/infrastructure/common/constants/queues.js';
 
 /**
  * Recibe jobs que agotaron sus reintentos.

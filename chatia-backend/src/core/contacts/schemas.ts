@@ -12,10 +12,11 @@ export const CreateContactSchema = z.object({
   username:    z.string().max(100).optional(),
   avatarUrl:   z.string().url().optional(),
   tags:        z.array(z.string()).default([]),
-  metadata:    z.record(z.unknown()).default({}),
+  metadata:    z.record(z.string(), z.unknown()).default({}),
 });
 
 export const UpdateContactSchema = z.object({
+  status:    z.enum(['ACTIVE', 'BLOCKED', 'UNSUBSCRIBED']).optional(),
   name:      z.string().max(150).optional(),
   email:     z.string().email().optional(),
   phone:     z.string().max(30).optional(),
@@ -23,13 +24,14 @@ export const UpdateContactSchema = z.object({
   avatarUrl: z.string().url().optional(),
   optedOut:  z.boolean().optional(),
   tags:      z.array(z.string()).optional(),
-  metadata:  z.record(z.unknown()).optional(),
+  metadata:  z.record(z.string(), z.unknown()).optional(),
 });
 
 export const ListContactsSchema = z.object({
   page:    z.coerce.number().int().positive().default(1),
   limit:   z.coerce.number().int().min(1).max(100).default(20),
   search:  z.string().optional(),
+  status:  z.enum(['ACTIVE', 'BLOCKED', 'UNSUBSCRIBED']).optional(),
   optedOut: z.coerce.boolean().optional(),
   tag:     z.string().optional(),
 });

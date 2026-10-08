@@ -45,6 +45,12 @@ COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/               ./packages/grpc-client/
 COPY pasarelapagos-backend/               ./pasarelapagos-backend/
 
+# Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
+# Ref: ADR-020 — los servicios consumen dist/, nunca src/
+RUN pnpm --dir packages/proto       build \
+ && pnpm --dir packages/auth-server build \
+ && pnpm --dir packages/grpc-client build
+
 WORKDIR /app/pasarelapagos-backend
 
 RUN pnpm prisma generate
@@ -66,7 +72,7 @@ COPY --from=build --chown=nestjs:nodejs /app/node_modules                       
 COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/dist            ./pasarelapagos-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/prisma          ./pasarelapagos-backend/prisma
 COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/package.json    ./pasarelapagos-backend/package.json
-COPY --from=build --chown=nestjs:nodejs /app/packages/proto/                       ./packages/proto/
+COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs pasarelapagos-backend/entrypoint.sh                     ./pasarelapagos-backend/entrypoint.sh
 
 USER nestjs
@@ -79,4 +85,4 @@ WORKDIR /app/pasarelapagos-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3001/health || exit 1
 
-CMD exec dumb-init "/app/pasarelapagos-backend/entrypoint.sh"]
+CMD ["dumb-init", "/app/pasarelapagos-backend/entrypoint.sh"]

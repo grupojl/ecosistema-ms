@@ -3,6 +3,7 @@
 **Fecha de última auditoría:** 2026-10-01
 **Puntaje real (código auditado):** 8.5 / 10
 **Fase actual:** Fase 3 Hardening — CERRADA ✅ → Fase 4 Escala
+**Último hito (2026-10-08):** `pnpm typecheck && pnpm build` en 0 errores en los 6 servicios (ADR-020, ADR-021). El puntaje no se re-audita hasta correr tests y smoke test con DB/Redis reales.
 
 ---
 
@@ -27,19 +28,20 @@
 ## Lo más sólido
 
 - Multi-tenancy: ecosystemId + organizationId en todas las queries críticas
-- Documentación .claude: ADR-001..019, checklists, reglas duras, lifecycle
+- Documentación .claude: ADR-001..021, checklists, reglas duras, lifecycle
 - BullMQ: jobs idempotentes, DLQ en todos los servicios críticos
 - Circuit breakers: opossum (chatia/pagos/notificaciones) con CircuitOpenError capturado
 - Lock distribuido: SET NX EX en analytics projections y workers campaigns
 - Imports: 100% alias @/ con .js — cero imports relativos
+- Packages compilan a `dist/` (tsc + tsc-alias); servicios consumen solo `dist/` — ADR-020
 - CI/CD: 6 workflows GitHub Actions con Trivy + Cosign + pnpm audit
 - Observabilidad: LoggerModule + PrometheusModule + RequestIdMiddleware en los 6 servicios
 
 ## Brechas pendientes (Fase 4)
 
-1. Domain/Repository: contacts, agents, campaigns, notifications sin patrón completo
-2. getAgentMetrics: take: 50_000 × 2 en Node — bomba de escala en analytics (DT-023)
-3. Health controller de pasarela: sin SELECT 1 real a la DB
+1. Domain/Repository: agents, campaigns, notifications sin patrón completo
+2. Tests: jest mal configurado en chatia/pasarela; nada ejecutado contra DB/Redis tras la reparación
+3. pasarela: falta provider de `PAYMENT_ORG_CONFIG_REPO`
 4. Branch protection GitHub main — MANUAL pendiente
 5. Tests: cobertura 85% pendiente para Fase 4+
 
@@ -50,12 +52,14 @@
 - `findMany` sin `ecosystemId` en where → bug de seguridad
 - Lógica de negocio en controller o componente UI → bug de capa
 - CircuitOpenError sin captura en paths de proveedores externos → PR bloqueado
+- Servicio que consume `src/` de un package (en vez de `dist/`) → bug de build (ADR-020)
 
 ## Próximas tareas (Fase 4 — Escala)
 
-1. `pnpm typecheck && pnpm build` → 0 errores
+1. ✅ `pnpm typecheck && pnpm build` → 0 errores (2026-10-08). Cliente Prisma compartido: ver ADR-020 (addendum)
 2. Branch protection GitHub main
-3. DT-023: corregir getAgentMetrics — groupBy en DB
-4. Health controller pasarela: agregar SELECT 1 real
-5. Domain/Repository: contacts, agents, campaigns, notifications
-6. RTO/RPO definidos por servicio (Escalón 9)
+3. ✅ DT-023 getAgentMetrics ya usa groupBy en DB
+4. ✅ Health controller pasarela con SELECT 1 + PING Redis
+5. Domain/Repository: agents, campaigns, notifications (contacts y conversations ✅)
+6. **P0 post-reestructura:** tests (jest duplicado), smoke test con DB/Redis, provider `PAYMENT_ORG_CONFIG_REPO` — ver `roadmap/deuda-tecnica.md`
+7. RTO/RPO definidos por servicio (Escalón 9)

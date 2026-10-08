@@ -5,16 +5,16 @@ import { BullModule }    from '@nestjs/bullmq';
 import { ConfigModule, ConfigService }   from '@nestjs/config';
 import { ClientsModule, Transport }      from '@nestjs/microservices';
 
-import { WORKER_QUEUES, QUEUE_CONFIG }       from '@/jobs/jobs.constants.js';
-import { JobsService }                       from '@/jobs/jobs.service.js';
+import { WORKER_QUEUES, QUEUE_CONFIG }       from '@/core/jobs/jobs.constants.js';
+import { JobsService }                       from '@/core/jobs/jobs.service.js';
 import { JobsController }                    from '@/jobs/jobs.controller.js';
-import { EmbeddingService }                  from '@/jobs/services/embedding.service.js';
-import { ChunkingService }                   from '@/jobs/services/chunking.service.js';
-import { CircuitBreakerService }             from '@/jobs/services/circuit-breaker.service.js';
-import { FaqIngestProcessor }                from '@/jobs/processors/faq-ingest.processor.js';
-import { VectorIndexProcessor }              from '@/jobs/processors/vector-index.processor.js';
-import { CampaignEmailProcessor }            from '@/jobs/processors/campaign-email.processor.js';
-import { AnalyticsExportProcessor }          from '@/jobs/processors/analytics-export.processor.js';
+import { EmbeddingService }                  from '@/infrastructure/common/services/embedding.service.js';
+import { ChunkingService }                   from '@/infrastructure/common/services/chunking.service.js';
+import { CircuitBreakerService }             from '@/infrastructure/common/services/circuit-breaker.service.js';
+import { FaqIngestProcessor }                from '@/queue/processors/faq-ingest.processor.js';
+import { VectorIndexProcessor }              from '@/queue/processors/vector-index.processor.js';
+import { CampaignEmailProcessor }            from '@/queue/processors/campaign-email.processor.js';
+import { AnalyticsExportProcessor }          from '@/queue/processors/analytics-export.processor.js';
 
 const PROTO_DIR = join(process.cwd(), 'proto');
 const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';

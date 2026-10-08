@@ -2,7 +2,7 @@
 import { z } from 'zod';
 
 export const ListConversationsSchema = z.object({
-  status:           z.enum(['OPEN', 'ASSIGNED', 'HUMAN_TAKEOVER', 'RESOLVED', 'CLOSED']).optional(),
+  status:           z.enum(['OPEN', 'HUMAN_TAKEOVER', 'RESOLVED', 'EXPIRED']).optional(),
   channelAccountId: z.string().optional(),
   tag:              z.string().optional(),
   archived:         z.coerce.boolean().optional(),

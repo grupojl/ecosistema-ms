@@ -9,7 +9,7 @@ export const CampaignEmailJobSchema = z.object({
   organizationId: z.string().min(1),
   contactId:      z.string().min(1),
   templateKey:    z.string().min(1),
-  payload:        z.record(z.unknown()).default({}),
+  payload:        z.record(z.string(), z.unknown()).default({}),
 });
 
 export const VectorIndexJobSchema = z.object({

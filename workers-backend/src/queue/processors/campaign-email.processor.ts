@@ -1,4 +1,4 @@
-import { requireJobId } from '@/jobs/services/job-id.helper.js';
+import { requireJobId } from '@/infrastructure/common/services/job-id.helper.js';
 // workers-backend/src/jobs/processors/campaign-email.processor.ts
 //
 // W-2.2: Procesa campañas masivas de email.
@@ -21,12 +21,12 @@ import type { Job }              from 'bullmq';
 import { firstValueFrom }        from 'rxjs';
 import { createHash }            from 'node:crypto';
 
-import { WORKER_QUEUES, QUEUE_CONFIG } from '@/jobs.constants.js';
-import { JobsService }                 from '@/jobs.service.js';
+import { WORKER_QUEUES, QUEUE_CONFIG } from '@/core/jobs/jobs.constants.js';
+import { JobsService }                 from '@/core/jobs/jobs.service.js';
 import type {
   CampaignEmailJobData,
   CampaignEmailJobResult,
-}                                      from '@/dto/campaign-email-job.dto.js';
+}                                      from '@/core/jobs/job-data.types.js';
 
 const BATCH_SIZE    = 50;
 const NOTIFY_QUEUE  = 'notify.email';
@@ -150,7 +150,7 @@ export class CampaignEmailProcessor extends WorkerHost {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      output as import("@prisma/client").Prisma.InputJsonValue,
+        result:      { ...output },
       });
 
       this.logger.log(

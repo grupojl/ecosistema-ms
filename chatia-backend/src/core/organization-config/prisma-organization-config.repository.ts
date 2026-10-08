@@ -1,12 +1,13 @@
 // chatia-backend/src/organization-config/prisma-organization-config.repository.ts
 // ÚNICO lugar con PrismaService en este módulo.
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import type { Prisma } from '@prisma/client';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import type {
   IOrganizationConfigRepository,
   StoredOrgConfig,
   UpsertOrgConfigInput,
-} from '@/organization-config/organization-config.repository.interface.js';
+} from '@/core/organization-config/organization-config.repository.interface.js';
 
 @Injectable()
 export class PrismaOrganizationConfigRepository implements IOrganizationConfigRepository {

@@ -1,7 +1,7 @@
 // src/langgraph/nodes/index.ts
 import { Logger } from '@nestjs/common';
-import { GroqService, GROQ_MODELS } from '@/groq/groq.service.js';
-import { GraphState, ClassifyResult, INTENTS } from '@/langgraph.types.js';
+import { GroqService, GROQ_MODELS, type GroqModel } from '@/infrastructure/groq/groq.service.js';
+import { GraphState, ClassifyResult, INTENTS } from '@/infrastructure/langgraph/langgraph.types.js';
 import { ConversationStage } from '@prisma/client';
 
 const logger = new Logger('LangGraphNodes');
@@ -110,7 +110,7 @@ export async function generateNode(
 
   try {
     const result = await groq.chat(messages, {
-      model: state.groqModel as string,
+      model: state.groqModel as GroqModel,
       temperature: state.temperature,
       maxTokens: state.maxTokens,
     });
@@ -222,3 +222,5 @@ Instrucción para este stage: ${stageContext[state.currentStage]}
 ${entities ? `Datos del cliente: ${entities}` : ''}
 
 Respondé en español, de forma conversacional y breve (máximo 3 oraciones).`.trim();
+
+}

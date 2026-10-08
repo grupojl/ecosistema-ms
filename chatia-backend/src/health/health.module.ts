@@ -2,8 +2,8 @@
 import { Module }                from '@nestjs/common';
 import { BullModule }            from '@nestjs/bullmq';
 import { HealthController }      from '@/health/health.controller.js';
-import { PrismaModule }          from '@/prisma/prisma.module.js';
-import { CommonModule }          from '@/common/common.module.js';
+import { PrismaModule }          from '@/infrastructure/prisma/prisma.module.js';
+import { CommonModule }          from '@/infrastructure/common/common.module.js';
 import { QUEUES }                from '@/queue/queue.constants.js';
 
 @Module({
@@ -11,8 +11,8 @@ import { QUEUES }                from '@/queue/queue.constants.js';
     PrismaModule,
     CommonModule,
     BullModule.registerQueue(
-      { name: QUEUES.INCOMING_MESSAGES },
-      { name: QUEUES.OUTGOING_MESSAGES },
+      { name: QUEUES.INCOMING_MESSAGE },
+      { name: QUEUES.OUTGOING_MESSAGE },
     ),
   ],
   controllers: [HealthController],

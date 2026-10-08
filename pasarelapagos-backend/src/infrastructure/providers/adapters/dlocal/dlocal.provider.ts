@@ -9,10 +9,10 @@ import {
   ProviderRefundResult,
   RefundInput,
   WebhookEvent,
-} from '@/provider.interface.js';
-import { ProviderRegistry } from '@/provider.registry.js';
-import { CircuitBreakerService } from '@/circuit-breaker.service.js';
-import { mapDlocalError } from '@/modules/providers/adapters/dlocal/dlocal-error.mapper.js';
+} from '@/infrastructure/providers/provider.interface.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { CircuitBreakerService } from '@/infrastructure/providers/circuit-breaker.service.js';
+import { mapDlocalError } from '@/infrastructure/providers/adapters/dlocal/dlocal-error.mapper.js';
 
 /**
  * Adapter dLocal — agregador LATAM.
@@ -20,6 +20,8 @@ import { mapDlocalError } from '@/modules/providers/adapters/dlocal/dlocal-error
  * Auth: HMAC-SHA256 con apiKey + secretKey.
  * Docs: https://docs.dlocal.com
  */
+type DlocalWebhookBody = { event_type?: string; data?: { id?: string; status?: string } };
+
 @Injectable()
 export class DlocalProvider implements PaymentProvider, OnModuleInit {
   private readonly logger = new Logger(DlocalProvider.name);
@@ -171,8 +173,8 @@ export class DlocalProvider implements PaymentProvider, OnModuleInit {
       throw new UnauthorizedException('Firma dLocal inválida');
     }
 
-    let body: Record<string, unknown>;
-    try { body = JSON.parse(raw.toString()); } catch { body = {}; }
+    let body: DlocalWebhookBody;
+    try { body = JSON.parse(raw.toString()) as DlocalWebhookBody; } catch { body = {}; }
 
     return {
       providerId: this.id,

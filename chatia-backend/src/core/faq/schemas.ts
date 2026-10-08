@@ -8,9 +8,11 @@ export const CreateKnowledgeBaseSchema = z.object({
   projectId:   z.string().min(1),
 });
 
+export const UpdateKnowledgeBaseSchema = CreateKnowledgeBaseSchema.omit({ projectId: true }).partial();
+
 export const CreateKbDocumentSchema = z.object({
   title:      z.string().min(1).max(200),
-  sourceType: z.enum(['TEXT', 'URL', 'FILE']).default('TEXT'),
+  sourceType: z.enum(['TEXT', 'MARKDOWN', 'PDF', 'URL', 'JSON']).default('TEXT'),
   sourceUrl:  z.string().url().optional(),
   rawContent: z.string().max(100_000).optional(),
   tags:       z.array(z.string()).default([]),
@@ -29,5 +31,6 @@ export const FaqQuerySchema = z.object({
 });
 
 export type CreateKnowledgeBaseInput = z.infer<typeof CreateKnowledgeBaseSchema>;
+export type UpdateKnowledgeBaseInput = z.infer<typeof UpdateKnowledgeBaseSchema>;
 export type CreateKbDocumentInput    = z.infer<typeof CreateKbDocumentSchema>;
 export type FaqQueryInput            = z.infer<typeof FaqQuerySchema>;

@@ -5,7 +5,7 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger }                               from '@nestjs/common';
 import { Job }                                  from 'bullmq';
-import { PrismaService }                        from '@/prisma/prisma.service.js';
+import { PrismaService }                        from '@/infrastructure/persistence/prisma.service.js';
 import { MARKETING_QUEUES }                     from '@/marketing.constants.js';
 
 export interface AttributeConversionJobData {

@@ -7,13 +7,13 @@ import { InjectQueue }    from '@nestjs/bullmq';
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue }          from 'bullmq';
-import { PrismaService }  from '@/prisma/prisma.service.js';
-import { ProviderRegistry } from '@/providers/provider.registry.js';
-import { assertValidTransition } from '@/modules/payments/payment-state.machine.js';
+import { PrismaService }  from '@/infrastructure/prisma/prisma.service.js';
+import { ProviderRegistry } from '@/infrastructure/providers/provider.registry.js';
+import { assertValidTransition } from '@/core/payments/payment-state.machine.js';
 import {
   QUEUE_RECONCILE,
   JOB_RECONCILE_PAYMENT,
-} from '@/common/constants/queues.js';
+} from '@/infrastructure/common/constants/queues.js';
 import { PaymentStatus } from '@prisma/client';
 
 export interface ReconcileJobData {

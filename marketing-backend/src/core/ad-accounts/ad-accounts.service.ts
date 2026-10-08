@@ -1,6 +1,6 @@
 // Invariante: accessToken NUNCA se retorna — solo se usa internamente en los processors.
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import { PrismaService } from '@/infrastructure/persistence/prisma.service.js';
 import type { AdPlatform } from '@prisma/client';
 
 export interface ConnectAdAccountDto {

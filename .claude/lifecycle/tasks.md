@@ -53,6 +53,8 @@
 - [x] Audit B tipado: 0 `any` sin marca en producción
 - [x] marketing-backend implementado completo
 - [x] ADR-019 project-strategy multi-servicio
+- [x] ADR-021 reparación post-reestructura (typecheck/build 0 errores en 6 servicios)
+- [x] ADR-020 packages consumen dist/ (auth-server, grpc-client, proto compilados; Dockerfiles + CI)
 
 ---
 

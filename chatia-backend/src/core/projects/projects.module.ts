@@ -1,7 +1,7 @@
 // src/projects/projects.module.ts
 import { Module } from '@nestjs/common';
-import { ProjectsController } from '@/projects/projects.controller.js';
-import { ProjectsService } from '@/projects/projects.service.js';
+import { ProjectsController } from '@/core/projects/projects.controller.js';
+import { ProjectsService } from '@/core/projects/projects.service.js';
 
 @Module({
   controllers: [ProjectsController],

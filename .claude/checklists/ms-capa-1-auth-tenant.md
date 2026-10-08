@@ -6,7 +6,7 @@
 
 ## Completado
 
-- [x] `TenantGuard` en `@ecosistema-ms/auth-server` — centralizado
+- [x] `TenantGuard` en `@ecosistema-ms/auth-server` — **stateless** (claims Zod, sin DB), agregado 2026-10-08; lo usa marketing-backend. chatia mantiene su propio guard (resuelve Ecosystem en DB), pasarela el suyo (`x-organization-id` + `productPermissions`)
 - [x] `ecosystemId` + `organizationId` resueltos del token Firebase en cada request
 - [x] Upsert pasivo de `Organization` en TenantGuard — crea la org si no existe
   (chatia-backend: cada request que llega de un ecosistema nuevo crea la Organization)

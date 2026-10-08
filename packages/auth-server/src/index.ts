@@ -6,3 +6,5 @@ export * from "@/decorators/public.decorator.js";
 export * from "@/decorators/tenant.decorator.js";
 export * from "@/types/tenant-context.js";
 export { ZodExceptionFilter } from '@/filters/zod-exception.filter.js';
+export * from "@/types/tenant-claims.js";
+export { TenantGuard } from "@/guards/tenant.guard.js";

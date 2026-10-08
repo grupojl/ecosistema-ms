@@ -1,4 +1,4 @@
-import { assertValidTransition, isTerminal } from '../src/modules/payments/payment-state.machine.js';
+import { assertValidTransition, isTerminal } from '@/core/payments/payment-state.machine.js';
 import { PaymentStatus } from '@prisma/client';
 
 /**

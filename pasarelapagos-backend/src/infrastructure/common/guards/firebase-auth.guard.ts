@@ -10,9 +10,10 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
-import type * as admin from 'firebase-admin';
-import { FIREBASE_ADMIN } from '@/modules/firebase/firebase.module.js';
-import { IS_PUBLIC_KEY } from '@/decorators/public.decorator.js';
+import type { App } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
+import { FIREBASE_ADMIN } from '@/infrastructure/firebase/firebase.module.js';
+import { IS_PUBLIC_KEY } from '@/infrastructure/common/decorators/public.decorator.js';
 
 @Injectable()
 export class FirebaseAuthGuard implements CanActivate {
@@ -20,7 +21,7 @@ export class FirebaseAuthGuard implements CanActivate {
 
   constructor(
     @Inject(FIREBASE_ADMIN)
-    private readonly firebase: admin.app.App | null,
+    private readonly firebase: App | null,
     private readonly reflector: Reflector,
   ) {}
 
@@ -47,7 +48,7 @@ export class FirebaseAuthGuard implements CanActivate {
     }
 
     try {
-      const decoded = await this.firebase.auth().verifyIdToken(token, true);
+      const decoded = await getAuth(this.firebase).verifyIdToken(token, true);
 
       // Tipado seguro gracias a src/common/types/express.d.ts
       request.firebaseUser = decoded;

@@ -5,26 +5,18 @@
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger, Inject }                       from '@nestjs/common';
 import { Job }                                  from 'bullmq';
-import { PrismaService }                        from '@/prisma/prisma.service.js';
+import { PrismaService }                        from '@/infrastructure/persistence/prisma.service.js';
 import { MARKETING_QUEUES }                     from '@/marketing.constants.js';
 import { AD_PLATFORM_TOKENS }                   from '@/ad-accounts/adapters/ad-platform.interface.js';
 import type { AdPlatformInterface }             from '@/ad-accounts/adapters/ad-platform.interface.js';
-import type { AutomationRule, AdPlatform }      from '@prisma/client';
-/** Tipos para AutomationRule.condition y .action (campos Json en Prisma schema) */
-interface AutomationRuleCondition {
-  metric:     string;  // 'roas' | 'ctr' | 'cpc' | 'spend'
-  operator:   string;  // 'lt' | 'gt' | 'lte' | 'gte' | 'eq'
-  value:      number;
-  windowDays: number;
-}
-interface AutomationRuleAction {
-  type:    string;  // 'pause' | 'scale_budget'
-  factor?: number;  // para scale_budget
-}
-interface AutomationRulePayload {
-  condition: AutomationRuleCondition;
-  action:    AutomationRuleAction;
-}
+import type { DailyMetric, Prisma }             from '@prisma/client';
+
+/** Regla con su campaña y cuenta publicitaria (accessToken solo para uso interno) */
+type RuleWithCampaign = Prisma.AutomationRuleGetPayload<{
+  include: { campaign: { include: { adAccount: true } } };
+}>;
+
+/** Forma de AutomationRule.condition y .action (campos Json en Prisma schema) */
 
 type RuleCondition = { metric: 'roas'|'ctr'|'cpc'|'spend'|'conversions'; operator: 'lt'|'gt'|'lte'|'gte'; value: number; windowDays: number };
 type RuleAction    = { type: 'pause'|'scale_budget'|'notify'; factor?: number };
@@ -45,12 +37,12 @@ export class AutomationCheckProcessor extends WorkerHost {
       include: { campaign: { include: { adAccount: true } } },
     });
     for (const rule of rules) {
-      try { await this.evaluateRule(rule as AutomationRulePayload, job.id ?? ''); }
+      try { await this.evaluateRule(rule, job.id ?? ''); }
       catch (err: unknown) { this.logger.warn(`Rule ${rule.id} failed: ${err instanceof Error ? err.message : err}`); }
     }
   }
 
-  private async evaluateRule(rule: AutomationRule & { campaign: import('@prisma/client').Campaign }, jobId: string): Promise<void> {
+  private async evaluateRule(rule: RuleWithCampaign, jobId: string): Promise<void> {
     // @ecosistema-ms/jsonb-cast  14 JSONB de Prisma, forma garantizada por AutomationRule.create()
     const condition = rule.condition as RuleCondition;
     // @ecosistema-ms/jsonb-cast  14 JSONB de Prisma, forma garantizada por AutomationRule.create()
@@ -86,14 +78,14 @@ export class AutomationCheckProcessor extends WorkerHost {
     this.logger.log(`Rule ${rule.id} executed — ${action.type} success:${success}`);
   }
 
-  private calcAvg(metrics: Record<string, unknown>[], metric: RuleCondition['metric']): number {
+  private calcAvg(metrics: DailyMetric[], metric: RuleCondition['metric']): number {
     const vals = metrics.map(m => {
       switch (metric) {
         case 'roas':        return Number(m.roas ?? 0);
-        case 'spend':       return Number(m.spend ?? 0);
+        case 'spend':       return Number(m.spend);
         case 'conversions': return m.conversions;
-        case 'ctr':         return Number(m.impressions) > 0 ? Number(m.clicks) / Number(m.impressions) : 0;
-        case 'cpc':         return Number(m.clicks) > 0 ? Number(m.spend) / Number(m.clicks) : 0;
+        case 'ctr':         return m.impressions > 0 ? m.clicks / m.impressions : 0;
+        case 'cpc':         return m.clicks > 0 ? Number(m.spend) / m.clicks : 0;
       }
     });
     return vals.reduce((a, b) => a + b, 0) / vals.length;
@@ -103,7 +95,7 @@ export class AutomationCheckProcessor extends WorkerHost {
     return op === 'lt' ? v < t : op === 'gt' ? v > t : op === 'lte' ? v <= t : v >= t;
   }
 
-  private async execAction(campaign: import('@prisma/client').Campaign, action: RuleAction): Promise<void> {
+  private async execAction(campaign: RuleWithCampaign['campaign'], action: RuleAction): Promise<void> {
     const adapter = campaign.platform === 'META' ? this.metaAdapter : null;
     if (!adapter) { this.logger.warn(`No adapter for ${campaign.platform}`); return; }
     if (action.type === 'pause')        await adapter.pauseCampaign(campaign.externalId, campaign.adAccount.accessToken);

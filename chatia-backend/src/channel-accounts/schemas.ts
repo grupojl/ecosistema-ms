@@ -8,7 +8,7 @@ export const CreateChannelAccountSchema = z.object({
   name:         z.string().min(1).max(100),
   externalId:   z.string().min(1),
   accessToken:  z.string().min(1),
-  extraConfig:  z.record(z.unknown()).default({}),
+  extraConfig:  z.record(z.string(), z.unknown()).default({}),
   projectId:    z.string().optional(),
 });
 

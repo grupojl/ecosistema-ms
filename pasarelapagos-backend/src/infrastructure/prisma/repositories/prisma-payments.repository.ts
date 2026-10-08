@@ -5,14 +5,18 @@ import { z } from 'zod';
 // toEntity() mapea campo por campo — TypeScript falla aquí si Prisma cambia el schema.
 
 import { Injectable }  from '@nestjs/common';
-import { PrismaService } from '@/prisma/prisma.service.js';
+import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import type {
   IPaymentsRepository,
   CreatePaymentInput,
   ListPaymentsFilter,
-} from '@/modules/payments/repository/payments.repository.interface.js';
-import type { Payment, PaymentStatus, PaymentMethodKind } from '@/domain/payment.entity.js';
-import type { Payment as PrismaPayment, PaymentStatus as PrismaStatus } from '@prisma/client';
+} from '@/core/payments/repository/payments.repository.interface.js';
+import type { Payment, PaymentStatus, PaymentMethodKind } from '@/core/payments/domain/payment.entity.js';
+import type {
+  Payment as PrismaPayment,
+  PaymentStatus as PrismaStatus,
+  PaymentMethodKind as PrismaMethodKind,
+} from '@prisma/client';
 
 @Injectable()
 export class PrismaPaymentsRepository implements IPaymentsRepository {
@@ -35,7 +39,7 @@ export class PrismaPaymentsRepository implements IPaymentsRepository {
       externalId:     row.externalId,
       description:    row.description,
       // Zod parse: campo Json de Prisma — shape validado en el boundary del repository
-      metadata:       z.record(z.string()).nullable().catch(null).parse(row.metadata) ?? {},
+      metadata:       z.record(z.string(), z.string()).nullable().catch(null).parse(row.metadata) ?? {},
       failureCode:    row.failureCode,
       failureMessage: row.failureMessage,
       idempotencyKey: row.idempotencyKey,
@@ -87,7 +91,7 @@ export class PrismaPaymentsRepository implements IPaymentsRepository {
         amountMinor:    input.amountMinor,
         currency:       input.currency,
         country:        input.country,
-        method:         input.method.toUpperCase() as PrismaStatus, // el enum de Prisma es UPPER
+        method:         input.method.toUpperCase() as PrismaMethodKind, // el enum de Prisma es UPPER
         providerId:     input.providerId,
         idempotencyKey: input.idempotencyKey,
         description:    input.description,
