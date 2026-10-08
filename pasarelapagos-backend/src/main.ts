@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory }         from '@nestjs/core';
+import { PAGOS_PROTO_PATH } from '@ecosistema-ms/proto';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ValidationPipe }      from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -19,7 +20,7 @@ async function bootstrap(): Promise<void> {
     transport: Transport.GRPC,
     options: {
       package:   'pagos',
-      protoPath:  join(process.cwd(), 'proto', 'pagos.proto'),
+      protoPath:  PAGOS_PROTO_PATH,
       url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5002'}`,
       channelOptions: {
         'grpc.keepalive_time_ms':             10_000,

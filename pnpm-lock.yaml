@@ -552,6 +552,9 @@ importers:
       '@ecosistema-ms/grpc-client':
         specifier: workspace:*
         version: link:../packages/grpc-client
+      '@ecosistema-ms/logger':
+        specifier: workspace:*
+        version: link:../packages/logger
       '@ecosistema-ms/proto':
         specifier: workspace:*
         version: link:../packages/proto
@@ -697,6 +700,9 @@ importers:
       '@ecosistema-ms/grpc-client':
         specifier: workspace:*
         version: link:../packages/grpc-client
+      '@ecosistema-ms/logger':
+        specifier: workspace:*
+        version: link:../packages/logger
       '@ecosistema-ms/proto':
         specifier: workspace:*
         version: link:../packages/proto
@@ -884,6 +890,9 @@ importers:
       '@ecosistema-ms/grpc-client':
         specifier: workspace:*
         version: link:../packages/grpc-client
+      '@ecosistema-ms/logger':
+        specifier: workspace:*
+        version: link:../packages/logger
       '@ecosistema-ms/proto':
         specifier: workspace:*
         version: link:../packages/proto
@@ -1029,6 +1038,9 @@ importers:
       '@ecosistema-ms/grpc-client':
         specifier: workspace:*
         version: link:../packages/grpc-client
+      '@ecosistema-ms/logger':
+        specifier: workspace:*
+        version: link:../packages/logger
       '@ecosistema-ms/proto':
         specifier: workspace:*
         version: link:../packages/proto
@@ -1284,6 +1296,9 @@ importers:
       '@ecosistema-ms/grpc-client':
         specifier: workspace:*
         version: link:../packages/grpc-client
+      '@ecosistema-ms/logger':
+        specifier: workspace:*
+        version: link:../packages/logger
       '@ecosistema-ms/proto':
         specifier: workspace:*
         version: link:../packages/proto
@@ -1516,6 +1531,9 @@ importers:
       '@ecosistema-ms/grpc-client':
         specifier: workspace:*
         version: link:../packages/grpc-client
+      '@ecosistema-ms/logger':
+        specifier: workspace:*
+        version: link:../packages/logger
       '@ecosistema-ms/proto':
         specifier: workspace:*
         version: link:../packages/proto

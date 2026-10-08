@@ -6,6 +6,7 @@ import { AssistantChatService }    from '@/core/assistant/chat/assistant-chat.se
 import { AssistantConfigService }  from '@/core/assistant/config/assistant-config.service.js';
 import { AssistantSessionService } from '@/core/assistant/session/assistant-session.service.js';
 import { AssistantChatProcessor }  from '@/core/assistant/processors/assistant-chat.processor.js';
+import { ProjectStrategyModule }   from '@/core/strategies/project-strategy.module.js';
 import { GroqModule }              from '@/infrastructure/groq/groq.module.js';
 import { EventsModule }            from '@/events/events.module.js';
 import { FaqModule }               from '@/core/faq/faq.module.js';
@@ -15,6 +16,7 @@ const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
 
 @Module({
   imports: [
+    ProjectStrategyModule,
     GroqModule,
     EventsModule,
     FaqModule,

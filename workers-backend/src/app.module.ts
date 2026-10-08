@@ -1,5 +1,6 @@
 // workers-backend/src/app.module.ts
 // Reestructurado por x.sh — arquitectura 10/10
+import { createLoggerModule } from '@ecosistema-ms/logger';
 import {
   Module, type NestModule, type MiddlewareConsumer, RequestMethod,
 } from '@nestjs/common';
@@ -18,7 +19,6 @@ import { CampaignsModule as CoreCampaignsModule } from '@/core/campaigns/campaig
 import { JobsModule as CoreJobsModule }            from '@/core/jobs/jobs.module.js';
 
 // ── Queue — processors BullMQ ─────────────────────────────────────────────
-import { QueueModule } from '@/queue/queue.module.js';
 
 // ── Entry points HTTP ─────────────────────────────────────────────────────
 import { CampaignsModule } from '@/campaigns/campaigns.module.js';
@@ -33,6 +33,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    createLoggerModule(),
     ScheduleModule.forRoot(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
 
@@ -44,9 +45,6 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     // Core
     CoreCampaignsModule,
     CoreJobsModule,
-
-    // Queue
-    QueueModule,
 
     // Entry points
     CampaignsModule,

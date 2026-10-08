@@ -1,4 +1,3 @@
-import { CircuitBreakerService } from '@/infrastructure/common/services/circuit-breaker.service.js';
 // notificaciones-backend/src/notifications/notifications.module.ts
 
 import { Module }       from '@nestjs/common';
@@ -16,7 +15,9 @@ import {
   EmailProcessor,
   PushProcessor,
 }                                    from '@/queue/notification.processor.js';
-import { DlqModule }                 from '@/queue/dlq/dlq.module.js';
+import { PrismaNotificationsRepository } from '@/core/notifications/repository/prisma-notifications.repository.js';
+import { NOTIFICATIONS_REPOSITORY }      from '@/core/notifications/repository/notifications.repository.interface.js';
+import { DlqModule }                from '@/queue/dlq/dlq.module.js';
 
 @Module({
   imports: [
@@ -30,8 +31,9 @@ import { DlqModule }                 from '@/queue/dlq/dlq.module.js';
   ],
   controllers: [NotificationsController],
   providers: [
-    CircuitBreakerService,
     NotificationsService,
+    PrismaNotificationsRepository,
+    { provide: NOTIFICATIONS_REPOSITORY, useClass: PrismaNotificationsRepository },
     // Adapters de canal
     WhatsappAdapter,
     EmailAdapter,
@@ -45,8 +47,3 @@ import { DlqModule }                 from '@/queue/dlq/dlq.module.js';
 })
 export class NotificationsModule {}
 
-// ── ECO-03: MANUAL — agregar al array providers del @Module:
-//   import { PrismaNotificationsRepository } from '@/core/notifications/repository/prisma-notifications.repository.js';
-//   import { NOTIFICATIONS_REPOSITORY }      from '@/core/notifications/repository/notifications.repository.interface.js';
-//   providers: [..., PrismaNotificationsRepository, { provide: NOTIFICATIONS_REPOSITORY, useClass: PrismaNotificationsRepository }]
-//   exports:   [..., NOTIFICATIONS_REPOSITORY]

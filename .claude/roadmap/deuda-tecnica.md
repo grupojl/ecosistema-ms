@@ -171,8 +171,11 @@ Una sesión de trabajo. Patrón documentado — solo requiere aplicarlo.
 
 ### Pendiente
 - [ ] **P0** Correr tests: `chatia` y `pasarelapagos` tienen `jest.config.ts` **y** clave `jest` en package.json (jest aborta). `marketing`: 1 spec falla. Specs de pasarela/chatia pueden estar desactualizados.
-- [ ] **P0** Smoke test con DB + Redis reales (nada se ejecutó contra infraestructura; solo carga de `app.module`).
-- [ ] **P0** pasarela: `PAYMENT_ORG_CONFIG_REPO` no tiene provider → DI falla al arrancar. Falta `PrismaPaymentOrgConfigRepository` + binding en `OrganizationConfigModule`.
+- [ ] **P0** Smoke test con DB + Redis reales. Los 6 servicios ya completan el bootstrap de Nest (rutas mapeadas, 0 duplicadas) con DB/Redis inexistentes; falta probar migraciones, conexiones y un request real.
+- [ ] **P1** `InternalModule` de notificaciones y analytics nunca se importa (endpoints /internal/* inexistentes en runtime); chatia: `DlqModule` y `MultimodalModule` sin importar.
+- [ ] **P1** workers exige `GROQ_API_KEY` al bootstrap (debería degradar con elegancia, ver norte de degradación).
+- [ ] **P1** Construir las 6 imágenes Docker (cambios de entrypoint/prisma.config/logger sin probar) y validar en Railway.
+- [x] pasarela: `PAYMENT_ORG_CONFIG_REPO` ahora tiene provider (`PrismaPaymentOrgConfigRepository`).
 - [ ] **P1** Prisma `output` por servicio (hoy el cliente de `node_modules` lo pisa el último `generate`; mitigado con scripts en serie). Ver ADR-020 addendum.
 - [ ] **P1** `nest start --watch` (`start:dev`): los alias `@/` no se resuelven sin `tsc-alias`; verificar flujo de dev.
 - [ ] **P1** `pnpm prisma migrate deploy` en workers (enum `CANCELLED`) y revisar migraciones de los demás servicios (no se probó ninguna).

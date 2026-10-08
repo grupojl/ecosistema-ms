@@ -22,14 +22,14 @@ WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/proto/package.json        ./packages/proto/
+COPY packages/logger/package.json       ./packages/logger/
 COPY packages/auth-server/package.json        ./packages/auth-server/
 COPY packages/grpc-client/package.json  ./packages/grpc-client/
 COPY analytics-backend/package.json     ./analytics-backend/
 
 RUN echo "shamefully-hoist=true" >> .npmrc
 
-RUN --mount=type=cache,id=pnpm-analytics,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # ─── Stage 2: build ───────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS build
@@ -41,13 +41,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules      ./node_modules
 COPY tsconfig.base.json                 ./
 COPY packages/proto/                    ./packages/proto/
+COPY packages/logger/                   ./packages/logger/
 COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/             ./packages/grpc-client/
 COPY analytics-backend/                 ./analytics-backend/
 
 # Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
 # Ref: ADR-020 — los servicios consumen dist/, nunca src/
-RUN pnpm --dir packages/proto       build \
+RUN pnpm --dir packages/logger      build \
+ && pnpm --dir packages/proto       build \
  && pnpm --dir packages/auth-server build \
  && pnpm --dir packages/grpc-client build
 
@@ -71,6 +73,7 @@ ENV PORT=3000
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                       ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/analytics-backend/dist             ./analytics-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/analytics-backend/prisma           ./analytics-backend/prisma
+COPY --from=build --chown=nestjs:nodejs /app/analytics-backend/prisma.config.ts ./analytics-backend/prisma.config.ts
 COPY --from=build --chown=nestjs:nodejs /app/analytics-backend/package.json     ./analytics-backend/package.json
 COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs analytics-backend/entrypoint.sh                      ./analytics-backend/entrypoint.sh
@@ -85,4 +88,4 @@ WORKDIR /app/analytics-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3000/health || exit 1
 
-CMD ["dumb-init", "/app/analytics-backend/entrypoint.sh"]
+CMD ["dumb-init", "sh", "/app/analytics-backend/entrypoint.sh"]

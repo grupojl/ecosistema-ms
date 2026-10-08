@@ -18,10 +18,9 @@
     "typecheck": "prisma generate && tsc --noEmit"
   },
   "dependencies": {
-    "@willsoto/nestjs-prometheus": "catalog:",
-    "prom-client": "catalog:",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/logger": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",
     "@grpc/grpc-js": "catalog:",
     "@grpc/proto-loader": "catalog:",
@@ -44,6 +43,7 @@
     "@prisma/client": "catalog:",
     "@types/compression": "catalog:",
     "@types/cookie-parser": "catalog:",
+    "@willsoto/nestjs-prometheus": "catalog:",
     "axios": "catalog:",
     "bcryptjs": "catalog:",
     "bullmq": "catalog:",
@@ -61,6 +61,7 @@
     "pg": "catalog:",
     "pino": "catalog:",
     "pino-http": "catalog:",
+    "prom-client": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "stripe": "catalog:",

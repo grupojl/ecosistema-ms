@@ -23,14 +23,14 @@ WORKDIR /app
 
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY packages/proto/package.json        ./packages/proto/
+COPY packages/logger/package.json       ./packages/logger/
 COPY packages/auth-server/package.json        ./packages/auth-server/
 COPY packages/grpc-client/package.json  ./packages/grpc-client/
 COPY marketing-backend/package.json     ./marketing-backend/
 
 RUN echo "shamefully-hoist=true" >> .npmrc
 
-RUN --mount=type=cache,id=pnpm-marketing,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
+RUN pnpm install --frozen-lockfile
 
 # ─── Stage 2: build ───────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS build
@@ -42,13 +42,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules      ./node_modules
 COPY tsconfig.base.json                 ./
 COPY packages/proto/                    ./packages/proto/
+COPY packages/logger/                   ./packages/logger/
 COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/             ./packages/grpc-client/
 COPY marketing-backend/                 ./marketing-backend/
 
 # Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
 # Ref: ADR-020 — los servicios consumen dist/, nunca src/
-RUN pnpm --dir packages/proto       build \
+RUN pnpm --dir packages/logger      build \
+ && pnpm --dir packages/proto       build \
  && pnpm --dir packages/auth-server build \
  && pnpm --dir packages/grpc-client build
 
@@ -72,6 +74,7 @@ ENV PORT=3005
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                       ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/dist             ./marketing-backend/dist
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/prisma           ./marketing-backend/prisma
+COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/prisma.config.ts ./marketing-backend/prisma.config.ts
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/package.json     ./marketing-backend/package.json
 COPY --from=build --chown=nestjs:nodejs /app/packages/                           ./packages/
 COPY --chown=nestjs:nodejs marketing-backend/entrypoint.sh                      ./marketing-backend/entrypoint.sh
@@ -86,4 +89,4 @@ WORKDIR /app/marketing-backend
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget -qO- http://localhost:3005/health || exit 1
 
-CMD ["dumb-init", "/app/marketing-backend/entrypoint.sh"]
+CMD ["dumb-init", "sh", "/app/marketing-backend/entrypoint.sh"]

@@ -1,5 +1,6 @@
 // marketing-backend/src/app.module.ts
 // Reestructurado por x.sh — arquitectura 10/10
+import { createLoggerModule } from '@ecosistema-ms/logger';
 import {
   Module, type NestModule, type MiddlewareConsumer, RequestMethod,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import { BullModule }     from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
 
 // ── Infraestructura ────────────────────────────────────────────────────────
+import { PrismaModule }    from '@/infrastructure/persistence/prisma.module.js';
 import { MetricsModule }   from '@/infrastructure/metrics/metrics.module.js';
 import { AdaptersModule }  from '@/infrastructure/adapters/adapters.module.js';
 import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
@@ -34,8 +36,10 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    createLoggerModule(),
     ScheduleModule.forRoot(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
+    PrismaModule,
 
     // Infraestructura
     MetricsModule,

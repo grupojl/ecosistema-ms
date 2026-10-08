@@ -1,6 +1,7 @@
 // chatia-backend/src/app.module.ts
 // Reestructurado por x.sh — arquitectura 10/10
 // Un solo import de módulos de negocio: ChatiaModulesModule
+import { createLoggerModule } from '@ecosistema-ms/logger';
 import {
   Module, type NestModule, type MiddlewareConsumer, RequestMethod,
 } from '@nestjs/common';
@@ -48,6 +49,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
       load:     [appConfig],
       validate: validateEnv,
     }),
+    createLoggerModule(),
     ScheduleModule.forRoot(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
     CacheModule.register({ isGlobal: true, ttl: 300_000 }),

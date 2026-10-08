@@ -1,7 +1,7 @@
 // chatia-backend/src/organization-config/organization-config.service.ts
 // Cache-aside Redis TTL 5min + degradación elegante garantizada.
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import type { CacheService }          from '@/infrastructure/common/services/cache.service.js';
+import { CacheService }               from '@/infrastructure/common/services/cache.service.js';
 import {
   ORGANIZATION_CONFIG_REPO, toOrgProfile,
   type IOrganizationConfigRepository, type UpsertOrgConfigInput,

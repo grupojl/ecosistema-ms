@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory }         from '@nestjs/core';
+import { CHATIA_PROTO_PATH } from '@ecosistema-ms/proto';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { ValidationPipe }      from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -19,7 +20,7 @@ async function bootstrap(): Promise<void> {
     transport: Transport.GRPC,
     options: {
       package:   'chatia',
-      protoPath:  join(process.cwd(), 'proto', 'chatia.proto'),
+      protoPath:  CHATIA_PROTO_PATH,
       url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5001'}`,
       channelOptions: {
         'grpc.keepalive_time_ms':             10_000,

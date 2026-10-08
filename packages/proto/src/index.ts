@@ -1,14 +1,9 @@
 // packages/proto/src/index.ts
-// Usa process.cwd() — funciona en CJS, ESM, dev y prod sin cambios.
-// En Railway runner (WORKDIR=/app): protos en /app/proto/
-// En desarrollo (cwd = raíz monorepo): protos en packages/proto/proto/
+// Los .proto viajan DENTRO del package (packages/proto/proto), así que se resuelven
+// relativo a este archivo (dist/index.js → ../proto). No dependen del cwd ni del Dockerfile.
 import { join } from 'path';
 
-const cwd = process.cwd();
-
-// Detectar si los protos están en ./proto (runner) o en packages/proto/proto (dev)
-// El Dockerfile copia los protos a {WORKDIR}/proto/
-const PROTO_DIR = join(cwd, 'proto');
+const PROTO_DIR = join(__dirname, '..', 'proto');
 
 export const CHATIA_PROTO_PATH    = join(PROTO_DIR, 'chatia.proto');
 export const NOTIF_PROTO_PATH     = join(PROTO_DIR, 'notificaciones.proto');

@@ -1,5 +1,6 @@
 // pasarelapagos-backend/src/app.module.ts
 // Reestructurado por x.sh — arquitectura 10/10
+import { createLoggerModule } from '@ecosistema-ms/logger';
 import {
   Module, type NestModule, type MiddlewareConsumer, RequestMethod,
 } from '@nestjs/common';
@@ -43,6 +44,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
+    createLoggerModule(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
     CacheModule.register({ isGlobal: true }),
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 200 }]),

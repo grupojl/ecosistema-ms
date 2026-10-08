@@ -1,10 +1,8 @@
 import 'reflect-metadata';
 import { NestFactory }                     from '@nestjs/core';
-import { MicroserviceOptions, Transport }  from '@nestjs/microservices';
 import { ValidationPipe }                  from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule }  from '@nestjs/swagger';
 import { Logger }                          from 'nestjs-pino';
-import { join }                            from 'path';
 import { AppModule }                       from '@/app.module.js';
 import { ZodExceptionFilter }              from '@ecosistema-ms/auth-server';
 
@@ -13,20 +11,7 @@ async function bootstrap(): Promise<void> {
 
   app.useLogger(app.get(Logger));
 
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package:  'marketing',
-      protoPath: join(process.cwd(), 'proto', 'marketing.proto'),
-      url:       `0.0.0.0:${process.env['GRPC_PORT'] ?? '5006'}`,
-      channelOptions: {
-        'grpc.keepalive_time_ms':             10_000,
-        'grpc.keepalive_timeout_ms':           5_000,
-        'grpc.keepalive_permit_without_calls':     1,
-        'grpc.http2.max_pings_without_data':       0,
-      },
-    },
-  });
+  // gRPC: sin servidor todavía (TODO(grpc) en src/grpc/grpc.module.ts) — por ahora HTTP + x-internal-api-key.
 
   // ZodExceptionFilter desde el inicio — no heredar deuda de class-validator
   app.useGlobalFilters(new ZodExceptionFilter());
@@ -41,10 +26,9 @@ async function bootstrap(): Promise<void> {
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
 
-  await app.startAllMicroservices();
   const port = process.env['PORT'] ?? '3005';
   await app.listen(port);
-  app.get(Logger).log(`HTTP:${port}  gRPC:${process.env['GRPC_PORT'] ?? '5006'}`, 'marketing-backend');
+  app.get(Logger).log(`HTTP:${port}`, 'marketing-backend');
 }
 
 void bootstrap();

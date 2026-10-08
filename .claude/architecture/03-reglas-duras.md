@@ -263,3 +263,8 @@ del merge. Si necesitás el dato, el módulo dueño expone un método en su serv
 grep -n '"main"\|"types"' packages/*/package.json | grep src   # → 0 resultados
 grep -rn "ecosistema-ms/[a-z-]*/src" */src --include="*.ts"     # → 0 resultados
 ```
+
+---
+
+### 🔴 Nunca `import type` de una clase que se inyecta por constructor
+La metadata de DI queda como `Function` y Nest falla al arrancar (`Nest can't resolve dependencies … Function at index`). `typecheck` y `build` **no** lo detectan: verificar arrancando el servicio compilado (`node dist/main.js`). Misma regla para módulos importados y no agregados a `imports`.

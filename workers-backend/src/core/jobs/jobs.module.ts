@@ -1,5 +1,6 @@
 // workers-backend/src/jobs/jobs.module.ts
-import { join }          from 'path';
+import { join, dirname }  from 'path';
+import { CHATIA_PROTO_PATH } from '@ecosistema-ms/proto';
 import { Module }        from '@nestjs/common';
 import { BullModule }    from '@nestjs/bullmq';
 import { ConfigModule, ConfigService }   from '@nestjs/config';
@@ -16,7 +17,7 @@ import { VectorIndexProcessor }              from '@/queue/processors/vector-ind
 import { CampaignEmailProcessor }            from '@/queue/processors/campaign-email.processor.js';
 import { AnalyticsExportProcessor }          from '@/queue/processors/analytics-export.processor.js';
 
-const PROTO_DIR = join(process.cwd(), 'proto');
+const PROTO_DIR = dirname(CHATIA_PROTO_PATH);
 const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';
 
 @Module({

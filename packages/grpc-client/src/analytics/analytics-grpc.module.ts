@@ -3,6 +3,7 @@
 // Módulo cliente gRPC para analytics-backend.
 // Exporta ANALYTICS_GRPC_CLIENT para inyección en otros servicios.
 import { join }                      from 'path';
+import { ANALYTICS_PROTO_PATH } from '@ecosistema-ms/proto';
 import { Module }                    from '@nestjs/common';
 import { ClientsModule, Transport }  from '@nestjs/microservices';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -20,7 +21,7 @@ export const ANALYTICS_CLIENT_TOKEN = 'ANALYTICS_GRPC_CLIENT';
           transport: Transport.GRPC,
           options: {
             package:   'analytics',
-            protoPath: join(process.cwd(), 'proto', 'analytics.proto'),
+            protoPath: ANALYTICS_PROTO_PATH,
             url: config.get<string>('ANALYTICS_GRPC_URL', 'localhost:5004'),
             channelOptions: {
               'grpc.keepalive_time_ms':              30_000,

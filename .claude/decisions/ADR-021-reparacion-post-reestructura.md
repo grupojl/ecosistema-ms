@@ -46,3 +46,35 @@ Resultado: `pnpm typecheck && pnpm build` → exit 0 en los 6 servicios, con `di
 ## Pendiente (no resuelto por este ADR)
 
 Ver `roadmap/deuda-tecnica.md` → sección "Post-reestructura 2026-10-08".
+
+## Addendum 2026-10-08 (2) — arranque real de los 6 servicios
+
+`typecheck`/`build` en verde **no** implicaban que arrancaran: al ejecutar `node dist/main.js` (con DB/Redis
+inexistentes) los 6 fallaban por inyección de dependencias. Ahora los 6 completan el bootstrap de Nest y mapean
+rutas sin duplicados (analytics 10, chatia 49, marketing 19, notificaciones 9, pasarela 16, workers 13).
+Sigue sin probarse contra DB/Redis reales.
+
+| Causa | Servicios | Arreglo |
+|---|---|---|
+| `LoggerModule` ausente (`main.ts` hace `app.get(Logger)`) | los 6 | `createLoggerModule()` de `@ecosistema-ms/logger` en cada `app.module` (+ dependencia y copia en Dockerfiles) |
+| `import type` de una clase inyectada (metadata DI = `Function`) | chatia (`CacheService`) | import de valor. Regla: nunca `import type` de providers inyectables |
+| Módulos de ecosistema sin `imports`/`controllers` (strategy registry, org-config, services) | chatia, pasarela, notificaciones | cada `<eco>.module` importa lo que consume y registra su controller |
+| Provider faltante | pasarela `PAYMENT_ORG_CONFIG_REPO` (nuevo `PrismaPaymentOrgConfigRepository`), notificaciones `NOTIFICATIONS_REPOSITORY`, marketing `PrismaModule` | registrados |
+| Processors/controllers declarados en 2 módulos (doble worker, rutas duplicadas) | workers, marketing | un único dueño: `core/jobs` y `core/campaigns` (workers), `QueueModule` (marketing); los módulos "entry" solo re-exportan |
+| `CircuitBreakerService` no compartido | notificaciones, chatia | `CommonModule` global |
+| `PrismaService` sin driver adapter (Prisma 7) | pasarela | `PrismaPg` + `Pool`, igual que el resto |
+| `EventsModule` sin `OverviewModule` | analytics | import agregado |
+| `.proto` resueltos con `process.cwd()` | todos | `@ecosistema-ms/proto` los resuelve relativo al package (`dist/../proto`); `main.ts` usa sus constantes |
+| marketing declaraba un servidor gRPC con `marketing.proto` inexistente | marketing | se quitó el microservice (TODO(grpc) documentado); queda solo HTTP |
+
+### Dockerfiles / entrypoints (misma auditoría)
+- Se quitó `--mount=type=cache,id=…` (Railway exige `id=s/<service-id>-…`; el flag rompía el build).
+- `entrypoint.sh`: `../node_modules/.bin/prisma migrate deploy` (node_modules vive en `/app`, el WORKDIR es `/app/<svc>`).
+- `prisma.config.ts` se copia al stage runtime (Prisma 7 lo necesita para `migrate deploy`).
+- Los `.sh` están en git como 100644: `CMD ["dumb-init","sh","/app/<svc>/entrypoint.sh"]`.
+- `packages/logger` se copia y compila en el stage build.
+
+### Limitaciones que siguen abiertas
+- `workers` exige `GROQ_API_KEY` al arrancar (falla con error explícito sin ella).
+- Módulos definidos y nunca importados: `InternalModule` en notificaciones y analytics (los endpoints /internal/* no existen en runtime), `DlqModule` y `MultimodalModule` en chatia.
+- `AttributionService` y adapters Google/TikTok (marketing) son placeholders.

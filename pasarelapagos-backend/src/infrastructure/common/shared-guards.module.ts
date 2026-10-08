@@ -13,6 +13,6 @@ import { PciGuard }            from '@/infrastructure/common/guards/pci.guard.js
 @Module({
   imports:   [FirebaseModule, TenantsModule],
   providers: [FirebaseAuthService, AuthGuard, TenantGuard, ApiKeyGuard, RolesGuard, WriteGuard, PciGuard],
-  exports:   [FirebaseAuthService, AuthGuard, TenantGuard, ApiKeyGuard, RolesGuard, WriteGuard, PciGuard],
+  exports:   [TenantsModule, FirebaseAuthService, AuthGuard, TenantGuard, ApiKeyGuard, RolesGuard, WriteGuard, PciGuard],
 })
 export class SharedGuardsModule {}

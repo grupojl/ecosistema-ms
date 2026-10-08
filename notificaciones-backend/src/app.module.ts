@@ -1,5 +1,7 @@
 // notificaciones-backend/src/app.module.ts
 // Reestructurado por x.sh — arquitectura 10/10
+import { CommonModule } from '@/infrastructure/common/common.module.js';
+import { createLoggerModule } from '@ecosistema-ms/logger';
 import {
   Module, type NestModule, type MiddlewareConsumer, RequestMethod,
 } from '@nestjs/common';
@@ -31,6 +33,8 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    createLoggerModule(),
+    CommonModule,
     ScheduleModule.forRoot(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
 

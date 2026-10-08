@@ -1,6 +1,7 @@
 // analytics-backend/src/app.module.ts
 // Reestructurado por x.sh — arquitectura 10/10
 // Un solo import de módulos de negocio: AnalyticsModulesModule
+import { createLoggerModule } from '@ecosistema-ms/logger';
 import { Module, type NestModule, type MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule }        from '@nestjs/config';
 import { BullModule }          from '@nestjs/bullmq';
@@ -27,6 +28,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    createLoggerModule(),
     ScheduleModule.forRoot(),
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
     CacheModule.register({ isGlobal: true, ttl: 300_000 }),

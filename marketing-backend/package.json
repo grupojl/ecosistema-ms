@@ -14,9 +14,9 @@
     "test:cov": "jest --coverage --config jest.config.ts"
   },
   "dependencies": {
-    "prom-client": "catalog:",
     "@ecosistema-ms/auth-server": "workspace:*",
     "@ecosistema-ms/grpc-client": "workspace:*",
+    "@ecosistema-ms/logger": "workspace:*",
     "@ecosistema-ms/proto": "workspace:*",
     "@grpc/grpc-js": "catalog:",
     "@grpc/proto-loader": "catalog:",
@@ -32,6 +32,8 @@
     "@nestjs/terminus": "catalog:",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",
+    "@willsoto/nestjs-prometheus": "catalog:",
+    "axios": "catalog:",
     "bullmq": "catalog:",
     "cache-manager": "catalog:",
     "dotenv": "catalog:",
@@ -43,13 +45,12 @@
     "pino": "catalog:",
     "pino-http": "catalog:",
     "prisma": "catalog:",
+    "prom-client": "catalog:",
     "protobufjs": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "swagger-ui-express": "catalog:",
-    "zod": "catalog:",
-    "axios": "catalog:",
-    "@willsoto/nestjs-prometheus": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@nestjs/cli": "catalog:",

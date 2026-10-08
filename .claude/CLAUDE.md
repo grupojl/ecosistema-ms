@@ -41,7 +41,7 @@
 
 1. Domain/Repository: agents, campaigns, notifications sin patrón completo
 2. Tests: jest mal configurado en chatia/pasarela; nada ejecutado contra DB/Redis tras la reparación
-3. pasarela: falta provider de `PAYMENT_ORG_CONFIG_REPO`
+3. Smoke test real: los 6 servicios arrancan (bootstrap Nest OK), falta DB/Redis reales e imágenes Docker
 4. Branch protection GitHub main — MANUAL pendiente
 5. Tests: cobertura 85% pendiente para Fase 4+
 
@@ -61,5 +61,5 @@
 3. ✅ DT-023 getAgentMetrics ya usa groupBy en DB
 4. ✅ Health controller pasarela con SELECT 1 + PING Redis
 5. Domain/Repository: agents, campaigns, notifications (contacts y conversations ✅)
-6. **P0 post-reestructura:** tests (jest duplicado), smoke test con DB/Redis, provider `PAYMENT_ORG_CONFIG_REPO` — ver `roadmap/deuda-tecnica.md`
+6. **P0 post-reestructura:** tests (jest duplicado), smoke test con DB/Redis, imágenes Docker — ver `roadmap/deuda-tecnica.md`
 7. RTO/RPO definidos por servicio (Escalón 9)
