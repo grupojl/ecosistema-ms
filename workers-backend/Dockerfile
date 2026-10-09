@@ -49,6 +49,13 @@ COPY packages/auth-server/                ./packages/auth-server/
 COPY packages/grpc-client/             ./packages/grpc-client/
 COPY workers-backend/                   ./workers-backend/
 
+# node_modules de cada workspace (symlinks + .bin: tsc, prisma, nest) — el install de deps los genera
+COPY --from=deps /app/packages/proto/node_modules        ./packages/proto/node_modules
+COPY --from=deps /app/packages/logger/node_modules       ./packages/logger/node_modules
+COPY --from=deps /app/packages/auth-server/node_modules  ./packages/auth-server/node_modules
+COPY --from=deps /app/packages/grpc-client/node_modules  ./packages/grpc-client/node_modules
+COPY --from=deps /app/workers-backend/node_modules            ./workers-backend/node_modules
+
 # Packages compartidos → dist (orden de dependencias: proto → auth-server → grpc-client)
 # Ref: ADR-020 — los servicios consumen dist/, nunca src/
 RUN pnpm --dir packages/logger      build \
