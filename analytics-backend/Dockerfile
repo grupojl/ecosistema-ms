@@ -14,6 +14,7 @@ ARG PNPM_VERSION=10.30.3
 
 # ─── Stage 1: deps ────────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS deps
+ARG PNPM_VERSION
 
 RUN apk add --no-cache dumb-init
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
@@ -33,6 +34,7 @@ RUN pnpm install --frozen-lockfile
 
 # ─── Stage 2: build ───────────────────────────────────────────────────────────
 FROM --platform=linux/amd64 node:${NODE_VERSION}-alpine AS build
+ARG PNPM_VERSION
 
 RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
