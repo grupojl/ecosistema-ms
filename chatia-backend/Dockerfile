@@ -3,8 +3,8 @@
 # Railway  → Root Directory: /  |  Dockerfile Path: chatia-backend/Dockerfile
 # VPS/AWS  → docker build -f chatia-backend/Dockerfile .
 #
-# HTTP:  3000 (público — REST + WebSocket)
-# gRPC:  5001 (interno — red privada Railway)
+# HTTP:  3010 (público — REST + WebSocket)
+# gRPC:  5010 (interno — red privada Railway)
 # BullMQ: incoming-messages, outgoing-messages, faq-ingestion
 # Ref: .claude/architecture/05-dockerfile-backend.md
 
@@ -76,7 +76,7 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3010
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                    ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/chatia-backend/dist             ./chatia-backend/dist
@@ -88,12 +88,12 @@ COPY --chown=nestjs:nodejs chatia-backend/entrypoint.sh                      ./c
 
 USER nestjs
 
-EXPOSE 3000
-EXPOSE 5001
+EXPOSE 3010
+EXPOSE 5010
 
 WORKDIR /app/chatia-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://localhost:3010/health || exit 1
 
 CMD ["dumb-init", "sh", "/app/chatia-backend/entrypoint.sh"]

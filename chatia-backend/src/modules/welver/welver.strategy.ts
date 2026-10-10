@@ -1,6 +1,6 @@
 // chatia-backend/src/modules/welver/welver.strategy.ts
 // Strategy org-aware de Welver. NUNCA lanza en enrich/after.
-import type { ConversationStage } from '@prisma/client';
+import type { ConversationStage } from '@/generated/prisma/client.js';
 import { Injectable, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaService }             from '@/infrastructure/prisma/prisma.service.js';
 import { OrganizationConfigService } from '@/core/organization-config/organization-config.service.js';

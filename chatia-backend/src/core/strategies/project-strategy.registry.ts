@@ -16,11 +16,17 @@ export class ProjectStrategyRegistry {
     this.logger.log(`Strategy registrada: ${type}`);
   }
 
-  get(ecosystemId: string): ProjectStrategy {
-    const strategy = this.strategies.get(ecosystemId as ProjectType);
+  /**
+   * Resuelve la strategy por tipo de proyecto (Ecosystem.config.projectType).
+   * Sin tipo o con un tipo no registrado cae a GenericStrategy.
+   */
+  get(ecosystemId: string, projectType?: string | null): ProjectStrategy {
+    const strategy = projectType ? this.strategies.get(projectType as ProjectType) : undefined;
     if (!strategy) {
-      this.logger.warn(`Sin strategy para ecosystemId="${ecosystemId}" — usando GenericStrategy`);
-      return this.strategies.get(ProjectType.GENERIC)!; // invariante: siempre registrada en onModuleInit
+      if (projectType) {
+        this.logger.warn(`projectType="${projectType}" sin strategy (ecosystemId="${ecosystemId}") — usando GenericStrategy`);
+      }
+      return this.strategies.get(ProjectType.GENERIC)!; // invariante: GenericStrategy se registra en onModuleInit
     }
     return strategy;
   }

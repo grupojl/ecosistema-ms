@@ -5,7 +5,7 @@ Este archivo documenta los RPCs disponibles, sus shapes y los timeouts/fallbacks
 
 ---
 
-## analytics.proto — AnalyticsService (puerto 5004)
+## analytics.proto — AnalyticsService (puerto 5012)
 
 | RPC | Input | Output | Consumidores |
 |-----|-------|--------|-------------|
@@ -33,7 +33,7 @@ to:             string (ISO date)
 
 ---
 
-## chatia.proto — ChatIAService (puerto 5001)
+## chatia.proto — ChatIAService (puerto 5010)
 
 | RPC | Input | Output | Consumidores |
 |-----|-------|--------|-------------|
@@ -44,7 +44,7 @@ to:             string (ISO date)
 
 ---
 
-## notificaciones.proto — NotificacionesService (puerto 5003)
+## notificaciones.proto — NotificacionesService (puerto 5013)
 
 | RPC | Input | Output | Consumidores |
 |-----|-------|--------|-------------|
@@ -65,7 +65,7 @@ idempotencyKey: string
 
 ---
 
-## pagos.proto — PagosService (puerto 5002)
+## pagos.proto — PagosService (puerto 5011)
 
 | RPC | Input | Output | Consumidores |
 |-----|-------|--------|-------------|
@@ -75,7 +75,7 @@ idempotencyKey: string
 
 ---
 
-## workers.proto — WorkersService (puerto 5005)
+## workers.proto — WorkersService (puerto 5014)
 
 | RPC | Input | Output | Consumidores |
 |-----|-------|--------|-------------|

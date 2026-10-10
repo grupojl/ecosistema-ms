@@ -3,11 +3,11 @@
 # Railway  → Root Directory: /  |  Dockerfile Path: workers-backend/Dockerfile
 # VPS/AWS  → docker build -f workers-backend/Dockerfile .
 #
-# HTTP:  3000 (interno — REST jobs/stats, DLQ management)
-# gRPC:  5005 (interno — red privada Railway)
+# HTTP:  3014 (interno — REST jobs/stats, DLQ management)
+# gRPC:  5014 (interno — red privada Railway)
 # BullMQ: faq-ingest, vector-index, campaign-email, analytics-export + DLQs
 # Scheduler: lock Redis distribuido (SET NX EX) — ADR-006
-# gRPC clients: chatia (5001), notificaciones (5003), analytics (5004)
+# gRPC clients: chatia (5010), notificaciones (5013), analytics (5012)
 # Ref: .claude/architecture/05-dockerfile-backend.md
 
 ARG NODE_VERSION=22
@@ -78,7 +78,7 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3014
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                      ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/workers-backend/dist              ./workers-backend/dist
@@ -90,12 +90,12 @@ COPY --chown=nestjs:nodejs workers-backend/entrypoint.sh                       .
 
 USER nestjs
 
-EXPOSE 3000
-EXPOSE 5005
+EXPOSE 3014
+EXPOSE 5014
 
 WORKDIR /app/workers-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://localhost:3014/health || exit 1
 
 CMD ["dumb-init", "sh", "/app/workers-backend/entrypoint.sh"]

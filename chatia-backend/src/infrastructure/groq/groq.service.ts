@@ -2,9 +2,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export const GROQ_MODELS = {
-  LLAMA_70B: 'llama-3.3-70b-versatile',   // mejor calidad — respuestas al cliente
-  LLAMA_8B: 'llama-3.1-8b-instant',        // más rápido — clasificación, intent
-  MIXTRAL: 'mixtral-8x7b-32768',           // contexto largo — resúmenes
+  GPT_OSS_120B: 'openai/gpt-oss-120b',   // mejor calidad — respuestas al cliente
+  GPT_OSS_20B: 'openai/gpt-oss-20b',     // más rápido — clasificación, intent
 } as const;
 
 export type GroqModel = (typeof GROQ_MODELS)[keyof typeof GROQ_MODELS];
@@ -35,7 +34,7 @@ export class GroqService {
     } = {},
   ): Promise<GroqResponse> {
     const {
-      model = GROQ_MODELS.LLAMA_70B,
+      model = GROQ_MODELS.GPT_OSS_120B,
       temperature = 0.7,
       maxTokens = 1024,
       jsonMode = false,

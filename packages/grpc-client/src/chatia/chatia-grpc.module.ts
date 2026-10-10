@@ -9,7 +9,7 @@ export const CHATIA_GRPC_CLIENT = 'CHATIA_GRPC_CLIENT';
  * ChatiaGrpcModule — importar en cualquier microservicio que necesite
  * llamar a chatia-backend via gRPC.
  *
- * URL interna Railway: CHATIA_GRPC_URL (ej: chatia-backend.railway.internal:5001)
+ * URL interna Railway: CHATIA_GRPC_URL (ej: chatia-backend.railway.internal:5010)
  */
 @Module({
   imports: [
@@ -19,7 +19,7 @@ export const CHATIA_GRPC_CLIENT = 'CHATIA_GRPC_CLIENT';
         useFactory: () => ({
           transport: Transport.GRPC,
           options: {
-            url:       process.env['CHATIA_GRPC_URL'] ?? 'localhost:5001',
+            url:       process.env['CHATIA_GRPC_URL'] ?? 'localhost:5010',
             package:   CHATIA_PACKAGE,
             protoPath: CHATIA_PROTO_PATH,
             channelOptions: {

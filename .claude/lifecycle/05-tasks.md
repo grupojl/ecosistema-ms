@@ -83,7 +83,7 @@ y cómo saber que está hecho. En orden de ejecución dentro de cada fase.
 ### Escalón 3 — Infraestructura
 
 - [ ] **[E3-01]** Confirmar HTTPS en todos los endpoints públicos de Railway
-- [ ] **[E3-02]** Confirmar que puertos gRPC (5001-5005) no son accesibles desde internet
+- [ ] **[E3-02]** Confirmar que puertos gRPC (5010-5014) no son accesibles desde internet
 - [ ] **[E3-03]** Agregar `Helmet` en el `main.ts` de cada servicio
 - [ ] **[E3-04]** Configurar `ALLOWED_ORIGINS` explícito sin wildcard en los 5 servicios
 - [ ] **[E3-05]** Implementar rate limiting en endpoints públicos de chatia y pagos

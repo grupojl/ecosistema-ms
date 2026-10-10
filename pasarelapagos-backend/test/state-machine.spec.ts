@@ -1,5 +1,5 @@
 import { assertValidTransition, isTerminal } from '@/core/payments/payment-state.machine.js';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentStatus } from '@/generated/prisma/client.js';
 
 /**
  * Tests unitarios del state machine — sin IO, rápidos.

@@ -3,7 +3,7 @@
 // ÚNICO archivo del módulo contacts que puede importar PrismaService.
 // Multi-tenant: organizationId + organization.ecosystemId en el where de todas las queries.
 import { Injectable } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client.js';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import type {
   IContactsRepository,

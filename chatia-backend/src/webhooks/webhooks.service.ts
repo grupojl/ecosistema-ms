@@ -4,7 +4,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue }       from 'bullmq';
 import { PrismaService }    from '@/infrastructure/prisma/prisma.service.js';
 import { ChannelRegistry }  from '@/channels/channel.registry.js';
-import { ChannelType }      from '@prisma/client';
+import { ChannelType }      from '@/generated/prisma/client.js';
 import { QUEUES, JOBS }     from '@/queue/queue.constants.js';
 import type { IncomingMessageJobData } from '@/queue/processors/incoming-message.processor.js';
 

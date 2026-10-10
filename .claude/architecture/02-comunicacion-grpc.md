@@ -28,11 +28,11 @@ packages/grpc-client/src/     # módulos NestJS para consumir cada servicio
 
 | Variable | Local | Railway (red privada) |
 |---|---|---|
-| `CHATIA_GRPC_URL` | `localhost:5001` | `chatia-backend.railway.internal:5001` |
-| `PAGOS_GRPC_URL` | `localhost:5002` | `pasarelapagos-backend.railway.internal:5002` |
-| `NOTIFICACIONES_GRPC_URL` | `localhost:5003` | `notificaciones-backend.railway.internal:5003` |
-| `ANALYTICS_GRPC_URL` | `localhost:5004` | `analytics-backend.railway.internal:5004` |
-| `WORKERS_GRPC_URL` | `localhost:5005` | `workers-backend.railway.internal:5005` |
+| `CHATIA_GRPC_URL` | `localhost:5010` | `chatia-backend.railway.internal:5010` |
+| `PAGOS_GRPC_URL` | `localhost:5011` | `pasarelapagos-backend.railway.internal:5011` |
+| `NOTIFICACIONES_GRPC_URL` | `localhost:5013` | `notificaciones-backend.railway.internal:5013` |
+| `ANALYTICS_GRPC_URL` | `localhost:5012` | `analytics-backend.railway.internal:5012` |
+| `WORKERS_GRPC_URL` | `localhost:5014` | `workers-backend.railway.internal:5014` |
 
 ## Cómo agregar un nuevo RPC
 

@@ -50,12 +50,12 @@
 
 ```bash
 # Verificar que /metrics responde en cada servicio
-for port in 3000 3001 3002 3003 3004; do
+for port in 3010 3011 3012 3013 3014 3015; do
   echo "=== Puerto $port ===" && curl -s http://localhost:$port/metrics | head -5
 done
 
 # Verificar /health
-for port in 3000 3001 3002 3003 3004; do
+for port in 3010 3011 3012 3013 3014 3015; do
   echo "=== /health :$port ===" && curl -s http://localhost:$port/health | jq .
 done
 ```

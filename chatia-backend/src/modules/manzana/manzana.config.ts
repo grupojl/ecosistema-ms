@@ -4,7 +4,7 @@
 // TODO: ajustar systemPrompt, stage y comportamiento cuando se integre el proyecto.
 // =============================================================================
 
-import { ConversationStage } from '@prisma/client';
+import { ConversationStage } from '@/generated/prisma/client.js';
 
 export const MANZANA_CONFIG = {
   /**
@@ -26,7 +26,7 @@ export const MANZANA_CONFIG = {
    * Modelo LLM preferido para MANZANA.
    * Puede sobrescribirse desde AssistantConfig en DB.
    */
-  preferredModel: 'llama-3.3-70b-versatile',
+  preferredModel: 'openai/gpt-oss-120b',
 
   /**
    * Si este proyecto usa FAQ/RAG como fuente de conocimiento.

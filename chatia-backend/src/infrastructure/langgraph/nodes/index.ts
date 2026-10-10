@@ -2,7 +2,7 @@
 import { Logger } from '@nestjs/common';
 import { GroqService, GROQ_MODELS, type GroqModel } from '@/infrastructure/groq/groq.service.js';
 import { GraphState, ClassifyResult, INTENTS } from '@/infrastructure/langgraph/langgraph.types.js';
-import { ConversationStage } from '@prisma/client';
+import { ConversationStage } from '@/generated/prisma/client.js';
 
 const logger = new Logger('LangGraphNodes');
 
@@ -40,7 +40,7 @@ Keywords de escalado: ${state.humanTakeoverKeywords.join(', ')}`;
     const result = await groq.chatJson<ClassifyResult>([
       { role: 'user', content: prompt },
     ], {
-      model: GROQ_MODELS.LLAMA_8B,
+      model: GROQ_MODELS.GPT_OSS_20B,
       temperature: 0.1,
       maxTokens: 256,
     });
@@ -162,7 +162,7 @@ Respuesta a validar: "${state.responseText}"`;
       reason: string | null;
       correctedResponse: string | null;
     }>([{ role: 'user', content: prompt }], {
-      model: GROQ_MODELS.LLAMA_8B,
+      model: GROQ_MODELS.GPT_OSS_20B,
       temperature: 0.1,
       maxTokens: 512,
     });

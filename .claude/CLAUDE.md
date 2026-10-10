@@ -18,12 +18,12 @@
 
 | Servicio | HTTP | gRPC | Estado |
 |----------|------|------|--------|
-| chatia-backend | 3000 | 5001 | ✅ ZodFilter + pino + PrometheusModule + CB fallback |
-| pasarelapagos-backend | 3001 | 5002 | ✅ ZodFilter + pino + PrometheusModule |
-| notificaciones-backend | 3002 | 5003 | ✅ ZodFilter + pino + PrometheusModule + CBService |
-| analytics-backend | 3003 | 5004 | ✅ ZodFilter + pino + PrometheusModule |
-| workers-backend | 3004 | 5005 | ✅ ZodFilter + pino + PrometheusModule |
-| marketing-backend | 3005 | 5006 | ✅ ZodFilter + pino + PrometheusModule |
+| chatia-backend | 3010 | 5010 | ✅ ZodFilter + pino + PrometheusModule + CB fallback |
+| pasarelapagos-backend | 3011 | 5011 | ✅ ZodFilter + pino + PrometheusModule |
+| notificaciones-backend | 3013 | 5013 | ✅ ZodFilter + pino + PrometheusModule + CBService |
+| analytics-backend | 3012 | 5012 | ✅ ZodFilter + pino + PrometheusModule |
+| workers-backend | 3014 | 5014 | ✅ ZodFilter + pino + PrometheusModule |
+| marketing-backend | 3015 | 5015 | ✅ ZodFilter + pino + PrometheusModule |
 
 ## Lo más sólido
 
@@ -53,6 +53,7 @@
 - Lógica de negocio en controller o componente UI → bug de capa
 - CircuitOpenError sin captura en paths de proveedores externos → PR bloqueado
 - Servicio que consume `src/` de un package (en vez de `dist/`) → bug de build (ADR-020)
+- Importar de `@prisma/client` en un servicio → usar `@/generated/prisma/client.js` (cliente por servicio, ADR-020)
 
 ## Próximas tareas (Fase 4 — Escala)
 

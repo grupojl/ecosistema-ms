@@ -3,7 +3,7 @@
 // Mapeo de columnas (anti-corruption): tenantId = ecosystemId, amountMinor = amount,
 // providerId = provider, failureMessage = failureReason.
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { Prisma } from '@/generated/prisma/client.js';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import type { ListPaymentsDto, RetryPaymentDto } from '@/internal/schemas.js';
 

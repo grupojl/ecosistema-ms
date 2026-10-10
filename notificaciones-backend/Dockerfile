@@ -3,8 +3,8 @@
 # Railway  → Root Directory: /  |  Dockerfile Path: notificaciones-backend/Dockerfile
 # VPS/AWS  → docker build -f notificaciones-backend/Dockerfile .
 #
-# HTTP:  3000 (público — REST preferencias)
-# gRPC:  5003 (interno — red privada Railway)
+# HTTP:  3013 (público — REST preferencias)
+# gRPC:  5013 (interno — red privada Railway)
 # BullMQ: notification-queue (con idempotency check + DLQ monitor)
 # Ref: .claude/architecture/05-dockerfile-backend.md
 
@@ -76,7 +76,7 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3013
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                           ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/notificaciones-backend/dist            ./notificaciones-backend/dist
@@ -88,12 +88,12 @@ COPY --chown=nestjs:nodejs notificaciones-backend/entrypoint.sh                 
 
 USER nestjs
 
-EXPOSE 3000
-EXPOSE 5003
+EXPOSE 3013
+EXPOSE 5013
 
 WORKDIR /app/notificaciones-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://localhost:3013/health || exit 1
 
 CMD ["dumb-init", "sh", "/app/notificaciones-backend/entrypoint.sh"]

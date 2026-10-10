@@ -78,7 +78,7 @@ export class WidgetController {
     @Res() res: Response,
   ) {
     const config = await this.resolveConfig(slug);
-    const appUrl  = process.env.APP_URL ?? 'http://localhost:3000';
+    const appUrl  = process.env.APP_URL ?? 'http://localhost:3010';
     const snippet = this.buildSnippet({
       projectSlug:    slug,
       apiUrl:         `${appUrl}/api/v1`,

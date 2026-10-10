@@ -5,8 +5,8 @@ Procesamiento de pagos (MercadoPago, Stripe, dLocal, Conekta, Pagarme, Fake),
 reconciliación, webhooks de proveedores, gestión de tenants/API keys.
 
 ## Puertos
-- HTTP público: 3001
-- gRPC interno: 5002
+- HTTP público: 3011
+- gRPC interno: 5011
 
 ## Arquitectura (reestructurada 2026-10-02)
 

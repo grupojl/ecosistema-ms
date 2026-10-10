@@ -54,6 +54,42 @@ export class AssistantConfigService {
     return config;
   }
 
+  /**
+   * Config del proyecto por defecto de la org: primer proyecto activo (el más antiguo).
+   * Si la org no tiene ninguno, crea uno con el slug de la organización.
+   */
+  async findDefaultForOrg(organizationId: string) {
+    const existing = await this.prisma.project.findFirst({
+      where:   { organizationId, isActive: true },
+      orderBy: { createdAt: 'asc' },
+      include: { assistantConfigs: true },
+    });
+    if (existing) {
+      return existing.assistantConfigs[0] ?? this.getOrCreate(existing.id, organizationId);
+    }
+
+    const org = await this.prisma.organization.findUnique({
+      where:  { id: organizationId },
+      select: { name: true, slug: true },
+    });
+    if (!org) throw new NotFoundException(`Organización "${organizationId}" no encontrada`);
+
+    const slug = (org.slug ?? organizationId)
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'default';
+
+    // upsert: tolera dos primeros chats concurrentes de la misma org
+    const project = await this.prisma.project.upsert({
+      where:  { organizationId_slug: { organizationId, slug } },
+      update: {},
+      create: { organizationId, slug, name: org.name },
+    });
+    this.logger.log(`Proyecto por defecto "${slug}" creado para org ${organizationId}`);
+    return this.getOrCreate(project.id, organizationId);
+  }
+
   private async verifyOwnership(projectId: string, organizationId: string) {
     const config = await this.prisma.assistantConfig.findFirst({
       where: { projectId, organizationId },

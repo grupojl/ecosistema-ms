@@ -1,6 +1,6 @@
 syntax = "proto3";
 package notificaciones;
-// Puerto gRPC interno: 5003 | Usado por: chatia-backend, workers-backend, pasarelapagos-backend
+// Puerto gRPC interno: 5013 | Usado por: chatia-backend, workers-backend, pasarelapagos-backend
 service NotificacionesService {
   rpc SendNotification          (SendNotificationRequest)          returns (SendNotificationResponse);
   rpc GetDeliveryStatus         (DeliveryStatusRequest)            returns (DeliveryStatusResponse);

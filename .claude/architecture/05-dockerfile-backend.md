@@ -93,11 +93,11 @@ El flujo CI ya contempla el paso — es un uncomment, no una reescritura.
 
 | Servicio               | HTTP | gRPC |
 |------------------------|------|------|
-| chatia-backend         | 3000 | 5001 |
-| pasarelapagos-backend  | 3001 | 5002 |
-| notificaciones-backend | 3000 | 5003 |
-| analytics-backend      | 3000 | 5004 |
-| workers-backend        | 3000 | 5005 |
+| chatia-backend         | 3010 | 5010 |
+| pasarelapagos-backend  | 3011 | 5011 |
+| notificaciones-backend | 3013 | 5013 |
+| analytics-backend      | 3012 | 5012 |
+| workers-backend        | 3014 | 5014 |
 
 `analytics-backend` y `workers-backend` no usan `packages/auth-server` —
 solo lo consumen otros MS via gRPC. Ajustar el `COPY` de packages según el servicio.
@@ -110,8 +110,8 @@ solo lo consumen otros MS via gRPC. Ajustar el `COPY` de packages según el serv
 # syntax=docker/dockerfile:1.7
 # Build context: raíz del monorepo (ecosistema-ms/)
 # Reemplazar <SERVICE_DIR>  → nombre del servicio (ej: chatia-backend)
-# Reemplazar <SERVICE_PORT> → puerto HTTP (ej: 3000)
-# Reemplazar <GRPC_PORT>    → puerto gRPC (ej: 5001)
+# Reemplazar <SERVICE_PORT> → puerto HTTP (ej: 3010)
+# Reemplazar <GRPC_PORT>    → puerto gRPC (ej: 5010)
 #
 # Railway  → Root Directory: /  |  Dockerfile Path: <SERVICE_DIR>/Dockerfile
 # CI/CD    → ver .github/workflows/ci-<SERVICE_DIR>.yml

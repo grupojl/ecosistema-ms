@@ -9,7 +9,7 @@ export const PAGOS_GRPC_CLIENT = 'PAGOS_GRPC_CLIENT';
  * PagosGrpcModule — importar en cualquier microservicio que necesite
  * llamar a pasarelapagos-backend via gRPC.
  *
- * URL interna Railway: PAGOS_GRPC_URL (ej: pasarelapagos-backend.railway.internal:5002)
+ * URL interna Railway: PAGOS_GRPC_URL (ej: pasarelapagos-backend.railway.internal:5011)
  */
 @Module({
   imports: [
@@ -19,7 +19,7 @@ export const PAGOS_GRPC_CLIENT = 'PAGOS_GRPC_CLIENT';
         useFactory: () => ({
           transport: Transport.GRPC,
           options: {
-            url:       process.env['PAGOS_GRPC_URL'] ?? 'localhost:5002',
+            url:       process.env['PAGOS_GRPC_URL'] ?? 'localhost:5011',
             package:   PAGOS_PACKAGE,
             protoPath: PAGOS_PROTO_PATH,
             channelOptions: {

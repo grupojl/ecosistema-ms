@@ -6,7 +6,7 @@ import { QUEUES } from '@/queue/queue.constants.js';
 import { ChannelRegistry } from '@/channels/channel.registry.js';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import { EventsGateway } from '@/events/events.gateway.js';
-import { ChannelType } from '@prisma/client';
+import { ChannelType } from '@/generated/prisma/client.js';
 
 export interface OutgoingMessageJobData {
   messageId: string;

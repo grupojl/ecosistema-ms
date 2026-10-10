@@ -173,7 +173,7 @@ export class OverviewService {
     payload:        Record<string, unknown>;
     occurredAt:     Date;
   }): Promise<{ id: string }> {
-    const created = await this.prisma.analyticsEvent.create({ data: { ...data, payload: data.payload as import("@prisma/client").Prisma.InputJsonValue } });
+    const created = await this.prisma.analyticsEvent.create({ data: { ...data, payload: data.payload as import("@/generated/prisma/client.js").Prisma.InputJsonValue } });
     return created;
   }
 }

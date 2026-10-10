@@ -30,14 +30,14 @@ export class PreferencesService {
         organizationId_contactId_channel: {
           organizationId,
           contactId,
-          channel: channel as import("@prisma/client").NotificationChannel,
+          channel: channel as import("@/generated/prisma/client.js").NotificationChannel,
         },
       },
       create: {
         ecosystemId,
         organizationId,
         contactId,
-        channel:     channel as import("@prisma/client").NotificationChannel,
+        channel:     channel as import("@/generated/prisma/client.js").NotificationChannel,
         optedOut,
         optedOutAt:  optedOut ? new Date() : null,
       },

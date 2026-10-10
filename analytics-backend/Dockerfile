@@ -3,8 +3,8 @@
 # Railway  → Root Directory: /  |  Dockerfile Path: analytics-backend/Dockerfile
 # VPS/AWS  → docker build -f analytics-backend/Dockerfile .
 #
-# HTTP:  3000 (interno — REST analytics + SSE /sse/events)
-# gRPC:  5004 (interno — red privada Railway)
+# HTTP:  3012 (interno — REST analytics + SSE /sse/events)
+# gRPC:  5012 (interno — red privada Railway)
 # BullMQ: analytics-events (best-effort, attempts:1, fire-and-forget)
 # NOTA: analytics-backend no usa auth-server — solo lo consumen otros MS vía gRPC
 # Ref: .claude/architecture/05-dockerfile-backend.md
@@ -77,7 +77,7 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=3012
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                       ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/analytics-backend/dist             ./analytics-backend/dist
@@ -89,12 +89,12 @@ COPY --chown=nestjs:nodejs analytics-backend/entrypoint.sh                      
 
 USER nestjs
 
-EXPOSE 3000
-EXPOSE 5004
+EXPOSE 3012
+EXPOSE 5012
 
 WORKDIR /app/analytics-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3000/health || exit 1
+  CMD wget -qO- http://localhost:3012/health || exit 1
 
 CMD ["dumb-init", "sh", "/app/analytics-backend/entrypoint.sh"]

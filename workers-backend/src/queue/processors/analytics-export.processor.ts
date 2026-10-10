@@ -102,7 +102,7 @@ export class AnalyticsExportProcessor extends WorkerHost {
         status:      'DONE',
         completedAt: new Date(),
         durationMs,
-        result:      { url, format, sizeBytes, rowCount } as import("@prisma/client").Prisma.InputJsonValue,
+        result:      { url, format, sizeBytes, rowCount } as import("@/generated/prisma/client.js").Prisma.InputJsonValue,
       });
 
       this.logger.log(

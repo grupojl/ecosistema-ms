@@ -5,8 +5,8 @@ Sincronización de métricas de campañas (Meta, Google, TikTok),
 automatización de reglas sobre métricas, atribución de conversiones de pagos.
 
 ## Puertos
-- HTTP público: 3005
-- gRPC interno: 5006
+- HTTP público: 3015
+- gRPC interno: 5015
 
 ## Arquitectura (reestructurada 2026-10-02)
 

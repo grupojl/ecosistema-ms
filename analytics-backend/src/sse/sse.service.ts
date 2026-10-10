@@ -46,11 +46,7 @@ export class SseService implements OnModuleDestroy {
 
   async onModuleInit(): Promise<void> {
     // Subscriber dedicado — no usar el mismo cliente que el publisher
-    this.subscriber = new Redis({
-      host:     this.config.get<string>('REDIS_HOST', 'localhost'),
-      port:     parseInt(this.config.get<string>('REDIS_PORT', '6379'), 10),
-      password: this.config.get<string>('REDIS_PASSWORD'),
-    });
+    this.subscriber = new Redis(this.config.get<string>('REDIS_URL', 'redis://localhost:6379'));
 
     await this.subscriber.subscribe(SSE_CHANNEL);
 

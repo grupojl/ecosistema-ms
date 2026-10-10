@@ -3,7 +3,7 @@
 // Nunca se borran ni modifican registros — compliance PCI-DSS.
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client.js';
 
 export type AuditAction =
   | 'payment.created'

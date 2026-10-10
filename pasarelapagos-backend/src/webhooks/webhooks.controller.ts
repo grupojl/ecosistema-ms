@@ -66,8 +66,8 @@ export class WebhooksController {
       data: {
         providerId,
         externalId: event.externalId,
-        headers:    headers as import("@prisma/client").Prisma.InputJsonValue,
-        body:       event.raw as import("@prisma/client").Prisma.InputJsonValue,
+        headers:    headers as import("@/generated/prisma/client.js").Prisma.InputJsonValue,
+        body:       event.raw as import("@/generated/prisma/client.js").Prisma.InputJsonValue,
         status:     'received',
       },
     });

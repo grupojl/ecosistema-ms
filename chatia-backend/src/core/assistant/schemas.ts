@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 export const ChatSchema = z.object({
-  projectSlug: z.string().min(1).max(60),
+  projectSlug: z.string().min(1).max(60).optional(), // sin slug → proyecto por defecto de la org
   message:     z.string().min(1).max(4096),
   userId:      z.string().min(1),
   channel:     z.enum(['api', 'whatsapp', 'instagram', 'messenger', 'tiktok']).default('api'),

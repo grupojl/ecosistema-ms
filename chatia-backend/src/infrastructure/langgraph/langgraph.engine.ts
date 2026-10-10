@@ -10,7 +10,7 @@ import {
   validateNode,
   humanTakeoverNode,
 } from '@/infrastructure/langgraph/nodes/index.js';
-import { ConversationStage } from '@prisma/client';
+import { ConversationStage } from '@/generated/prisma/client.js';
 
 export interface RunGraphInput {
   conversationId: string;

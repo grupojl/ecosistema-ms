@@ -23,8 +23,8 @@ import { MetricsService }   from '@/infrastructure/metrics/metrics.service.js';
 import type { CreatePaymentInput } from '@/core/payments/schemas.js';
 import { assertValidTransition }   from '@/core/payments/payment-state.machine.js';
 import type { OrgContext }         from '@/infrastructure/common/interfaces/org-context.interface.js';
-import { PaymentStatus, Prisma }   from '@prisma/client';
-import { PaymentMethodKind as PrismaPaymentMethodKind } from '@prisma/client';
+import { PaymentStatus, Prisma }   from '@/generated/prisma/client.js';
+import { PaymentMethodKind as PrismaPaymentMethodKind } from '@/generated/prisma/client.js';
 import type { PaymentMethodKind as ProviderMethodKind } from '@/infrastructure/providers/provider.interface.js';
 
 // ---------------------------------------------------------------------------

@@ -40,7 +40,7 @@ export class RoutingService {
 
     if (!providerIds) {
       const routes = await this.prisma.providerRoute.findMany({
-        where:   { country, currency, method: method.toUpperCase() as import("@prisma/client").PaymentMethodKind, active: true },
+        where:   { country, currency, method: method.toUpperCase() as import("@/generated/prisma/client.js").PaymentMethodKind, active: true },
         orderBy: { priority: 'desc' },
         select:  { providerId: true },
       });

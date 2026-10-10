@@ -13,7 +13,7 @@
  *   error rate < 1%
  *
  * Uso:
- *   k6 run --env API_URL=http://localhost:3000 --env API_KEY=test-api-key-dev-only test/load/k6-payments.ts
+ *   k6 run --env API_URL=http://localhost:3011 --env API_KEY=test-api-key-dev-only test/load/k6-payments.ts
  *   k6 run --scenario=stress test/load/k6-payments.ts
  */
 import http from 'k6/http';
@@ -26,7 +26,7 @@ const errorRate         = new Rate('errors');
 const paymentDuration   = new Trend('payment_duration', true);
 
 // --- Config ----------------------------------------------------------------
-const BASE_URL = __ENV.API_URL  ?? 'http://localhost:3000';
+const BASE_URL = __ENV.API_URL  ?? 'http://localhost:3011';
 const API_KEY  = __ENV.API_KEY  ?? 'test-api-key-dev-only';
 
 const HEADERS = {

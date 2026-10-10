@@ -20,13 +20,13 @@
 
 ```bash
 # En el microservicio que LLAMA
-CHATIA_GRPC_URL=chatia-backend.railway.internal:5001     # Railway prod
-CHATIA_GRPC_URL=localhost:5001                            # Desarrollo local
+CHATIA_GRPC_URL=chatia-backend.railway.internal:5010     # Railway prod
+CHATIA_GRPC_URL=localhost:5010                            # Desarrollo local
 
-PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5002
-NOTIF_GRPC_URL=notificaciones-backend.railway.internal:5003
-ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5004
-WORKERS_GRPC_URL=workers-backend.railway.internal:5005
+PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5011
+NOTIF_GRPC_URL=notificaciones-backend.railway.internal:5013
+ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5012
+WORKERS_GRPC_URL=workers-backend.railway.internal:5014
 ```
 
 ## Reglas

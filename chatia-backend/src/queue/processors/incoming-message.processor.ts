@@ -5,7 +5,7 @@ import { Job } from 'bullmq';
 import { QUEUES, JOBS } from '@/queue/queue.constants.js';
 import { ConversationsService } from '@/core/conversations/conversations.service.js';
 import { MultimodalService } from '@/channels/multimodal.service.js';
-import { ChannelType } from '@prisma/client';
+import { ChannelType } from '@/generated/prisma/client.js';
 import { IncomingMessage } from '@/channels/channel.interface.js';
 
 export interface IncomingMessageJobData {

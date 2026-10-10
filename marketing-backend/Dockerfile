@@ -3,8 +3,8 @@
 # Railway  → Root Directory: /  |  Dockerfile Path: marketing-backend/Dockerfile
 # VPS/AWS  → docker build -f marketing-backend/Dockerfile .
 #
-# HTTP:  3005 (REST público + /internal/* para superadmin)
-# gRPC:  5006 (red privada Railway)
+# HTTP:  3015 (REST público + /internal/* para superadmin)
+# gRPC:  5015 (red privada Railway)
 # BullMQ: campaign-sync, campaign-automation, marketing-attribution + DLQs
 # Scheduler: cron jobs via @nestjs/schedule
 # Ref: .claude/architecture/05-dockerfile-backend.md
@@ -78,7 +78,7 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3005
+ENV PORT=3015
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                       ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/marketing-backend/dist             ./marketing-backend/dist
@@ -90,12 +90,12 @@ COPY --chown=nestjs:nodejs marketing-backend/entrypoint.sh                      
 
 USER nestjs
 
-EXPOSE 3005
-EXPOSE 5006
+EXPOSE 3015
+EXPOSE 5015
 
 WORKDIR /app/marketing-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3005/health || exit 1
+  CMD wget -qO- http://localhost:3015/health || exit 1
 
 CMD ["dumb-init", "sh", "/app/marketing-backend/entrypoint.sh"]

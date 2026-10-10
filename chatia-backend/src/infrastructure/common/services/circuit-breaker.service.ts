@@ -20,7 +20,9 @@ export class CircuitOpenError extends Error {
 @Injectable()
 export class CircuitBreakerService implements OnModuleDestroy {
   private readonly logger   = new Logger(CircuitBreakerService.name);
-  private readonly breakers = new Map<string, CircuitBreaker<unknown[], unknown>>();
+  // El breaker es un dispatcher: recibe la operación en cada fire() y la ejecuta.
+  // (Crearlo con `fn` fijo repetiría siempre la primera llamada.)
+  private readonly breakers = new Map<string, CircuitBreaker<[() => Promise<unknown>], unknown>>();
 
   /**
    * Parametros recomendados por integración:
@@ -33,9 +35,9 @@ export class CircuitBreakerService implements OnModuleDestroy {
     fn: () => Promise<T>,
     options: CircuitBreakerOptions = {},
   ): Promise<T> {
-    const breaker = this.getOrCreate(key, fn, options);
+    const breaker = this.getOrCreate(key, options);
     try {
-      return await breaker.fire() as T;
+      return await breaker.fire(fn) as T;
     } catch (err) {
       if (breaker.opened) throw new CircuitOpenError(key);
       throw err;
@@ -63,15 +65,13 @@ export class CircuitBreakerService implements OnModuleDestroy {
     this.breakers.clear();
   }
 
-  private getOrCreate<T>(
+  private getOrCreate(
     key: string,
-    fn: () => Promise<T>,
     opts: CircuitBreakerOptions,
-  ): CircuitBreaker<unknown[], T> {
-    if (this.breakers.has(key)) {
-      return this.breakers.get(key) as CircuitBreaker<unknown[], T>;
-    }
-    const breaker = new CircuitBreaker(fn, {
+  ): CircuitBreaker<[() => Promise<unknown>], unknown> {
+    const existing = this.breakers.get(key);
+    if (existing) return existing;
+    const breaker = new CircuitBreaker((op: () => Promise<unknown>) => op(), {
       timeout:                  opts.timeout        ?? 10_000,
       errorThresholdPercentage: opts.errorThreshold ?? 40,
       resetTimeout:             opts.resetTimeout   ?? 60_000,
@@ -80,7 +80,7 @@ export class CircuitBreakerService implements OnModuleDestroy {
     breaker.on('open',     () => this.logger.warn(`CB open: ${key}`));
     breaker.on('halfOpen', () => this.logger.log(`CB half-open: ${key}`));
     breaker.on('close',    () => this.logger.log(`CB closed: ${key}`));
-    this.breakers.set(key, breaker as CircuitBreaker<unknown[], unknown>);
+    this.breakers.set(key, breaker);
     return breaker;
   }
 }

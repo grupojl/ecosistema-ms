@@ -5,8 +5,8 @@ Chat IA, Knowledge Base (RAG + FAQ), Canales de comunicación, Agentes IA,
 Proyectos, Contactos, Conversaciones, Mensajes.
 
 ## Puertos
-- HTTP público: 3000
-- gRPC interno: 5001
+- HTTP público: 3010
+- gRPC interno: 5010
 
 ## Arquitectura (reestructurada 2026-10-02)
 

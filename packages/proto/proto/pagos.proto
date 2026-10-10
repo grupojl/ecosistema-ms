@@ -3,7 +3,7 @@ syntax = "proto3";
 package pagos;
 
 // ─── Servicio Pasarela de Pagos ───────────────────────────────────────────
-// Puerto gRPC interno: 5002
+// Puerto gRPC interno: 5011
 // Usado por: chatia-backend (pagos de suscripción), futuros microservicios
 service PagosService {
   // Crear intención de pago

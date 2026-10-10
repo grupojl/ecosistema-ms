@@ -5,7 +5,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@/generated/prisma/client.js';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import type { RegisterEcosystemInput } from '@/core/ecosystem/schemas.js';
 

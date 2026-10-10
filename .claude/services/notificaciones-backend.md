@@ -5,8 +5,8 @@ Envío de notificaciones multicanal (Email, Push, WhatsApp),
 idempotencia, DLQ, preferencias de usuario, renderizado de templates.
 
 ## Puertos
-- HTTP interno: 3002
-- gRPC interno: 5003
+- HTTP interno: 3013
+- gRPC interno: 5013
 
 ## Arquitectura (reestructurada 2026-10-02)
 

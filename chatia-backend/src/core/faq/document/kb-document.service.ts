@@ -37,7 +37,7 @@ export class KbDocumentService {
       where: {
         knowledgeBaseId: kbId,
         organizationId,
-        ...(status ? { status: status as import("@prisma/client").KbDocumentStatus } : {}),
+        ...(status ? { status: status as import("@/generated/prisma/client.js").KbDocumentStatus } : {}),
       },
       orderBy: { createdAt: 'desc' },
     });

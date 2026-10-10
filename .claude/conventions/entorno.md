@@ -34,12 +34,12 @@ Si ves `catalog:algo` en cualquier `package.json` → es un bug, normalizar a `c
 
 | Servicio | HTTP | gRPC |
 |---|---|---|
-| `chatia-backend` | 3000 | 5001 |
-| `pasarelapagos-backend` | 3001 | 5002 |
-| `notificaciones-backend` | 3002 | 5003 |
-| `analytics-backend` | 3003 | 5004 |
-| `workers-backend` | 3004 | 5005 |
-| `marketing-backend` | 3005 | 5006 |
+| `chatia-backend` | 3010 | 5010 |
+| `pasarelapagos-backend` | 3011 | 5011 |
+| `notificaciones-backend` | 3013 | 5013 |
+| `analytics-backend` | 3012 | 5012 |
+| `workers-backend` | 3014 | 5014 |
+| `marketing-backend` | 3015 | 5015 |
 
 ## Variables de entorno — marketing-backend
 
@@ -59,13 +59,13 @@ MARKETING_AUTOMATION_INTERVAL_HOURS=1 # frecuencia de evaluación de reglas
 
 # ── Interno (mismo valor que todos los MS) ────────────────────────────────────
 INTERNAL_API_KEY=              # igual en todos los servicios + superadmin
-MARKETING_GRPC_PORT=5006
+MARKETING_GRPC_PORT=5015
 
 # ── Infra ─────────────────────────────────────────────────────────────────────
 DATABASE_URL=                  # PostgreSQL dedicado para marketing-backend
 REDIS_URL=                     # mismo Redis compartido del ecosistema
 NODE_ENV=production
-PORT=3005
+PORT=3015
 ```
 
 ## Paquetes externos específicos de marketing-backend

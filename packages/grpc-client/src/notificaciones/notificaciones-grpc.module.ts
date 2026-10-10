@@ -14,7 +14,7 @@ export const NOTIF_GRPC_CLIENT = 'NOTIF_GRPC_CLIENT';
         options: {
           package:   NOTIF_PACKAGE,
           protoPath: NOTIF_PROTO_PATH,
-          url:       process.env['NOTIF_GRPC_URL'] ?? 'localhost:5003',
+          url:       process.env['NOTIF_GRPC_URL'] ?? 'localhost:5013',
           loader:    { keepCase: true, longs: String, enums: String, defaults: true, oneofs: true },
           channelOptions: {
             'grpc.keepalive_time_ms':              30_000,

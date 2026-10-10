@@ -1,6 +1,6 @@
 syntax = "proto3";
 package workers;
-// Puerto gRPC interno: 5005 | Interaccion principal via BullMQ (fire-and-forget)
+// Puerto gRPC interno: 5014 | Interaccion principal via BullMQ (fire-and-forget)
 // gRPC solo para consultas sincronas de estado desde welver
 service WorkersService {
   rpc GetJobStatus (JobStatusRequest)  returns (JobStatusResponse);

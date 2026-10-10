@@ -9,7 +9,7 @@ import { PrismaService }                        from '@/infrastructure/persisten
 import { MARKETING_QUEUES }                     from '@/marketing.constants.js';
 import { AD_PLATFORM_TOKENS }                   from '@/ad-accounts/adapters/ad-platform.interface.js';
 import type { AdPlatformInterface }             from '@/ad-accounts/adapters/ad-platform.interface.js';
-import type { DailyMetric, Prisma }             from '@prisma/client';
+import type { DailyMetric, Prisma }             from '@/generated/prisma/client.js';
 
 /** Regla con su campaña y cuenta publicitaria (accessToken solo para uso interno) */
 type RuleWithCampaign = Prisma.AutomationRuleGetPayload<{

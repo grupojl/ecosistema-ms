@@ -22,7 +22,7 @@ import { DlqMonitorService } from '@/queue/dlq/dlq-monitor.service.js';
           options: {
             package:   'chatia',
             protoPath: CHATIA_PROTO_PATH,
-            url: config.get<string>('CHATIA_GRPC_URL', 'localhost:5001'),
+            url: config.get<string>('CHATIA_GRPC_URL', 'localhost:5010'),
           },
         }),
       },

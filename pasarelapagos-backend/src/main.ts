@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory }         from '@nestjs/core';
 import { PAGOS_PROTO_PATH } from '@ecosistema-ms/proto';
@@ -21,7 +22,7 @@ async function bootstrap(): Promise<void> {
     options: {
       package:   'pagos',
       protoPath:  PAGOS_PROTO_PATH,
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5002'}`,
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5011'}`,
       channelOptions: {
         'grpc.keepalive_time_ms':             10_000,
         'grpc.keepalive_timeout_ms':           5_000,
@@ -49,10 +50,10 @@ async function bootstrap(): Promise<void> {
 
   // ── Arranque ───────────────────────────────────────────────────────────
   await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3001';
+  const port = process.env['PORT'] ?? '3011';
   await app.listen(port);
   app.get(Logger).log(
-    `HTTP:${port}  gRPC:5002`,
+    `HTTP:${port}  gRPC:5011`,
     'pasarelapagos-backend',
   );
 }

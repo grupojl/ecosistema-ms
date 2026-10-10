@@ -1,5 +1,5 @@
 // src/langgraph/langgraph.types.ts
-import { ConversationStage } from '@prisma/client';
+import { ConversationStage } from '@/generated/prisma/client.js';
 
 // ─── Estado del grafo ─────────────────────────────────────────────────────────
 

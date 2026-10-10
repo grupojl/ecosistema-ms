@@ -3,8 +3,8 @@
 # Railway  → Root Directory: /  |  Dockerfile Path: pasarelapagos-backend/Dockerfile
 # VPS/AWS  → docker build -f pasarelapagos-backend/Dockerfile .
 #
-# HTTP:  3001 (público — REST pagos, webhooks de providers)
-# gRPC:  5002 (interno — red privada Railway)
+# HTTP:  3011 (público — REST pagos, webhooks de providers)
+# gRPC:  5011 (interno — red privada Railway)
 # BullMQ: reconcile-payments, webhook-processing, dlq-payments
 # IMPORTANTE: PII_ENCRYPTION_KEY (32 bytes hex) requerida en producción
 # Ref: .claude/architecture/05-dockerfile-backend.md
@@ -77,7 +77,7 @@ RUN addgroup --system --gid 1001 nodejs \
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3001
+ENV PORT=3011
 
 COPY --from=build --chown=nestjs:nodejs /app/node_modules                          ./node_modules
 COPY --from=build --chown=nestjs:nodejs /app/pasarelapagos-backend/dist            ./pasarelapagos-backend/dist
@@ -89,12 +89,12 @@ COPY --chown=nestjs:nodejs pasarelapagos-backend/entrypoint.sh                  
 
 USER nestjs
 
-EXPOSE 3001
-EXPOSE 5002
+EXPOSE 3011
+EXPOSE 5011
 
 WORKDIR /app/pasarelapagos-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3001/health || exit 1
+  CMD wget -qO- http://localhost:3011/health || exit 1
 
 CMD ["dumb-init", "sh", "/app/pasarelapagos-backend/entrypoint.sh"]

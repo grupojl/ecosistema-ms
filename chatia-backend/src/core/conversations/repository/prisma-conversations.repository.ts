@@ -31,7 +31,7 @@ import {
   MessageStatus,
   MessageType,
   type Conversation as PrismaConversation,
-} from '@prisma/client';
+} from '@/generated/prisma/client.js';
 
 @Injectable()
 export class PrismaConversationsRepository implements IConversationsRepository {

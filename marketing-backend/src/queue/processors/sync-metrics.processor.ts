@@ -8,7 +8,7 @@ import { PrismaService }                        from '@/infrastructure/persisten
 import { MARKETING_QUEUES }                     from '@/marketing.constants.js';
 import { AD_PLATFORM_TOKENS }                   from '@/ad-accounts/adapters/ad-platform.interface.js';
 import type { AdPlatformInterface }             from '@/ad-accounts/adapters/ad-platform.interface.js';
-import type { AdPlatform }                      from '@prisma/client';
+import type { AdPlatform }                      from '@/generated/prisma/client.js';
 
 @Processor(MARKETING_QUEUES.CAMPAIGN_SYNC, { concurrency: 3 })
 export class SyncMetricsProcessor extends WorkerHost {

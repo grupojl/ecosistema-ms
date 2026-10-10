@@ -44,11 +44,11 @@ services:
       NODE_ENV:      development
       DATABASE_URL:  postgresql://chatia:chatia_dev@postgres:5432/chatia_db
       REDIS_URL:     redis://redis:6379
-      PORT:          3000
+      PORT:          3010
     env_file:
       - .env               # para GROQ_API_KEY, META_APP_SECRET, FIREBASE_*, etc.
     ports:
-      - "3000:3000"
+      - "3010:3010"
     volumes:
       - .:/app
       - /app/node_modules  # evita sobreescribir node_modules del container

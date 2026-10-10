@@ -4,11 +4,11 @@ import { z } from 'zod';
 
 export const configValidationSchema = z.object({
   NODE_ENV:     z.enum(['development', 'production', 'test']).default('development'),
-  PORT:         z.coerce.number().default(3000),
+  PORT:         z.coerce.number().default(3010),
   DATABASE_URL: z.string().min(1),
-  REDIS_HOST:   z.string().default('localhost'),
-  REDIS_PORT:   z.coerce.number().default(6379),
+  REDIS_URL:    z.string().default('redis://localhost:6379'),
   GROQ_API_KEY: z.string().optional(),
+  GROQ_MODEL:   z.string().optional(),
   JWT_SECRET:   z.string().optional(),
 });
 

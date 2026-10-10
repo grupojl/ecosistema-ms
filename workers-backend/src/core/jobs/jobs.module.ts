@@ -46,7 +46,7 @@ const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';
           options: {
             package:   'chatia',
             protoPath: join(PROTO_DIR, 'chatia.proto'),
-            url: config.get<string>('CHATIA_GRPC_URL', 'localhost:5001'),
+            url: config.get<string>('CHATIA_GRPC_URL', 'localhost:5010'),
           },
         }),
       },
@@ -59,7 +59,7 @@ const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';
           options: {
             package:   'notificaciones',
             protoPath: join(PROTO_DIR, 'notificaciones.proto'),
-            url: config.get<string>('NOTIF_GRPC_URL', 'localhost:5003'),
+            url: config.get<string>('NOTIF_GRPC_URL', 'localhost:5013'),
           },
         }),
       },
@@ -72,7 +72,7 @@ const ANALYTICS_EXPORT_QUEUE = 'workers.analytics-export';
           options: {
             package:   'analytics',
             protoPath: join(PROTO_DIR, 'analytics.proto'),
-            url: config.get<string>('ANALYTICS_GRPC_URL', 'localhost:5004'),
+            url: config.get<string>('ANALYTICS_GRPC_URL', 'localhost:5012'),
           },
         }),
       },

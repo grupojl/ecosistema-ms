@@ -2,7 +2,7 @@
 // ADR-011 Sprint 2 — Puerto del repositorio de contactos.
 // Multi-tenancy: todas las operaciones filtran por organizationId + ecosystemId
 // (Contact no tiene ecosystemId propio: se resuelve por Organization.ecosystemId).
-import type { ContactStatus, Prisma } from '@prisma/client';
+import type { ContactStatus, Prisma } from '@/generated/prisma/client.js';
 
 export const CONTACTS_REPOSITORY = Symbol('CONTACTS_REPOSITORY');
 

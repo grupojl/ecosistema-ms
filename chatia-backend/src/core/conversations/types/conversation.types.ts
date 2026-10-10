@@ -5,7 +5,7 @@ import type {
   ConversationStatus,
   ConversationStage,
   ChannelType,
-} from '@prisma/client';
+} from '@/generated/prisma/client.js';
 
 export interface ConversationOutput {
   id:               string;

@@ -3,7 +3,7 @@ import type { WELVERBusinessData } from '@/modules/welver/types/context.js';
 import type { OrganizationProfile } from '@/core/strategies/project-context.interface.js';
 
 export const WELVER_CONFIG = {
-  defaultModel: 'llama-3.3-70b-versatile',
+  defaultModel: 'openai/gpt-oss-120b',
   defaultStage: 'INITIAL' as const,
   systemPromptTemplate: `
 Eres el asistente virtual de {STORE_NAME}, una tienda de {STORE_CATEGORY}.

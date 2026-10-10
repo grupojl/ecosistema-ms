@@ -45,21 +45,21 @@ pnpm --filter marketing-backend run start:dev
 **Puertos locales:**
 | Servicio | HTTP | gRPC |
 |---------|------|------|
-| chatia-backend | 3001 | 5001 |
-| pasarelapagos-backend | 3001 | 5002 |
-| analytics-backend | 3001 | 5004 |
-| notificaciones-backend | 3001 | 5003 |
-| workers-backend | 3001 | 5005 |
-| marketing-backend | 3001 | 5006 |
+| chatia-backend | 3010 | 5010 |
+| pasarelapagos-backend | 3011 | 5011 |
+| analytics-backend | 3012 | 5012 |
+| notificaciones-backend | 3013 | 5013 |
+| workers-backend | 3014 | 5014 |
+| marketing-backend | 3015 | 5015 |
 
 **URLs gRPC locales:**
 ```bash
-CHATIA_GRPC_URL=localhost:5001
-PAGOS_GRPC_URL=localhost:5002
-NOTIFICACIONES_GRPC_URL=localhost:5003
-ANALYTICS_GRPC_URL=localhost:5004
-WORKERS_GRPC_URL=localhost:5005
-MARKETING_GRPC_URL=localhost:5006
+CHATIA_GRPC_URL=localhost:5010
+PAGOS_GRPC_URL=localhost:5011
+NOTIFICACIONES_GRPC_URL=localhost:5013
+ANALYTICS_GRPC_URL=localhost:5012
+WORKERS_GRPC_URL=localhost:5014
+MARKETING_GRPC_URL=localhost:5015
 ```
 
 **Diferencias con producción:**
@@ -82,12 +82,12 @@ MARKETING_GRPC_URL=localhost:5006
 
 | Servicio | Dockerfile | Root Dir | Puerto gRPC |
 |---------|-----------|----------|------------|
-| chatia-backend | `chatia-backend/Dockerfile` | `/` | 5001 |
-| pasarelapagos-backend | `pasarelapagos-backend/Dockerfile` | `/` | 5002 |
-| notificaciones-backend | `notificaciones-backend/Dockerfile` | `/` | 5003 |
-| analytics-backend | `analytics-backend/Dockerfile` | `/` | 5004 |
-| workers-backend | `workers-backend/Dockerfile` | `/` | 5005 |
-| marketing-backend | `marketing-backend/Dockerfile` | `/` | 5006 |
+| chatia-backend | `chatia-backend/Dockerfile` | `/` | 5010 |
+| pasarelapagos-backend | `pasarelapagos-backend/Dockerfile` | `/` | 5011 |
+| notificaciones-backend | `notificaciones-backend/Dockerfile` | `/` | 5013 |
+| analytics-backend | `analytics-backend/Dockerfile` | `/` | 5012 |
+| workers-backend | `workers-backend/Dockerfile` | `/` | 5014 |
+| marketing-backend | `marketing-backend/Dockerfile` | `/` | 5015 |
 
 **Infraestructura:**
 - PostgreSQL: plugin dedicado por servicio backend
@@ -96,12 +96,12 @@ MARKETING_GRPC_URL=localhost:5006
 
 **URLs internas Railway:**
 ```bash
-CHATIA_GRPC_URL=chatia-backend.railway.internal:5001
-PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5002
-NOTIFICACIONES_GRPC_URL=notificaciones-backend.railway.internal:5003
-ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5004
-WORKERS_GRPC_URL=workers-backend.railway.internal:5005
-MARKETING_GRPC_URL=marketing-backend.railway.internal:5006
+CHATIA_GRPC_URL=chatia-backend.railway.internal:5010
+PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5011
+NOTIFICACIONES_GRPC_URL=notificaciones-backend.railway.internal:5013
+ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5012
+WORKERS_GRPC_URL=workers-backend.railway.internal:5014
+MARKETING_GRPC_URL=marketing-backend.railway.internal:5015
 ```
 
 **Migraciones:** automáticas en `entrypoint.sh` (`prisma migrate deploy`)
@@ -127,12 +127,12 @@ Hetzner Cloud
 │   ├── HTTP/HTTPS → servicios frontend / API REST
 │   └── gRPC (HTTP/2) → servicios backend inter-servicio
 ├── Servidor app principal (CX52 o superior)
-│   ├── chatia-backend          (HTTP :3001 + gRPC :5001)
-│   ├── pasarelapagos-backend   (HTTP :3002 + gRPC :5002)
-│   ├── analytics-backend       (HTTP :3003 + gRPC :5004)
-│   ├── notificaciones-backend  (HTTP :3004 + gRPC :5003)
-│   ├── workers-backend         (HTTP :3005 + gRPC :5005)
-│   └── marketing-backend       (HTTP :3006 + gRPC :5006)
+│   ├── chatia-backend          (HTTP :3010 + gRPC :5010)
+│   ├── pasarelapagos-backend   (HTTP :3011 + gRPC :5011)
+│   ├── analytics-backend       (HTTP :3012 + gRPC :5012)
+│   ├── notificaciones-backend  (HTTP :3013 + gRPC :5013)
+│   ├── workers-backend         (HTTP :3014 + gRPC :5014)
+│   └── marketing-backend       (HTTP :3015 + gRPC :5015)
 ├── Servidores DB (CPX31 × 2 o Managed DB)
 │   ├── PostgreSQL cluster A (chatia, pagos, analytics)
 │   └── PostgreSQL cluster B (notificaciones, workers, marketing)
@@ -142,7 +142,7 @@ Hetzner Cloud
 
 **Diferencias críticas vs Railway para gRPC:**
 - El load balancer de Hetzner necesita configuración explícita para HTTP/2
-- Caddy soporta gRPC nativo — usar `reverse_proxy h2c://backend:5001`
+- Caddy soporta gRPC nativo — usar `reverse_proxy h2c://backend:5010`
 - TLS entre servicios: evaluarse — mTLS en red privada de Hetzner
 
 **Checklist antes de migrar a Hetzner:**

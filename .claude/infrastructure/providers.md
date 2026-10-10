@@ -141,14 +141,9 @@ DATABASE_URL=postgresql://user:pass@host:5432/dbname
 **Variables de entorno:**
 ```bash
 REDIS_URL=redis://user:pass@host:6379
-# analytics-backend usa formato separado — pendiente de unificar
-REDIS_HOST=
-REDIS_PORT=6379
-REDIS_PASSWORD=
 ```
 
-> ⚠️ Inconsistencia: `analytics-backend` usa `REDIS_HOST/PORT/PASSWORD` mientras
-> los demás usan `REDIS_URL`. Pendiente de unificar a `REDIS_URL`.
+> Todos los servicios usan solo `REDIS_URL` (ya no existen `REDIS_HOST/PORT/PASSWORD`).
 
 ---
 
@@ -162,21 +157,21 @@ REDIS_PASSWORD=
 **Mapa de puertos gRPC:**
 | Servicio | Puerto gRPC |
 |---------|------------|
-| `chatia-backend` | 5001 |
-| `pasarelapagos-backend` | 5002 |
-| `notificaciones-backend` | 5003 |
-| `analytics-backend` | 5004 |
-| `workers-backend` | 5005 |
-| `marketing-backend` | 5006 |
+| `chatia-backend` | 5010 |
+| `pasarelapagos-backend` | 5011 |
+| `notificaciones-backend` | 5013 |
+| `analytics-backend` | 5012 |
+| `workers-backend` | 5014 |
+| `marketing-backend` | 5015 |
 
 **URLs en Railway (red privada):**
 ```bash
-CHATIA_GRPC_URL=chatia-backend.railway.internal:5001
-PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5002
-NOTIFICACIONES_GRPC_URL=notificaciones-backend.railway.internal:5003
-ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5004
-WORKERS_GRPC_URL=workers-backend.railway.internal:5005
-MARKETING_GRPC_URL=marketing-backend.railway.internal:5006
+CHATIA_GRPC_URL=chatia-backend.railway.internal:5010
+PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5011
+NOTIFICACIONES_GRPC_URL=notificaciones-backend.railway.internal:5013
+ANALYTICS_GRPC_URL=analytics-backend.railway.internal:5012
+WORKERS_GRPC_URL=workers-backend.railway.internal:5014
+MARKETING_GRPC_URL=marketing-backend.railway.internal:5015
 ```
 
 **Resiliencia:**

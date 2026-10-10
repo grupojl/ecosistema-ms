@@ -4,7 +4,7 @@
 import { Controller, Get, Post, Param, Query, Body, Req, Res, HttpCode } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { ChannelType } from '@prisma/client';
+import { ChannelType } from '@/generated/prisma/client.js';
 import { WebhooksService } from '@/webhooks/webhooks.service.js';
 
 @ApiTags('webhooks')

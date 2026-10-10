@@ -56,7 +56,7 @@ Respondé en español, de forma concisa y citando el número de fuente cuando co
         },
       ],
       {
-        model: (options.groqModel ?? 'llama-3.3-70b-versatile') as GroqModel,
+        model: (options.groqModel ?? 'openai/gpt-oss-120b') as GroqModel,
         temperature: options.temperature ?? 0.3,
         maxTokens: options.maxTokens ?? 1024,
       },

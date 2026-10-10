@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory }                     from '@nestjs/core';
 import { ValidationPipe }                  from '@nestjs/common';
@@ -26,7 +27,7 @@ async function bootstrap(): Promise<void> {
     .build();
   SwaggerModule.setup('api/docs', app, SwaggerModule.createDocument(app, swaggerCfg));
 
-  const port = process.env['PORT'] ?? '3005';
+  const port = process.env['PORT'] ?? '3015';
   await app.listen(port);
   app.get(Logger).log(`HTTP:${port}`, 'marketing-backend');
 }

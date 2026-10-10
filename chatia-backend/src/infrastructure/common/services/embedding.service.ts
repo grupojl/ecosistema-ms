@@ -23,7 +23,7 @@ export class EmbeddingService {
           },
           { role: 'user', content: truncated },
         ],
-        { model: 'llama-3.1-8b-instant', temperature: 0, maxTokens: 2048 },
+        { model: 'openai/gpt-oss-20b', temperature: 0, maxTokens: 2048 },
       );
 
       const match = response.content.trim().match(/\[[\d\s,.\-e+]+\]/);

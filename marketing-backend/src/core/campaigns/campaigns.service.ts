@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService }                  from '@/infrastructure/persistence/prisma.service.js';
-import type { Prisma }                  from '@prisma/client';
+import type { Prisma }                  from '@/generated/prisma/client.js';
 
 @Injectable()
 export class CampaignsService {

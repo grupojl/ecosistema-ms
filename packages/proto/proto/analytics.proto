@@ -1,6 +1,6 @@
 syntax = "proto3";
 package analytics;
-// Puerto gRPC interno: 5004 | Usado por: chatia-backend (emite eventos), welver (consultas)
+// Puerto gRPC interno: 5012 | Usado por: chatia-backend (emite eventos), welver (consultas)
 service AnalyticsService {
   rpc TrackEvent            (TrackEventRequest)    returns (TrackEventResponse);
   rpc GetOverview           (OverviewRequest)      returns (OverviewResponse);

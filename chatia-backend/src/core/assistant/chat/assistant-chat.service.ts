@@ -14,7 +14,7 @@ export type RagServiceLike = {
 };
 
 export interface ChatInput {
-  projectSlug:    string;
+  projectSlug?:   string;   // opcional: sin slug se usa el proyecto por defecto de la org
   organizationId: string;
   ecosystemId:    string;   // NUEVO — requerido para resolver la strategy
   userId:         string;
@@ -52,7 +52,7 @@ export class AssistantChatService {
     const { projectSlug, organizationId, ecosystemId, userId, message, channel = 'api' } = input;
 
     // ── 1. Resolver strategy por ecosistema + perfil de org ──────────────────
-    const strategy = this.strategyRegistry.get(ecosystemId);
+    const strategy = this.strategyRegistry.get(ecosystemId, await this.resolveProjectType(ecosystemId));
     const projectCtx = await strategy.enrichConversationContext({
       conversationId:  '',   // aún no existe — se asigna después de getOrCreate
       organizationId,
@@ -70,7 +70,9 @@ export class AssistantChatService {
     }
 
     // ── 3. Config del proyecto (puede sobreescribir el modelo de la strategy) ─
-    const config = await this.configService.findByProjectSlug(projectSlug, organizationId);
+    const config = projectSlug
+      ? await this.configService.findByProjectSlug(projectSlug, organizationId)
+      : await this.configService.findDefaultForOrg(organizationId);
 
     if (!config.isEnabled) {
       return {
@@ -87,7 +89,8 @@ export class AssistantChatService {
 
     // systemPrompt viene de la strategy (personalizado por org) y se combina con el config del proyecto
     const systemPrompt = projectCtx.systemPrompt || this.buildSystemPrompt(config);
-    const modelToUse   = config.groqModel || projectCtx.preferredModel;
+    // GROQ_MODEL (env) manda sobre la config del proyecto y la strategy
+    const modelToUse   = process.env.GROQ_MODEL || config.groqModel || projectCtx.preferredModel;
 
     const messages: GroqMessage[] = [
       { role: 'system', content: systemPrompt },
@@ -164,6 +167,16 @@ export class AssistantChatService {
     );
 
     return { sessionId: session.id, response: responseText, tokensUsed, modelUsed, usedFaqFallback, faqSources };
+  }
+
+  /** Tipo de strategy del ecosistema: Ecosystem.config.projectType ('welver' | 'manzana' | 'mexus'). */
+  private async resolveProjectType(ecosystemId: string): Promise<string | null> {
+    const eco = await this.prisma.ecosystem.findUnique({
+      where:  { id: ecosystemId },
+      select: { config: true },
+    });
+    const type = (eco?.config as { projectType?: unknown } | null)?.projectType;
+    return typeof type === 'string' ? type : null;
   }
 
   private buildSystemPrompt(config: { systemPrompt: string; personaName: string }): string {

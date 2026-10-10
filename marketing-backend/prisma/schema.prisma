@@ -5,8 +5,8 @@
 // Ref: .claude/architecture/norte-marketing.md
 
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {

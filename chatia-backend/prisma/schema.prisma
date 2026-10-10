@@ -12,8 +12,8 @@
 // =============================================================================
 
 generator client {
-  provider   = "prisma-client-js"
-  engineType = "client"
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
@@ -347,7 +347,7 @@ model AiConfig {
 
   systemPrompt      String  @default("")
   personaName       String  @default("Asistente")
-  groqModel         String  @default("llama-3.3-70b-versatile")
+  groqModel         String  @default("openai/gpt-oss-120b")
   temperature       Float   @default(0.7)
   maxTokens         Int     @default(1024)
   contextWindowSize Int     @default(10)
@@ -399,7 +399,7 @@ model AssistantConfig {
 
   personaName     String  @default("Asistente")
   systemPrompt    String  @default("")
-  groqModel       String  @default("llama-3.3-70b-versatile")
+  groqModel       String  @default("openai/gpt-oss-120b")
   temperature     Float   @default(0.7)
   maxTokens       Int     @default(1024)
   contextWindow   Int     @default(10)

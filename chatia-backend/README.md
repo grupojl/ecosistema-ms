@@ -6,7 +6,7 @@ API multi-tenant de mensajería con IA — AssistantModule + FaqModule + Widget 
 ## Integración con owner-dashboard
 
 Este sistema es un **sistema hoja** del ecosistema SaaS multi-tenant.
-El [owner-dashboard](http://localhost:3001) maneja toda la auth, orgs y permisos.
+El [owner-dashboard](http://localhost:3010) maneja toda la auth, orgs y permisos.
 
 ### Cómo funciona el SSO
 
@@ -76,7 +76,7 @@ pnpm prisma generate
 pnpm start:dev
 ```
 
-Swagger disponible en: `http://localhost:3000/api/v1/docs`
+Swagger disponible en: `http://localhost:3010/api/v1/docs`
 
 ## Quickstart con Docker completo
 

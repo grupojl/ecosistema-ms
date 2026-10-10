@@ -137,7 +137,7 @@ export class CampaignEmailProcessor extends WorkerHost {
         // Actualizar cursor en JobLog después de cada batch
         cursor += batch.length;
         await this.jobs.updateJobLog(requireJobId(job.id, job.name), {
-          result: { cursor, totalSent, totalFailed } as import("@prisma/client").Prisma.InputJsonValue,
+          result: { cursor, totalSent, totalFailed } as import("@/generated/prisma/client.js").Prisma.InputJsonValue,
         });
 
         this.logger.debug(`[${job.id}] Batch procesado: ${cursor}/${recipientIds.length}`);
@@ -167,7 +167,7 @@ export class CampaignEmailProcessor extends WorkerHost {
         completedAt: new Date(),
         durationMs,
         error:       message,
-        result:      { cursor, totalSent, totalFailed } as import("@prisma/client").Prisma.InputJsonValue,
+        result:      { cursor, totalSent, totalFailed } as import("@/generated/prisma/client.js").Prisma.InputJsonValue,
       });
 
       throw error;

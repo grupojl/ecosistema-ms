@@ -1,6 +1,7 @@
 // chatia-backend/src/core/strategies/generic.strategy.ts
 // Fallback garantizado. NUNCA crece con lógica de negocio real.
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ProjectStrategyRegistry } from '@/core/strategies/project-strategy.registry.js';
 import {
   ProjectType, type ProjectStrategy,
   type ConversationEnrichInput, type ConversationResult,
@@ -11,8 +12,16 @@ import {
 } from '@/core/strategies/project-context.interface.js';
 
 @Injectable()
-export class GenericStrategy implements ProjectStrategy {
+export class GenericStrategy implements ProjectStrategy, OnModuleInit {
   private readonly logger = new Logger(GenericStrategy.name);
+
+  constructor(private readonly registry: ProjectStrategyRegistry) {}
+
+  // El registry asume que GENERIC siempre está registrada (fallback de get()).
+  onModuleInit(): void {
+    this.registry.register(this);
+    this.logger.log('GenericStrategy registrada');
+  }
 
   getProjectType(): ProjectType { return ProjectType.GENERIC; }
 
@@ -21,7 +30,7 @@ export class GenericStrategy implements ProjectStrategy {
     return {
       systemPrompt:   'Eres un asistente útil y amable.',
       defaultStage:   'INITIAL',
-      preferredModel: 'llama-3.3-70b-versatile',
+      preferredModel: 'openai/gpt-oss-120b',
       useFaqFallback: false,
       orgProfile:     { ...DEFAULT_ORG_PROFILE, organizationId: input.organizationId, ecosystemId: input.ecosystemId },
       businessData:   {},

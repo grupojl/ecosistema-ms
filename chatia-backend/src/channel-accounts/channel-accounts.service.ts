@@ -3,7 +3,7 @@
 import { Logger, Injectable, NotFoundException } from '@nestjs/common';
 import type { CreateChannelAccountInput, UpdateChannelAccountInput } from '@/channel-accounts/schemas.js';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
-import { ChannelType, Prisma } from '@prisma/client';
+import { ChannelType, Prisma } from '@/generated/prisma/client.js';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class ChannelAccountsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(organizationId: string, dto: CreateChannelAccountInput) {
-    const appUrl = process.env.APP_URL ?? 'http://localhost:3000';
+    const appUrl = process.env.APP_URL ?? 'http://localhost:3010';
 
     const account = await this.prisma.channelAccount.create({
       data: {

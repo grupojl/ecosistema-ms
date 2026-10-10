@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory }         from '@nestjs/core';
 import { CHATIA_PROTO_PATH } from '@ecosistema-ms/proto';
@@ -15,13 +16,19 @@ async function bootstrap(): Promise<void> {
   // ── Pino structured logger ─────────────────────────────────────────────
   app.useLogger(app.get(Logger));
 
+  // ── CORS — los fronts (dashboard, etc.) llaman directo con Bearer + x-organization-id ──
+  app.enableCors({
+    origin: (process.env['ALLOWED_ORIGINS'] ?? '').split(',').map((o) => o.trim()).filter(Boolean),
+    credentials: true,
+  });
+
   // ── gRPC microservice ──────────────────────────────────────────────────
   app.connectMicroservice<MicroserviceOptions>({
     transport: Transport.GRPC,
     options: {
       package:   'chatia',
       protoPath:  CHATIA_PROTO_PATH,
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5001'}`,
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5010'}`,
       channelOptions: {
         'grpc.keepalive_time_ms':             10_000,
         'grpc.keepalive_timeout_ms':           5_000,
@@ -49,10 +56,10 @@ async function bootstrap(): Promise<void> {
 
   // ── Arranque ───────────────────────────────────────────────────────────
   await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3000';
+  const port = process.env['PORT'] ?? '3010';
   await app.listen(port);
   app.get(Logger).log(
-    `HTTP:${port}  gRPC:5001`,
+    `HTTP:${port}  gRPC:5010`,
     'chatia-backend',
   );
 }

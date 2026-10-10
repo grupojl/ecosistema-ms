@@ -326,7 +326,7 @@ railway-all-new: railway-notificaciones railway-analytics railway-workers
 # UTILS
 # ─────────────────────────────────────────────────────────────────────────────
 queue-stats:
-	curl -s http://localhost:3004/api/v1/dlq/stats | jq .
+	curl -s http://localhost:3014/api/v1/dlq/stats | jq .
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SETUP INICIAL

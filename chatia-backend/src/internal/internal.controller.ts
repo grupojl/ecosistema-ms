@@ -17,7 +17,7 @@ import { InternalApiKeyGuard }              from '@/internal/internal-api-key.gu
 import { PrismaService }                    from '@/infrastructure/prisma/prisma.service.js';
 import { ZodValidationPipe }               from '@/infrastructure/common/pipes/zod-validation.pipe.js';
 import { z }                               from 'zod';
-import type { Prisma }                     from '@prisma/client';
+import type { Prisma }                     from '@/generated/prisma/client.js';
 
 // ── Schemas Zod ──────────────────────────────────────────────────────────────
 

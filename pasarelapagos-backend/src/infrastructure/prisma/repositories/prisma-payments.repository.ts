@@ -16,7 +16,7 @@ import type {
   Payment as PrismaPayment,
   PaymentStatus as PrismaStatus,
   PaymentMethodKind as PrismaMethodKind,
-} from '@prisma/client';
+} from '@/generated/prisma/client.js';
 
 @Injectable()
 export class PrismaPaymentsRepository implements IPaymentsRepository {

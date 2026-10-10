@@ -5,6 +5,7 @@ import { QUEUES }     from '@/queue/queue.constants.js';
 import { IncomingMessageProcessor } from '@/queue/processors/incoming-message.processor.js';
 import { OutgoingMessageProcessor } from '@/queue/processors/outgoing-message.processor.js';
 import { ChannelsModule }      from '@/channels/channel.module.js';
+import { MultimodalModule }    from '@/channels/multimodal.module.js';
 import { ConversationsModule } from '@/core/conversations/conversations.module.js';
 import { EventsModule }        from '@/events/events.module.js';
 
@@ -21,6 +22,7 @@ const REDIS_URL     = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
       ),
     ] : []),
     ChannelsModule,
+    MultimodalModule,
     ConversationsModule,
     EventsModule,
   ],

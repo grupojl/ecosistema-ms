@@ -1,6 +1,6 @@
 // chatia-backend/src/contacts/types/contact.types.ts
 // Tipos de salida del ContactsService. — ADR-007
-import type { ContactStatus, ChannelType } from '@prisma/client';
+import type { ContactStatus, ChannelType } from '@/generated/prisma/client.js';
 
 export interface ContactOutput {
   id:             string;

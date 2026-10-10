@@ -14,7 +14,7 @@ import {
   QUEUE_RECONCILE,
   JOB_RECONCILE_PAYMENT,
 } from '@/infrastructure/common/constants/queues.js';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentStatus } from '@/generated/prisma/client.js';
 
 export interface ReconcileJobData {
   paymentId: string;
@@ -120,7 +120,7 @@ export class ReconciliationService {
         data: {
           paymentId,
           type:    'reconciliation.updated',
-          payload: { from: payment.status, to: newStatus, raw: result.raw as import("@prisma/client").Prisma.InputJsonValue },
+          payload: { from: payment.status, to: newStatus, raw: result.raw as import("@/generated/prisma/client.js").Prisma.InputJsonValue },
         },
       });
     });

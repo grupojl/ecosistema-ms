@@ -40,7 +40,7 @@ export class ManzanaStrategy implements ProjectStrategy, OnModuleInit {
       return {
         systemPrompt:   'Eres un asistente de MANZANA. TODO: completar con instrucciones específicas.',
         defaultStage:   'INITIAL',
-        preferredModel: 'llama-3.3-70b-versatile',
+        preferredModel: 'openai/gpt-oss-120b',
         useFaqFallback: orgProfile.featureFlags.faqEnabled,
         orgProfile,
         businessData:   bizData,
@@ -49,7 +49,7 @@ export class ManzanaStrategy implements ProjectStrategy, OnModuleInit {
       this.logger.error(`ManzanaStrategy.enrich falló: ${err instanceof Error ? err.message : String(err)}`);
       return {
         systemPrompt: 'Eres un asistente amable.', defaultStage: 'INITIAL',
-        preferredModel: 'llama-3.3-70b-versatile', useFaqFallback: false,
+        preferredModel: 'openai/gpt-oss-120b', useFaqFallback: false,
         orgProfile: { ...DEFAULT_ORG_PROFILE, organizationId: input.organizationId, ecosystemId: input.ecosystemId },
         businessData: {},
       };

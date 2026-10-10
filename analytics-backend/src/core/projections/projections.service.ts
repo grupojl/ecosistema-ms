@@ -24,11 +24,7 @@ export class ProjectionsService implements OnModuleInit {
     private readonly prisma:  PrismaService,
     private readonly config:  ConfigService,
   ) {
-    this.redis = new Redis({
-      host:     config.get<string>('REDIS_HOST', 'localhost'),
-      port:     parseInt(config.get<string>('REDIS_PORT', '6379'), 10),
-      password: config.get<string>('REDIS_PASSWORD'),
-    });
+    this.redis = new Redis(config.get<string>('REDIS_URL', 'redis://localhost:6379'));
   }
 
   async onModuleInit(): Promise<void> {

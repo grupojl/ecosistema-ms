@@ -44,7 +44,7 @@ export class AiConfigService {
         channelAccountId,
         systemPrompt: dto.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
         personaName: dto.personaName ?? 'Asistente',
-        groqModel: dto.groqModel ?? 'llama-3.3-70b-versatile',
+        groqModel: dto.groqModel ?? 'openai/gpt-oss-120b',
         temperature: dto.temperature ?? 0.7,
         maxTokens: dto.maxTokens ?? 1024,
         contextWindowSize: dto.contextWindowSize ?? 10,

@@ -5,8 +5,8 @@ Ejecución de jobs asíncronos BullMQ: campañas de mensajería,
 indexación de vectores para RAG, exportación de analytics, DLQ monitoring.
 
 ## Puertos
-- HTTP interno: 3004
-- gRPC interno: 5005
+- HTTP interno: 3014
+- gRPC interno: 5014
 
 ## Arquitectura (reestructurada 2026-10-02)
 

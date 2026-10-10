@@ -5,8 +5,8 @@ Persistencia de eventos de analítica, proyecciones agregadas,
 SSE (Server-Sent Events) para dashboards en tiempo real, exportación.
 
 ## Puertos
-- HTTP interno/público: 3003
-- gRPC interno: 5004
+- HTTP interno/público: 3012
+- gRPC interno: 5012
 
 ## Arquitectura (reestructurada 2026-10-02)
 

@@ -1,6 +1,6 @@
 // src/channels/channel.registry.ts
 import { Injectable } from '@nestjs/common';
-import { ChannelType } from '@prisma/client';
+import { ChannelType } from '@/generated/prisma/client.js';
 import type { IChannel } from '@/channels/channel.interface.js';
 import { WhatsAppChannel } from '@/channels/whatsapp/whatsapp.channel.js';
 import { InstagramChannel } from '@/channels/instagram/instagram.channel.js';

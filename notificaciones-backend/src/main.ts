@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import 'reflect-metadata';
 import { NestFactory }         from '@nestjs/core';
 import { NOTIF_PROTO_PATH } from '@ecosistema-ms/proto';
@@ -21,7 +22,7 @@ async function bootstrap(): Promise<void> {
     options: {
       package:   'notificaciones',
       protoPath:  NOTIF_PROTO_PATH,
-      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5003'}`,
+      url:        `0.0.0.0:${process.env['GRPC_PORT'] ?? '5013'}`,
       channelOptions: {
         'grpc.keepalive_time_ms':             10_000,
         'grpc.keepalive_timeout_ms':           5_000,
@@ -49,10 +50,10 @@ async function bootstrap(): Promise<void> {
 
   // ── Arranque ───────────────────────────────────────────────────────────
   await app.startAllMicroservices();
-  const port = process.env['PORT'] ?? '3002';
+  const port = process.env['PORT'] ?? '3013';
   await app.listen(port);
   app.get(Logger).log(
-    `HTTP:${port}  gRPC:5003`,
+    `HTTP:${port}  gRPC:5013`,
     'notificaciones-backend',
   );
 }

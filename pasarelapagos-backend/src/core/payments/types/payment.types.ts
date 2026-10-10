@@ -2,7 +2,7 @@
 // PaymentOutput — tipo de salida del PaymentsService. — ADR-007
 // El service ya tenia private serialize() haciendo este trabajo.
 // Este archivo formaliza el tipo para que el controller lo use con inference.
-import type { PaymentStatus, PaymentMethodKind } from '@prisma/client';
+import type { PaymentStatus, PaymentMethodKind } from '@/generated/prisma/client.js';
 
 export interface PaymentOutput {
   id:              string;

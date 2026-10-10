@@ -6,8 +6,8 @@ Monorepo de microservicios — grupojl/ecosistema-ms
 
 | Carpeta | Puerto HTTP | Puerto gRPC | Estado |
 |---------|------------|-------------|--------|
-| `chatia-backend` | 3000 | 5001 | ✅ existente |
-| `pasarelapagos-backend` | 3001 | 5002 | 🚧 scaffold |
+| `chatia-backend` | 3010 | 5010 | ✅ existente |
+| `pasarelapagos-backend` | 3011 | 5011 | 🚧 scaffold |
 
 ## Packages compartidos
 
@@ -54,5 +54,5 @@ Cada microservicio es un servicio separado en Railway apuntando al mismo repo:
 ## Comunicación inter-servicio
 
 Los microservicios se comunican via gRPC sobre la red privada de Railway:
-- `CHATIA_GRPC_URL=chatia-backend.railway.internal:5001`
-- `PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5002`
+- `CHATIA_GRPC_URL=chatia-backend.railway.internal:5010`
+- `PAGOS_GRPC_URL=pasarelapagos-backend.railway.internal:5011`

@@ -53,11 +53,10 @@ Cada servicio compila ahora con `prisma generate && nest build && tsc-alias -p t
 `tsconfig.build.json` fija `rootDir: ./src` (el entrypoint queda en `dist/main.js`, no `dist/src/main.js`)
 e `incremental: false` (con `deleteOutDir`, el `.tsbuildinfo` viejo dejaba `dist/` sin `.js`).
 
-**Cliente Prisma compartido (limitación conocida):** con `shamefully-hoist` los 6 servicios generan en el
-mismo `@prisma/client` de `node_modules`; gana el último `prisma generate`. Por eso:
-- `typecheck` y `build` de cada servicio ejecutan `prisma generate` primero;
-- los scripts raíz corren servicios en serie (`--workspace-concurrency=1`);
-- CI define `DATABASE_URL` ficticia (Prisma 7 la exige para generar);
-- Docker no se ve afectado: cada imagen genera solo su schema.
-
-Remedio definitivo (pendiente): `output` por servicio en cada `generator client` + alias de import.
+**Cliente Prisma por servicio (2026-10-10):** el cliente compartido (`shamefully-hoist` → un solo
+`@prisma/client` donde ganaba el último `prisma generate`) se reemplazó por un cliente propio por servicio:
+- cada `schema.prisma` usa `provider = "prisma-client"` con `output = "../src/generated/prisma"` (ignorado por git);
+- el código importa de `@/generated/prisma/client.js` (nunca de `@prisma/client`); tsc lo compila a `dist/generated/prisma`;
+- `PrismaClient` exige `adapter` (PrismaPg) también en seeds fuera de `src/` (import relativo `../src/generated/prisma/client.js`);
+- `start:dev`, `typecheck` y `build` ejecutan `prisma generate` antes; `pnpm dev` ya puede levantar los 6 en paralelo;
+- Docker no cambia: la imagen genera su schema y compila a `dist/`.

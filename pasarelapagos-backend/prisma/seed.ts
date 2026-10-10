@@ -1,8 +1,13 @@
-import { PrismaClient, PaymentMethodKind } from '@prisma/client';
+import 'dotenv/config';
+import { PrismaClient, PaymentMethodKind } from '../src/generated/prisma/client.js';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import * as bcrypt from 'bcryptjs';
 import { nanoid } from 'nanoid';
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  adapter: new PrismaPg(new Pool({ connectionString: process.env['DATABASE_URL'] })),
+});
 
 async function main() {
   // --- Tenant de dev ---
@@ -64,7 +69,7 @@ async function main() {
 
   console.log(`✅ ${routes.length} ProviderRoutes configuradas`);
   console.log(`\n🔑 API Key dev: ${RAW_KEY}`);
-  console.log(`📖 Docs: http://localhost:3000/docs`);
+  console.log(`📖 Docs: http://localhost:3011/docs`);
   console.log(`\n🔐 Generar PII_ENCRYPTION_KEY:`);
   console.log(`   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`);
 }

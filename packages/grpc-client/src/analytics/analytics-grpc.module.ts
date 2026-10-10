@@ -22,7 +22,7 @@ export const ANALYTICS_CLIENT_TOKEN = 'ANALYTICS_GRPC_CLIENT';
           options: {
             package:   'analytics',
             protoPath: ANALYTICS_PROTO_PATH,
-            url: config.get<string>('ANALYTICS_GRPC_URL', 'localhost:5004'),
+            url: config.get<string>('ANALYTICS_GRPC_URL', 'localhost:5012'),
             channelOptions: {
               'grpc.keepalive_time_ms':              30_000,
               'grpc.keepalive_timeout_ms':            5_000,

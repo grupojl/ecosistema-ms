@@ -61,7 +61,7 @@ const CHATIA_URL = '../chatia-backend';
 
 // CORRECTO
 const CHATIA_GRPC_URL = process.env.CHATIA_GRPC_URL;
-// En local: localhost:5001 | En Railway: chatia-backend.railway.internal:5001
+// En local: localhost:5010 | En Railway: chatia-backend.railway.internal:5010
 ```
 
 ## Comunicación interna — gRPC sobre red privada
@@ -78,8 +78,8 @@ const CHATIA_GRPC_URL = process.env.CHATIA_GRPC_URL;
 ```
 
 **Variables gRPC por entorno:**
-- Local: `CHATIA_GRPC_URL=localhost:5001`
-- Railway: `CHATIA_GRPC_URL=chatia-backend.railway.internal:5001`
+- Local: `CHATIA_GRPC_URL=localhost:5010`
+- Railway: `CHATIA_GRPC_URL=chatia-backend.railway.internal:5010`
 
 ## Degradación y resiliencia entre servicios
 

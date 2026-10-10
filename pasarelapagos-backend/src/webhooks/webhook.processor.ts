@@ -7,7 +7,7 @@ import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import { assertValidTransition } from '@/core/payments/payment-state.machine.js';
 import { QUEUE_WEBHOOKS, QUEUE_MARKETING_ATTRIBUTION, JOB_ATTRIBUTE_CONVERSION } from '@/infrastructure/common/constants/queues.js';
 import { WebhookEvent } from '@/infrastructure/providers/provider.interface.js';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentStatus } from '@/generated/prisma/client.js';
 import { MetricsService } from '@/infrastructure/metrics/metrics.service.js';
 
 export interface WebhookJobData {
@@ -111,7 +111,7 @@ export class WebhookProcessor extends WorkerHost {
         data: {
           paymentId: payment.id,
           type:      `webhook.${event.eventType}`,
-          payload:   event.raw as import("@prisma/client").Prisma.InputJsonValue,
+          payload:   event.raw as import("@/generated/prisma/client.js").Prisma.InputJsonValue,
         },
       });
     });

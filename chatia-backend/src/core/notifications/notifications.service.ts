@@ -2,7 +2,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
 import { EventsGateway } from '@/events/events.gateway.js';
-import { NotificationType } from '@prisma/client';
+import { NotificationType } from '@/generated/prisma/client.js';
 import { randomUUID } from 'crypto';
 
 export interface CreateNotificationInput {
@@ -104,7 +104,7 @@ export class NotificationsService {
   async list(agentId: string, onlyUnread = false, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
 
-    const where: import("@prisma/client").Prisma.NotificationWhereInput = {
+    const where: import("@/generated/prisma/client.js").Prisma.NotificationWhereInput = {
       agentId,
       ...(onlyUnread && { isRead: false }),
     };

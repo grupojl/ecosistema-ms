@@ -23,17 +23,23 @@ export class InternalApiKeyGuard implements CanActivate {
 
   canActivate(ctx: ExecutionContext): boolean {
     const req     = ctx.switchToHttp().getRequest();
-    const apiKey  = req.headers['x-api-key'] as string | undefined;
-    const valid   = this.config.get<string>('CHAT_INTERNAL_API_KEY');
+    // Contrato superadmin: x-internal-api-key + INTERNAL_API_KEY (igual en todos los MS).
+    // Legacy: x-api-key + CHAT_INTERNAL_API_KEY — se mantiene para no romper consumidores existentes.
+    const headers = req.headers as Record<string, string | undefined>;
+    const candidates: Array<[string | undefined, string | undefined]> = [
+      [headers['x-internal-api-key'], this.config.get<string>('INTERNAL_API_KEY')],
+      [headers['x-api-key'],          this.config.get<string>('CHAT_INTERNAL_API_KEY')],
+    ];
 
-    if (!valid) {
-      this.logger.error('CHAT_INTERNAL_API_KEY no configurada en .env');
+    if (!candidates.some(([, expected]) => expected)) {
+      this.logger.error('INTERNAL_API_KEY / CHAT_INTERNAL_API_KEY no configurada en .env');
       throw new ForbiddenException('Servicio no configurado para acceso interno');
     }
 
-    if (!apiKey || apiKey !== valid) {
-      this.logger.warn(`x-api-key inválida desde ${req.ip}`);
-      throw new ForbiddenException('x-api-key inválida o ausente');
+    const ok = candidates.some(([received, expected]) => !!received && !!expected && received === expected);
+    if (!ok) {
+      this.logger.warn(`API key interna inválida desde ${req.ip}`);
+      throw new ForbiddenException('API key interna inválida o ausente');
     }
 
     return true;

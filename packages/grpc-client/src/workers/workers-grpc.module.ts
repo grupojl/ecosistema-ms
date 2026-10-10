@@ -14,7 +14,7 @@ export const WORKERS_GRPC_CLIENT = 'WORKERS_GRPC_CLIENT';
         options: {
           package:   WORKERS_PACKAGE,
           protoPath: WORKERS_PROTO_PATH,
-          url:       process.env['WORKERS_GRPC_URL'] ?? 'localhost:5005',
+          url:       process.env['WORKERS_GRPC_URL'] ?? 'localhost:5014',
           loader:    { keepCase: true, longs: String, enums: String, defaults: true, oneofs: true },
           channelOptions: {
             'grpc.keepalive_time_ms':              30_000,

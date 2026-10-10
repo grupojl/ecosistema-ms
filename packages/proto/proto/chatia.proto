@@ -3,7 +3,7 @@ syntax = "proto3";
 package chatia;
 
 // ─── Servicio Chat IA ──────────────────────────────────────────────────────
-// Puerto gRPC interno: 5001
+// Puerto gRPC interno: 5010
 // Usado por: pasarelapagos-backend, futuros microservicios
 service ChatIaService {
   // Enviar mensaje a un proyecto de chat
