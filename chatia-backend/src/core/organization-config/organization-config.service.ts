@@ -1,13 +1,16 @@
-// chatia-backend/src/organization-config/organization-config.service.ts
+// chatia-backend/src/core/organization-config/organization-config.service.ts
 // Cache-aside Redis TTL 5min + degradación elegante garantizada.
 import { Injectable, Inject, Logger } from '@nestjs/common';
-import { CacheService }               from '@/infrastructure/common/services/cache.service.js';
+import { CacheService } from '@/infrastructure/common/services/cache.service.js';
 import {
-  ORGANIZATION_CONFIG_REPO, toOrgProfile,
-  type IOrganizationConfigRepository, type UpsertOrgConfigInput,
+  ORGANIZATION_CONFIG_REPO,
+  toOrgProfile,
+  type IOrganizationConfigRepository,
+  type UpsertOrgConfigInput,
 } from '@/core/organization-config/organization-config.repository.interface.js';
 import {
-  DEFAULT_ORG_PROFILE, type OrganizationProfile,
+  DEFAULT_ORG_PROFILE,
+  type OrganizationProfile,
 } from '@/core/strategies/project-context.interface.js';
 
 const TTL_5MIN = 300;
@@ -19,14 +22,19 @@ export class OrganizationConfigService {
 
   constructor(
     @Inject(ORGANIZATION_CONFIG_REPO)
-    private readonly repo:  IOrganizationConfigRepository,
+    private readonly repo: IOrganizationConfigRepository,
     private readonly cache: CacheService,
   ) {}
 
   /** Siempre retorna un valor válido. NUNCA lanza. */
-  async resolve(ecosystemId: string, organizationId: string): Promise<OrganizationProfile> {
+  async resolve(
+    ecosystemId: string,
+    organizationId: string,
+  ): Promise<OrganizationProfile> {
     try {
-      const cached = await this.cache.get<OrganizationProfile>(ckey(ecosystemId, organizationId));
+      const cached = await this.cache.get<OrganizationProfile>(
+        ckey(ecosystemId, organizationId),
+      );
       if (cached) return cached;
 
       const stored = await this.repo.findByOrgId(ecosystemId, organizationId);
@@ -34,7 +42,11 @@ export class OrganizationConfigService {
         ? toOrgProfile(stored)
         : { ...DEFAULT_ORG_PROFILE, organizationId, ecosystemId };
 
-      await this.cache.set(ckey(ecosystemId, organizationId), profile, TTL_5MIN);
+      await this.cache.set(
+        ckey(ecosystemId, organizationId),
+        profile,
+        TTL_5MIN,
+      );
       return profile;
     } catch (err: unknown) {
       this.logger.error(
@@ -45,10 +57,12 @@ export class OrganizationConfigService {
   }
 
   async upsert(input: UpsertOrgConfigInput): Promise<OrganizationProfile> {
-    const stored  = await this.repo.upsert(input);
+    const stored = await this.repo.upsert(input);
     const profile = toOrgProfile(stored);
     await this.cache.del(ckey(input.ecosystemId, input.organizationId));
-    this.logger.log(`OrgConfig upserted + cache invalidada: ${input.ecosystemId}/${input.organizationId}`);
+    this.logger.log(
+      `OrgConfig upserted + cache invalidada: ${input.ecosystemId}/${input.organizationId}`,
+    );
     return profile;
   }
 

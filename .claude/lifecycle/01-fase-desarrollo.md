@@ -32,7 +32,7 @@ validación defensiva en todos los límites del sistema.
    no produce tipos de dominio — Zod sí.
 
 2. **Crear Domain/Repository con MOLDE VIVO** — `.claude/checklists/backend-capas-4-5-domain-repo.md`
-   Empezar por `chatia-backend/conversations/`. Una vez migrado, es el molde
+   Empezar por `chatia-backend/src/core/conversations/`. Una vez migrado, es el molde
    que todos los demás módulos siguen.
 
 3. **Eliminar `as any` y `as unknown as`** — agregar `toEntity()` privado en

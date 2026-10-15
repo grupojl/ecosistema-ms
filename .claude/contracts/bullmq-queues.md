@@ -38,9 +38,13 @@
 ## Convención de jobId determinista (pagos)
 ```typescript
 // ✅ Idempotente — mismo pago siempre el mismo jobId
-const jobId = `payment-reconcile:${paymentId}`;
+const jobId = `payment-reconcile_${paymentId}`; // NUNCA ":" (ver abajo)
 await queue.add('reconcile', data, { jobId, removeOnComplete: true });
 ```
+
+> **Regla (hallada con Redis real, 2026-10-15):** BullMQ rechaza un `jobId` que contenga `:` salvo que tenga exactamente 3 partes
+> (`Custom Id cannot contain :`). Usar `_` o `-` como separador y reemplazar los `:` de ids externos. Un mock de la cola no lo detecta:
+> la prueba es `chatia-backend/src/infrastructure/testing/integration/queues-redis.integration.spec.ts`.
 
 ## DLQ policy
 Jobs fallidos después de `maxAttempts` van a la queue `dlq` del microservicio.

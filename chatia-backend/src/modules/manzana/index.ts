@@ -1,1 +1,1 @@
-export { ManzanaModule } from "@/modules/manzana/manzana.module.js";
+export { ManzanaModule } from '@/modules/manzana/manzana.module.js';

@@ -25,12 +25,15 @@ pasarelapagos-backend/src/modules/providers/routing.service.ts:
 ### Fallback de LLM en chatia
 
 ```typescript
-// Cuando Groq CB esta abierto -> respuesta predefinida + escalar a humano
+// Cuando Groq CB esta abierto -> probar siguiente proveedor de la cadena (ILlmProvider).
+// Solo si TODA la cadena falla -> mensaje de reintento. NUNCA escalar a humano:
+// el handoff es decision del agente o del usuario, no consecuencia de una caida.
 if (err instanceof CircuitOpenError) {
-  await this.escalateToHuman(conversationId);
-  return { response: config.fallbackMessage, usedFaqFallback: false };
+  return this.llmRouter.chatWithFallback(messages, opts); // Groq -> Claude -> Gemini
 }
 ```
+
+Ver `infrastructure/providers-fallback.md`.
 
 ### CB en adapters de notificaciones
 
@@ -41,7 +44,8 @@ Ver checklist circuit-breaker-adapters.md.
 
 1. AnalyticsEventsService.track() — NUNCA await en path de request HTTP
 2. Todos los adapters externos DEBEN tener CB antes de produccion seria
-3. Fallback de LLM SIEMPRE hacia AssistantConfig.fallbackMessage — nunca string hardcodeado
+3. Fallback de LLM: primero proveedor alternativo; solo si toda la cadena cae, AssistantConfig.fallbackMessage — nunca string hardcodeado
+3b. La falla de un proveedor NUNCA dispara escalado a humano (el handoff es voluntad del agente/usuario)
 4. DLQ processor NUNCA lanza excepciones — solo loguea y ack el job
 5. SSE disconnection NUNCA propaga al caller — removeClient() es silencioso
 

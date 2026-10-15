@@ -17,13 +17,13 @@
 - [x] Lock distribuido `SET NX EX` en analytics projections (referencia)
 - [x] Lock distribuido `SET NX EX` en campaigns scheduler (ADR-006 cerrado)
 - [x] `CampaignRecipient` tabla en schema.prisma — dispatcher usa recipients reales
-- [x] `chatia-backend/src/queue/dlq/` — DlqService + DlqController + DlqModule
+- [x] `chatia-backend/src/infrastructure/queue/dlq/` — DlqService + DlqController + DlqModule
 
 ## Pendiente para 10/10
 
 ### Pasos manuales urgentes
 - [ ] `cd workers-backend && pnpm prisma migrate dev --name add_campaign_recipient`
-- [ ] Conectar `DlqModule` en `chatia-backend/src/queue/queue.module.ts`
+- [ ] Conectar `DlqModule` en `chatia-backend/src/infrastructure/queue/queue.module.ts`
 - [ ] `CampaignEmailProcessor`: leer recipients de la tabla en lugar del payload
 
 ### DLQ en canales salientes de chatia (S2)

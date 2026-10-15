@@ -499,7 +499,7 @@ model KbDocument {
 // ─────────────────────────────────────────────
 // FAQ — chunks con embeddings
 // MVP: JSON array de floats
-// Producción: migrar a Unsupported("vector(1536)") con pgvector
+// Vectores: Json (respaldo) + embeddingVec pgvector(1024) para búsqueda indexada
 // ─────────────────────────────────────────────
 
 model KbChunk {
@@ -509,6 +509,10 @@ model KbChunk {
   chunkIndex Int
 
   embedding Json?
+  // pgvector: columna agregada por migración (vector(1024), índice HNSW coseno). Prisma no la lee:
+  // se escribe y consulta con SQL crudo. Si el Postgres no tiene pgvector la columna no existe.
+  embeddingVec   Unsupported("vector(1024)")?
+  embeddingModel String?
   metadata  Json     @default("{}")
   createdAt DateTime @default(now())
 

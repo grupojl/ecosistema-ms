@@ -1,11 +1,16 @@
-// src/faq/rag/rag.service.ts
+// src/core/faq/rag/rag.service.ts
 import { Injectable, Logger } from '@nestjs/common';
-import { GroqService, type GroqModel } from '@/infrastructure/groq/groq.service.js';
-import { FaqQueryService, ChunkResult } from '@/core/faq/query/faq-query.service.js';
+import { LlmService } from '@/infrastructure/providers/llm.service.js';
+import { FaqQueryService } from '@/core/faq/query/faq-query.service.js';
 
 export interface RagAnswer {
   answer: string;
-  sources: Array<{ documentId: string; documentTitle: string; excerpt: string; score: number }>;
+  sources: Array<{
+    documentId: string;
+    documentTitle: string;
+    excerpt: string;
+    score: number;
+  }>;
   tokensUsed: number;
   modelUsed: string;
 }
@@ -16,16 +21,27 @@ export class RagService {
 
   constructor(
     private readonly faqQuery: FaqQueryService,
-    private readonly groq: GroqService,
+    private readonly llm: LlmService,
   ) {}
 
   async answer(
     kbId: string,
     question: string,
-    options: { groqModel?: string; temperature?: number; maxTokens?: number; topK?: number } = {},
+    options: {
+      groqModel?: string;
+      temperature?: number;
+      maxTokens?: number;
+      topK?: number;
+      organizationId?: string;
+    } = {},
   ): Promise<RagAnswer> {
     // 1. Recuperar chunks relevantes
-    const chunks = await this.faqQuery.search(kbId, question, options.topK ?? 5);
+    const chunks = await this.faqQuery.search(
+      kbId,
+      question,
+      options.topK ?? 5,
+      options.organizationId,
+    );
 
     if (!chunks.length) {
       return {
@@ -41,8 +57,8 @@ export class RagService {
       .map((c, i) => `[${i + 1}] ${c.documentTitle}\n${c.content}`)
       .join('\n\n---\n\n');
 
-    // 3. Llamar a Groq con prompt aumentado
-    const result = await this.groq.chat(
+    // 3. Llamar al LLM (cadena Groq → SiliconFlow) con prompt aumentado
+    const result = await this.llm.chat(
       [
         {
           role: 'system',
@@ -56,7 +72,7 @@ Respondé en español, de forma concisa y citando el número de fuente cuando co
         },
       ],
       {
-        model: (options.groqModel ?? 'openai/gpt-oss-120b') as GroqModel,
+        model: options.groqModel ?? 'openai/gpt-oss-120b',
         temperature: options.temperature ?? 0.3,
         maxTokens: options.maxTokens ?? 1024,
       },

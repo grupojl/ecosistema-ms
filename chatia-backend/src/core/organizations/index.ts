@@ -1,1 +1,1 @@
-export { OrganizationsModule } from "@/core/organizations/organizations.module.js";
+export { OrganizationsModule } from '@/core/organizations/organizations.module.js';

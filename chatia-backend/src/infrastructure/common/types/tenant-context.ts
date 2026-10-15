@@ -1,4 +1,4 @@
-// src/common/types/tenant-context.ts
+// src/infrastructure/common/types/tenant-context.ts
 //
 // Contexto del tenant resuelto por TenantGuard en cada request autenticado.
 // Disponible via @Tenant() decorator en todos los controllers.
@@ -13,23 +13,23 @@ import type { TenantRole } from '@/infrastructure/common/schemas/tenant-claims.s
 
 export interface TenantContext {
   // ── Plataforma ──────────────────────────────────────────────────────────────
-  ecosystemId: string;          // id del Ecosystem local (Sprint 1)
+  ecosystemId: string; // id del Ecosystem local (Sprint 1)
 
   // ── Organización ────────────────────────────────────────────────────────────
-  organizationId:   string;
+  organizationId: string;
   organizationName: string;
 
   // ── Usuario ─────────────────────────────────────────────────────────────────
   firebaseUid: string;
-  email:       string;
-  name:        string;
+  email: string;
+  name: string;
 
   // ── Autorización ─────────────────────────────────────────────────────────────
-  role:     TenantRole;
-  canRead:  boolean;
+  role: TenantRole;
+  canRead: boolean;
   canWrite: boolean;
 
   // agentId opcional — lo upsertea el TenantGuard reescrito en Sprint 2
   agentId?: string;
-  marketCountry?: string;   // ISO 3166-1 alpha-2 — undefined si no aplica (ADR-014)
+  marketCountry?: string; // ISO 3166-1 alpha-2 — undefined si no aplica (ADR-014)
 }

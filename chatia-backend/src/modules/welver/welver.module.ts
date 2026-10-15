@@ -5,9 +5,9 @@ import { WelverController } from '@/modules/welver/welver.controller.js';
 import { WelverStrategy } from '@/modules/welver/welver.strategy.js';
 
 @Module({
-  imports:     [ProjectStrategyModule],
+  imports: [ProjectStrategyModule],
   controllers: [WelverController],
   providers: [WelverStrategy],
-  exports:   [WelverStrategy],
+  exports: [WelverStrategy],
 })
 export class WelverModule {}

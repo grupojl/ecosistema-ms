@@ -11,7 +11,7 @@
 
 ## Módulo de referencia (MOLDE VIVO a crear)
 
-`chatia-backend/src/conversations/` será el **MOLDE VIVO** una vez migrado
+`chatia-backend/src/core/conversations/` será el **MOLDE VIVO** una vez migrado
 a Domain + Repository. Todos los módulos dinámicos seguirán la misma estructura.
 
 ## Patrón correcto de módulo

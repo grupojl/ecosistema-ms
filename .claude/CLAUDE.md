@@ -1,9 +1,9 @@
 # ecosistema-ms — Contexto para Claude
 
-**Fecha de última auditoría:** 2026-10-01
-**Puntaje real (código auditado):** 8.5 / 10
+**Fecha de última auditoría:** 2026-10-15 (chatia-backend)
+**Puntaje chatia-backend (rúbrica audit-service, medido 2026-10-15):** 9.5 / 10 — los otros 5 servicios aún sin auditar con la rúbrica (la nota global previa, 8.5, no era comparable)
 **Fase actual:** Fase 3 Hardening — CERRADA ✅ → Fase 4 Escala
-**Último hito (2026-10-08):** `pnpm typecheck && pnpm build` en 0 errores en los 6 servicios (ADR-020, ADR-021). El puntaje no se re-audita hasta correr tests y smoke test con DB/Redis reales.
+**Último hito (2026-10-08):** `pnpm typecheck && pnpm build` en 0 errores en los 6 servicios (ADR-020, ADR-021). chatia ya se probó con Postgres y Redis reales (50 tests de integración, 2026-10-15).
 
 ---
 
@@ -39,13 +39,17 @@
 
 ## Brechas pendientes (Fase 4)
 
-1. Domain/Repository: agents, campaigns, notifications sin patrón completo
-2. Tests: jest mal configurado en chatia/pasarela; nada ejecutado contra DB/Redis tras la reparación
+1. Domain/Repository: campaigns y notifications sin patrón completo (agents ✅ en chatia; en chatia 19 services de `core/` aún usan Prisma directo — trinquete en `architecture.spec.ts`)
+2. Tests: chatia ✅ (601 unit + 50 integración con Postgres/Redis reales, cobertura 92 %); pasarela y los otros 4 servicios sin ejecutar contra DB/Redis
 3. Smoke test real: los 6 servicios arrancan (bootstrap Nest OK), falta DB/Redis reales e imágenes Docker
 4. Branch protection GitHub main — MANUAL pendiente
 5. Tests: cobertura 85% pendiente para Fase 4+
 
 ## Reglas duras (nunca romper)
+
+- `jobId` de BullMQ **nunca con `:`** (usar `_`): BullMQ lo rechaza salvo 3 partes exactas. Pendiente en pasarela, workers y marketing — ver `roadmap/deuda-tecnica.md`
+
+- `src/` solo tiene `core/`, `infrastructure/`, `modules/` (+ `main.ts`, `app.module.ts`, `generated/`) — ADR-022. `@Controller` solo en `modules/` (comunes en `modules/common/`, exclusivos en `modules/<eco>/`) o en `infrastructure/transport/`; nunca en `core/`. Lo fuerza `architecture.spec.ts` (chatia ya cumple; los otros 5 servicios pendientes)
 
 - `any` implícito o explícito sin marca → bug de diseño
 - Import relativo (`../`, `./`) en src/ → usar `@/`

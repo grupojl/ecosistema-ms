@@ -1,12 +1,18 @@
-// src/organizations/organizations.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+// src/core/organizations/organizations.service.ts
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  ORGANIZATIONS_REPOSITORY,
+  type IOrganizationsRepository,
+} from '@/core/organizations/repository/organizations.repository.interface.js';
 
 @Injectable()
 export class OrganizationsService {
   private readonly logger = new Logger(OrganizationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(ORGANIZATIONS_REPOSITORY)
+    private readonly repo: IOrganizationsRepository,
+  ) {}
 
   /**
    * Garantiza que la organización existe localmente.
@@ -15,18 +21,14 @@ export class OrganizationsService {
    */
   async ensureExists(id: string, name: string, slug: string): Promise<void> {
     try {
-      await this.prisma.organization.upsert({
-        where: { id },
-        create: { id, ecosystemId: 'dev', name, slug, isActive: true },
-        update: { name, slug }, // actualiza nombre/slug si cambiaron en el dashboard
-      });
+      await this.repo.ensureLocal(id, name, slug); // actualiza nombre/slug si cambiaron en el dashboard
     } catch (err) {
       // Nunca debe romper el flujo principal
-      this.logger.warn(`No se pudo upsert Organization ${id}: ${err}`);
+      this.logger.warn(`No se pudo upsert Organization ${id}: ${String(err)}`);
     }
   }
 
   async findOne(id: string) {
-    return this.prisma.organization.findUnique({ where: { id } });
+    return this.repo.findById(id);
   }
 }

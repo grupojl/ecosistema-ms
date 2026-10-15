@@ -17,8 +17,24 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     env:
-      # prisma generate (parte de typecheck/build) exige DATABASE_URL aunque no conecte
+      # prisma generate exige DATABASE_URL; además apunta al Postgres del servicio de abajo (migraciones + integración)
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      # Tests de integración (SQL real). NUNCA apuntar a una base con datos: crean y borran filas.
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+
+    services:
+      postgres:
+        # Imagen con pgvector: la migración 20261014000000 crea la columna vectorial y el índice HNSW
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_USER: ci, POSTGRES_PASSWORD: ci, POSTGRES_DB: ci }
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d ci" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-timeout 3s --health-retries 10
     permissions:
       contents: read
       packages: write
@@ -40,14 +56,26 @@ jobs:
         run: pnpm build:packages
 
       # ── Calidad ────────────────────────────────────────────────────────────
+      # Sin --fix: en CI el lint solo VERIFICA (con --fix "pasaba" corrigiendo en el runner sin que nadie viera el cambio)
       - name: Lint
-        run: pnpm --filter=chatia-backend lint
+        run: pnpm --filter=chatia-backend lint:check
 
       - name: Typecheck
         run: pnpm --filter=chatia-backend typecheck
 
-      - name: Test + Coverage
+      # ── Base de datos real: migraciones desde cero + sin deriva con el schema ───────────
+      - name: Migraciones (migrate deploy desde una base vacía)
+        run: pnpm --filter=chatia-backend exec prisma migrate deploy
+
+      - name: Deriva schema ↔ migraciones (falla si schema.prisma tiene cambios sin migración)
+        run: pnpm --filter=chatia-backend exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+
+      # ── Tests ───────────────────────────────────────────────────────────────────────
+      - name: Test unitarios + cobertura (umbral en jest.config.ts)
         run: pnpm --filter=chatia-backend test:cov
+
+      - name: Test de integración (Postgres real)
+        run: pnpm --filter=chatia-backend test:integration
 
       # ── pnpm audit ─────────────────────────────────────────────────────────
       - name: Audit dependencies
@@ -70,13 +98,15 @@ jobs:
           file: chatia-backend/Dockerfile
           platforms: linux/amd64
           push: ${{ github.ref == 'refs/heads/main' }}
+          # En PR la imagen no se sube: se carga en el daemon local para que Trivy pueda escanearla
+          load: ${{ github.ref != 'refs/heads/main' }}
           tags: ghcr.io/${{ github.repository }}/chatia-backend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       # ── Trivy — escaneo de vulnerabilidades ────────────────────────────────
       - name: Scan image — Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: ghcr.io/${{ github.repository }}/chatia-backend:${{ github.sha }}
           format: table

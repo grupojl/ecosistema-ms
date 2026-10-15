@@ -37,9 +37,9 @@ export class ZodValidationPipe implements PipeTransform {
       const formatted = this.formatZodError(result.error);
       this.logger.debug(`Validation failed: ${JSON.stringify(formatted)}`);
       throw new BadRequestException({
-        message:    'Validation failed',
+        message: 'Validation failed',
         statusCode: 400,
-        errors:     formatted,
+        errors: formatted,
       });
     }
 

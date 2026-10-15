@@ -5,9 +5,9 @@ import { MexusController } from '@/modules/mexus/mexus.controller.js';
 import { MexusStrategy } from '@/modules/mexus/mexus.strategy.js';
 
 @Module({
-  imports:     [ProjectStrategyModule],
+  imports: [ProjectStrategyModule],
   controllers: [MexusController],
   providers: [MexusStrategy],
-  exports:   [MexusStrategy],
+  exports: [MexusStrategy],
 })
 export class MexusModule {}

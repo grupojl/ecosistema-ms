@@ -1,8 +1,12 @@
 // @ecosistema-ms/zod-migrated
-// src/ai-config/ai-config.service.ts
-import { Logger, Injectable, NotFoundException } from '@nestjs/common';
+// src/core/ai-config/ai-config.service.ts
+import { Inject, Logger, Injectable, NotFoundException } from '@nestjs/common';
 import type { UpdateAiConfigInput } from '@/core/ai-config/schemas.js';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import {
+  AI_CONFIG_REPOSITORY,
+  type AiConfigUpdateData,
+  type IAiConfigRepository,
+} from '@/core/ai-config/repository/ai-config.repository.interface.js';
 
 const DEFAULT_SYSTEM_PROMPT = `Sos un asistente virtual. Tu objetivo es atender consultas de forma amigable y profesional.
 
@@ -13,34 +17,41 @@ Reglas:
 @Injectable()
 export class AiConfigService {
   private readonly logger = new Logger(AiConfigService.name);
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(AI_CONFIG_REPOSITORY) private readonly repo: IAiConfigRepository,
+  ) {}
 
   async getOrCreate(channelAccountId: string, organizationId: string) {
     await this.verifyOwnership(channelAccountId, organizationId);
 
-    const existing = await this.prisma.aiConfig.findUnique({
-      where: { channelAccountId },
-    });
+    const existing = await this.repo.findByChannelAccount(channelAccountId);
 
     if (existing) return { success: true, data: existing };
 
-    const created = await this.prisma.aiConfig.create({
-      data: {
-        channelAccountId,
-        systemPrompt: DEFAULT_SYSTEM_PROMPT,
-        personaName: 'Asistente',
-      },
+    const created = await this.repo.create({
+      channelAccountId,
+      systemPrompt: DEFAULT_SYSTEM_PROMPT,
+      personaName: 'Asistente',
     });
 
     return { success: true, data: created };
   }
 
-  async update(channelAccountId: string, organizationId: string, dto: UpdateAiConfigInput) {
+  async update(
+    channelAccountId: string,
+    organizationId: string,
+    dto: UpdateAiConfigInput,
+  ) {
     await this.verifyOwnership(channelAccountId, organizationId);
 
-    const config = await this.prisma.aiConfig.upsert({
-      where: { channelAccountId },
-      create: {
+    // Solo se modifican los campos enviados
+    const update = Object.fromEntries(
+      Object.entries(dto).filter(([, value]) => value !== undefined),
+    ) as AiConfigUpdateData;
+
+    const config = await this.repo.upsert(
+      channelAccountId,
+      {
         channelAccountId,
         systemPrompt: dto.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
         personaName: dto.personaName ?? 'Asistente',
@@ -54,31 +65,20 @@ export class AiConfigService {
         offlineMessage: dto.offlineMessage,
         isEnabled: dto.isEnabled ?? true,
       },
-      update: {
-        ...(dto.systemPrompt      !== undefined && { systemPrompt: dto.systemPrompt }),
-        ...(dto.personaName       !== undefined && { personaName: dto.personaName }),
-        ...(dto.groqModel         !== undefined && { groqModel: dto.groqModel }),
-        ...(dto.temperature       !== undefined && { temperature: dto.temperature }),
-        ...(dto.maxTokens         !== undefined && { maxTokens: dto.maxTokens }),
-        ...(dto.contextWindowSize !== undefined && { contextWindowSize: dto.contextWindowSize }),
-        ...(dto.humanTakeoverKeywords !== undefined && { humanTakeoverKeywords: dto.humanTakeoverKeywords }),
-        ...(dto.autoResolveAfterHours !== undefined && { autoResolveAfterHours: dto.autoResolveAfterHours }),
-        ...(dto.welcomeMessage    !== undefined && { welcomeMessage: dto.welcomeMessage }),
-        ...(dto.offlineMessage    !== undefined && { offlineMessage: dto.offlineMessage }),
-        ...(dto.isEnabled         !== undefined && { isEnabled: dto.isEnabled }),
-      },
-    });
+      update,
+    );
 
     return { success: true, data: config };
   }
 
-  async toggleEnabled(channelAccountId: string, organizationId: string, enabled: boolean) {
+  async toggleEnabled(
+    channelAccountId: string,
+    organizationId: string,
+    enabled: boolean,
+  ) {
     await this.verifyOwnership(channelAccountId, organizationId);
 
-    const config = await this.prisma.aiConfig.update({
-      where: { channelAccountId },
-      data: { isEnabled: enabled },
-    });
+    const config = await this.repo.setEnabled(channelAccountId, enabled);
 
     return {
       success: true,
@@ -87,11 +87,14 @@ export class AiConfigService {
     };
   }
 
-  private async verifyOwnership(channelAccountId: string, organizationId: string) {
-    const account = await this.prisma.channelAccount.findFirst({
-      where: { id: channelAccountId, organizationId },
-    });
-    if (!account) throw new NotFoundException('Cuenta no encontrada');
-    return account;
+  private async verifyOwnership(
+    channelAccountId: string,
+    organizationId: string,
+  ) {
+    const owned = await this.repo.channelAccountBelongsTo(
+      channelAccountId,
+      organizationId,
+    );
+    if (!owned) throw new NotFoundException('Cuenta no encontrada');
   }
 }

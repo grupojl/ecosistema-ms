@@ -8,3 +8,7 @@ coverage/
 .env.*.local
 *.tsbuildinfo
 generated/
+
+# mutation testing
+.stryker-tmp/
+chatia-backend/reports/

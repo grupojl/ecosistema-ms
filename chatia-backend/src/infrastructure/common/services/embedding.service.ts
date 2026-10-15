@@ -1,45 +1,91 @@
-// src/common/services/embedding.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { GroqService } from '@/infrastructure/groq/groq.service.js';
+// src/infrastructure/common/services/embedding.service.ts
+//
+// Embeddings reales vía endpoint /embeddings (SiliconFlow `BAAI/bge-m3` por defecto,
+// multilingüe, 1024 dims). Antes se le pedía a un LLM de chat que "inventara" los números.
+//
+// Sin fallback entre modelos: vectores de modelos distintos no son comparables.
+// Si falla lanza AllProvidersFailedError (nunca devuelve ceros) y el caller degrada
+// a búsqueda por texto. Cambiar EMBEDDINGS_MODEL obliga a reindexar la base de conocimiento,
+// y workers-backend (que indexa) debe usar el MISMO modelo.
+import { Injectable } from '@nestjs/common';
+import { ProviderChainService } from '@/infrastructure/providers/provider-chain.service.js';
+import { parseProviderOrder } from '@/infrastructure/providers/provider-order.js';
+import {
+  createEmbeddings,
+  resolveEndpoint,
+} from '@/infrastructure/providers/openai-compat.client.js';
+
+const EMBEDDING_PROVIDERS = ['siliconflow', 'groq'] as const;
+const MAX_INPUT_CHARS = 4000;
+const CB_OPTIONS = {
+  timeout: 10_000,
+  errorThreshold: 40,
+  resetTimeout: 60_000,
+};
+// Indexar documentos manda lotes grandes: más margen que una consulta suelta
+const BATCH_CB_OPTIONS = {
+  timeout: 30_000,
+  errorThreshold: 40,
+  resetTimeout: 60_000,
+};
+const BATCH_SIZE = 32;
 
 @Injectable()
 export class EmbeddingService {
-  private readonly logger = new Logger(EmbeddingService.name);
+  constructor(private readonly chain: ProviderChainService) {}
 
-  // Sprint 4: cambiar a OpenAI text-embedding-3-small (1536 dims) + pgvector
-  static readonly DIMENSIONS = 384;
-
-  constructor(private readonly groq: GroqService) {}
+  /** Modelo activo (para registrar con qué modelo se generó cada vector). */
+  get modelName(): string {
+    const provider = this.provider();
+    const fallback =
+      provider === 'groq' ? 'nomic-embed-text-v1_5' : 'BAAI/bge-m3';
+    return process.env['EMBEDDINGS_MODEL'] ?? fallback;
+  }
 
   async embed(text: string): Promise<number[]> {
-    const truncated = text.slice(0, 2000);
+    const [vector] = await this.run([text], CB_OPTIONS);
+    return vector;
+  }
 
-    try {
-      const response = await this.groq.chat(
-        [
-          {
-            role: 'system',
-            content: `You are an embedding generator. Given a text, output ONLY a JSON array of ${EmbeddingService.DIMENSIONS} floating point numbers between -1 and 1 that semantically represent the text. Output NOTHING else, no explanation, just the JSON array.`,
-          },
-          { role: 'user', content: truncated },
-        ],
-        { model: 'openai/gpt-oss-20b', temperature: 0, maxTokens: 2048 },
+  /** Varios textos (indexación): en lotes, mismo orden de entrada. Falla entero si falla un lote. */
+  async embedMany(texts: string[]): Promise<number[][]> {
+    const out: number[][] = [];
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      out.push(
+        ...(await this.run(texts.slice(i, i + BATCH_SIZE), BATCH_CB_OPTIONS)),
       );
-
-      const match = response.content.trim().match(/\[[\d\s,.\-e+]+\]/);
-      if (!match) throw new Error('Formato de embedding inválido');
-
-      const embedding = JSON.parse(match[0]) as number[];
-      return this.normalize(embedding);
-    } catch (err) {
-      this.logger.error(`Error generando embedding: ${err}`);
-      return new Array(EmbeddingService.DIMENSIONS).fill(0);
     }
+    return out;
+  }
+
+  private async run(
+    texts: string[],
+    cb: typeof CB_OPTIONS,
+  ): Promise<number[][]> {
+    const provider = this.provider();
+    const endpoint = resolveEndpoint(provider);
+    const model = this.modelName;
+    const inputs = texts.map((t) => t.slice(0, MAX_INPUT_CHARS));
+
+    const { value } = await this.chain.run('embeddings', [
+      {
+        provider,
+        cbKey: `${provider}-embeddings`,
+        enabled: Boolean(endpoint.apiKey),
+        cb,
+        run: () =>
+          createEmbeddings(endpoint, { model, inputs, timeoutMs: cb.timeout }),
+      },
+    ]);
+
+    return value.map((v) => this.normalize(v));
   }
 
   cosineSimilarity(a: number[], b: number[]): number {
     if (a.length !== b.length) return 0;
-    let dot = 0, normA = 0, normB = 0;
+    let dot = 0,
+      normA = 0,
+      normB = 0;
     for (let i = 0; i < a.length; i++) {
       dot += a[i] * b[i];
       normA += a[i] * a[i];
@@ -47,6 +93,16 @@ export class EmbeddingService {
     }
     const denom = Math.sqrt(normA) * Math.sqrt(normB);
     return denom === 0 ? 0 : dot / denom;
+  }
+
+  private provider(): (typeof EMBEDDING_PROVIDERS)[number] {
+    return (
+      parseProviderOrder(
+        process.env['EMBEDDINGS_PROVIDER'],
+        EMBEDDING_PROVIDERS,
+        ['siliconflow'],
+      )[0] ?? 'siliconflow'
+    );
   }
 
   private normalize(v: number[]): number[] {

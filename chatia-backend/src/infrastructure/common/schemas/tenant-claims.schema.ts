@@ -1,4 +1,4 @@
-// src/common/schemas/tenant-claims.schema.ts
+// src/infrastructure/common/schemas/tenant-claims.schema.ts
 //
 // Contrato de custom claims que el sass-back de cada ecosistema debe emitir
 // en el token Firebase al momento del login.
@@ -6,7 +6,7 @@
 import { z } from 'zod';
 
 export const TenantClaimsSchema = z.object({
-  organizationId:   z.string().min(1),
+  organizationId: z.string().min(1),
   organizationName: z.string().min(1),
   organizationSlug: z.string().optional(),
 
@@ -14,12 +14,16 @@ export const TenantClaimsSchema = z.object({
 
   // Permisos por servicio de plataforma.
   // Extensible: agregar claves por cada nuevo servicio (payments, analytics, etc.)
-  permissions: z.object({
-    chat: z.object({
-      canRead:  z.boolean(),
-      canWrite: z.boolean(),
-    }).optional(),
-  }).optional(),
+  permissions: z
+    .object({
+      chat: z
+        .object({
+          canRead: z.boolean(),
+          canWrite: z.boolean(),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 export type TenantClaims = z.infer<typeof TenantClaimsSchema>;

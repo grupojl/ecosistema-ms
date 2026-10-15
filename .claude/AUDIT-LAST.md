@@ -1,5 +1,30 @@
 # AUDIT-LAST — ecosistema-ms
 
+## chatia-backend — auditoría con rúbrica `audit-service` (2026-10-15)
+
+**Nota medida: 9,5 / 10** (anterior con la misma rúbrica: 8,6 el mismo día, antes de la prueba con Redis).
+
+```
+Estructura 2,50/2,5  [carpetas extra 0 · controllers en core 0 · imports relativos 0 · any 0 · Prisma directo en core 0 · .bak 0]
+Seguridad  2,50/2,5  [ALTA 0 · MEDIA real corregida (updateMany por messageId sin organización) · test de aislamiento contra DB real: sí]
+Tests      2,00/2,0  [cobertura 92,2 % stmts / 80,5 % branches (2026-10-15) · 601 unitarios + 50 de integración · 2 services sin spec]
+Funcional  1,50/1,5  [entrante → asistente → envío → SENT con Postgres + Redis + BullMQ reales; canal y LLM simulados]
+Operación  1,00/1,5  [Dockerfile, railway.json, health, validación de env, CI · imagen sin construir · sin staging]
+Topes aplicados: ninguno (verify en verde en esta sesión)
+```
+
+**Evidencia:** `node .claude/skills/verify/scripts/verify.js chatia-backend --integration` con `TEST_DATABASE_URL` y `TEST_REDIS_URL` → verde. `scan.js`: 0 ALTA.
+
+**Bug real hallado por Redis real:** `jobId` con `:` (`reply:<id>`, `send:<id>`) rechazados por BullMQ → la respuesta automática y el envío nunca se encolaban. Corregido; los mismos patrones siguen en pasarelapagos, workers y marketing (ver `roadmap/deuda-tecnica.md`, "Detectado fuera de chatia").
+
+**Actualización (misma fecha, tras llevar los pilares 1-3 al techo pre-producción):** escáner 0 ALTA / 0 MEDIA, branches 85,7 %, 0 services sin spec, mutación 96,55 % en 7 archivos críticos, LLM real y Redis real probados, ADR-023 (RLS). La nota por rúbrica no cambia de forma medible (ya estaba en 9,5; Seguridad y Tests ya puntuaban al máximo); lo que sube es la evidencia detrás de cada línea. Sigue pendiente el sandbox de Meta, imagen Docker y staging.
+
+**Para el 10:** imagen Docker construida (+0,25) · staging con smoke test de webhook firmado (+0,25). Pendiente revisar a mano los ~19 hallazgos MEDIA restantes del escáner (se asumieron falsos positivos tras revisar una muestra).
+
+**Sobre las notas de abajo (9,2 del 2026-10-02, 8,5 de CLAUDE.md):** eran del ecosistema, sin rúbrica fija ni mediciones; no son comparables con esta. Los otros 5 servicios no se auditaron con la rúbrica.
+
+---
+
 **Fecha:** 2026-10-02
 **Auditor:** Claude (sesión reestructuración arquitectura 10/10)
 **Puntaje real:** 9.2 / 10

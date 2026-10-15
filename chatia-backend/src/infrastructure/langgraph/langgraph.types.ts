@@ -1,4 +1,4 @@
-// src/langgraph/langgraph.types.ts
+// src/infrastructure/langgraph/langgraph.types.ts
 import { ConversationStage } from '@/generated/prisma/client.js';
 
 // ─── Estado del grafo ─────────────────────────────────────────────────────────
@@ -66,5 +66,4 @@ export interface ClassifyResult {
   shouldEscalate: boolean;
   nextStage: ConversationStage | null;
   confidence: number;
-
 }

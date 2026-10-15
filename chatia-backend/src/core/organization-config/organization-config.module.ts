@@ -1,15 +1,11 @@
-// chatia-backend/src/organization-config/organization-config.module.ts
+// chatia-backend/src/core/organization-config/organization-config.module.ts
+// El binding ORGANIZATION_CONFIG_REPO → implementación Prisma vive en infrastructure/prisma/prisma.module.ts.
 import { Global, Module } from '@nestjs/common';
-import { OrganizationConfigService }          from '@/core/organization-config/organization-config.service.js';
-import { PrismaOrganizationConfigRepository } from '@/core/organization-config/prisma-organization-config.repository.js';
-import { ORGANIZATION_CONFIG_REPO }           from '@/core/organization-config/organization-config.repository.interface.js';
+import { OrganizationConfigService } from '@/core/organization-config/organization-config.service.js';
 
 @Global()
 @Module({
-  providers: [
-    OrganizationConfigService,
-    { provide: ORGANIZATION_CONFIG_REPO, useClass: PrismaOrganizationConfigRepository },
-  ],
+  providers: [OrganizationConfigService],
   exports: [OrganizationConfigService],
 })
 export class OrganizationConfigModule {}

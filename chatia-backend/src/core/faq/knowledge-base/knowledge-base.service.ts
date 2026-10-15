@@ -1,64 +1,72 @@
-// src/faq/knowledge-base/knowledge-base.service.ts
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
-import type { CreateKnowledgeBaseInput, UpdateKnowledgeBaseInput } from '@/core/faq/schemas.js';
+// src/core/faq/knowledge-base/knowledge-base.service.ts
+import { Inject, Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  KNOWLEDGE_REPOSITORY,
+  type IKnowledgeRepository,
+} from '@/core/faq/repository/knowledge.repository.interface.js';
+import type {
+  CreateKnowledgeBaseInput,
+  UpdateKnowledgeBaseInput,
+} from '@/core/faq/schemas.js';
 
 @Injectable()
 export class KnowledgeBaseService {
   private readonly logger = new Logger(KnowledgeBaseService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(KNOWLEDGE_REPOSITORY) private readonly repo: IKnowledgeRepository,
+  ) {}
 
-  async create(projectId: string, organizationId: string, dto: CreateKnowledgeBaseInput) {
-    const kb = await this.prisma.knowledgeBase.create({
-      data: { ...dto, projectId, organizationId },
+  async create(
+    projectId: string,
+    organizationId: string,
+    dto: CreateKnowledgeBaseInput,
+  ) {
+    // El projectId viene del cliente: debe pertenecer a SU organización (si no, se podría colgar una KB en un proyecto ajeno)
+    if (!(await this.repo.projectBelongsTo(projectId, organizationId)))
+      throw new NotFoundException('Proyecto no encontrado');
+
+    const kb = await this.repo.createKnowledgeBase({
+      ...dto,
+      projectId,
+      organizationId,
     });
     this.logger.log(`KnowledgeBase creada: ${kb.id} en proyecto ${projectId}`);
     return { success: true, data: kb };
   }
 
   async findAll(projectId: string, organizationId: string) {
-    const items = await this.prisma.knowledgeBase.findMany({
-      where: { projectId, organizationId },
-      include: { _count: { select: { documents: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
+    const items = await this.repo.listKnowledgeBases(projectId, organizationId);
     return { success: true, data: items };
   }
 
   async findOne(kbId: string, organizationId: string) {
-    const kb = await this.prisma.knowledgeBase.findFirst({
-      where: { id: kbId, organizationId },
-      include: { _count: { select: { documents: true } } },
-    });
+    const kb = await this.repo.findKnowledgeBase(kbId, organizationId);
     if (!kb) throw new NotFoundException('Knowledge base no encontrada');
     return kb;
   }
 
-  async update(kbId: string, organizationId: string, dto: UpdateKnowledgeBaseInput) {
+  async update(
+    kbId: string,
+    organizationId: string,
+    dto: UpdateKnowledgeBaseInput,
+  ) {
     await this.findOne(kbId, organizationId);
-    return this.prisma.knowledgeBase.update({ where: { id: kbId }, data: dto });
+    return this.repo.updateKnowledgeBase(kbId, dto);
   }
 
   async remove(kbId: string, organizationId: string) {
     await this.findOne(kbId, organizationId);
-    await this.prisma.knowledgeBase.delete({ where: { id: kbId } });
+    await this.repo.deleteKnowledgeBase(kbId);
     return { success: true, message: 'Knowledge base eliminada' };
   }
 
   async getStats(kbId: string, organizationId: string) {
     await this.findOne(kbId, organizationId);
-    const [total, byStatus, chunks] = await Promise.all([
-      this.prisma.kbDocument.count({ where: { knowledgeBaseId: kbId } }),
-      this.prisma.kbDocument.groupBy({
-        by: ['status'],
-        where: { knowledgeBaseId: kbId },
-        _count: { id: true },
-      }),
-      this.prisma.kbChunk.count({
-        where: { document: { knowledgeBaseId: kbId } },
-      }),
-    ]);
-    return { success: true, data: { totalDocuments: total, byStatus, totalChunks: chunks } };
+    const { total, byStatus, chunks } = await this.repo.getStats(kbId);
+    return {
+      success: true,
+      data: { totalDocuments: total, byStatus, totalChunks: chunks },
+    };
   }
 }

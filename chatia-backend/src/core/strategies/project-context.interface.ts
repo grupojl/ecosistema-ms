@@ -3,58 +3,58 @@
 // REGLA: solo tipos. Sin lógica de negocio.
 
 export interface ChatFeatureFlags {
-  aiAssistantEnabled:      boolean;
-  faqEnabled:              boolean;
-  multiChannelEnabled:     boolean;
-  humanEscalationEnabled:  boolean;
-  voiceEnabled:            boolean;
+  aiAssistantEnabled: boolean;
+  faqEnabled: boolean;
+  multiChannelEnabled: boolean;
+  humanEscalationEnabled: boolean;
+  voiceEnabled: boolean;
 }
 
 export interface ChatLimits {
-  maxActiveConversations:      number;
-  maxMessagesPerConversation:  number;
-  inactivityTimeoutSeconds:    number;
-  escalationAlertMinutes:      number;
+  maxActiveConversations: number;
+  maxMessagesPerConversation: number;
+  inactivityTimeoutSeconds: number;
+  escalationAlertMinutes: number;
 }
 
 export interface OrganizationProfile {
-  organizationId:  string;
-  ecosystemId:     string;
-  plan:            'starter' | 'growth' | 'enterprise' | 'custom';
-  featureFlags:    ChatFeatureFlags;
-  limits:          ChatLimits;
-  timezone:        string;
-  locale:          string;
-  updatedAt:       Date;
+  organizationId: string;
+  ecosystemId: string;
+  plan: 'starter' | 'growth' | 'enterprise' | 'custom';
+  featureFlags: ChatFeatureFlags;
+  limits: ChatLimits;
+  timezone: string;
+  locale: string;
+  updatedAt: Date;
 }
 
 export interface ProjectContext {
-  systemPrompt:   string;
-  defaultStage:   string;
+  systemPrompt: string;
+  defaultStage: string;
   preferredModel: string;
   useFaqFallback: boolean;
-  orgProfile:     OrganizationProfile;
-  businessData:   unknown;
+  orgProfile: OrganizationProfile;
+  businessData: unknown;
 }
 
 export const DEFAULT_ORG_PROFILE: OrganizationProfile = {
-  organizationId:  'unknown',
-  ecosystemId:     'unknown',
-  plan:            'starter',
+  organizationId: 'unknown',
+  ecosystemId: 'unknown',
+  plan: 'starter',
   featureFlags: {
-    aiAssistantEnabled:      true,
-    faqEnabled:              false,
-    multiChannelEnabled:     false,
-    humanEscalationEnabled:  true,
-    voiceEnabled:            false,
+    aiAssistantEnabled: true,
+    faqEnabled: false,
+    multiChannelEnabled: false,
+    humanEscalationEnabled: true,
+    voiceEnabled: false,
   },
   limits: {
-    maxActiveConversations:      100,
-    maxMessagesPerConversation:  200,
-    inactivityTimeoutSeconds:    1800,
-    escalationAlertMinutes:      60,
+    maxActiveConversations: 100,
+    maxMessagesPerConversation: 200,
+    inactivityTimeoutSeconds: 1800,
+    escalationAlertMinutes: 60,
   },
-  timezone:  'America/Buenos_Aires',
-  locale:    'es',
+  timezone: 'America/Buenos_Aires',
+  locale: 'es',
   updatedAt: new Date(0),
 };

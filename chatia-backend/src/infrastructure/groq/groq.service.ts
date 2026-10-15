@@ -1,9 +1,9 @@
-// src/groq/groq.service.ts
+// src/infrastructure/groq/groq.service.ts
 import { Injectable, Logger } from '@nestjs/common';
 
 export const GROQ_MODELS = {
-  GPT_OSS_120B: 'openai/gpt-oss-120b',   // mejor calidad — respuestas al cliente
-  GPT_OSS_20B: 'openai/gpt-oss-20b',     // más rápido — clasificación, intent
+  GPT_OSS_120B: 'openai/gpt-oss-120b', // mejor calidad — respuestas al cliente
+  GPT_OSS_20B: 'openai/gpt-oss-20b', // más rápido — clasificación, intent
 } as const;
 
 export type GroqModel = (typeof GROQ_MODELS)[keyof typeof GROQ_MODELS];
@@ -69,9 +69,9 @@ export class GroqService {
       throw new Error(`Groq API error: ${res.status}`);
     }
 
-    const data = await res.json() as {
+    const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
-      usage?:   { total_tokens?: number };
+      usage?: { total_tokens?: number };
     };
     const choice = data.choices?.[0];
 
@@ -89,10 +89,13 @@ export class GroqService {
   ): Promise<T> {
     const response = await this.chat(messages, { ...options, jsonMode: true });
     try {
-      try { return JSON.parse(response.content) as T; } catch (e: unknown) { throw new Error('Groq JSON invalido: ' + String(e)); }
+      try {
+        return JSON.parse(response.content) as T;
+      } catch (e: unknown) {
+        throw new Error('Groq JSON invalido: ' + String(e), { cause: e });
+      }
     } catch {
       throw new Error(`Groq devolvió JSON inválido: ${response.content}`);
     }
   }
-
 }

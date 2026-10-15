@@ -3,16 +3,20 @@
 
 export class ContactAlreadyExistsError extends Error {
   constructor(phone: string, organizationId: string) {
-    super(`Contact with phone ${phone} already exists in org ${organizationId}`);
+    super(
+      `Contact with phone ${phone} already exists in org ${organizationId}`,
+    );
     this.name = 'ContactAlreadyExistsError';
   }
 }
 
 export class ContactNotFoundError extends Error {
   constructor(id: string, organizationId?: string) {
-    super(organizationId
-      ? `Contact ${id} not found in org ${organizationId}`
-      : `Contact ${id} not found`);
+    super(
+      organizationId
+        ? `Contact ${id} not found in org ${organizationId}`
+        : `Contact ${id} not found`,
+    );
     this.name = 'ContactNotFoundError';
   }
 }

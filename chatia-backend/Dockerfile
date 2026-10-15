@@ -94,6 +94,6 @@ EXPOSE 5010
 WORKDIR /app/chatia-backend
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://localhost:3010/health || exit 1
+  CMD wget -qO- http://localhost:3010/health/live || exit 1
 
 CMD ["dumb-init", "sh", "/app/chatia-backend/entrypoint.sh"]

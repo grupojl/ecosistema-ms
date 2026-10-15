@@ -1,7 +1,12 @@
-// src/langgraph/nodes/index.ts
+// src/infrastructure/langgraph/nodes/index.ts
 import { Logger } from '@nestjs/common';
-import { GroqService, GROQ_MODELS, type GroqModel } from '@/infrastructure/groq/groq.service.js';
-import { GraphState, ClassifyResult, INTENTS } from '@/infrastructure/langgraph/langgraph.types.js';
+import { GROQ_MODELS } from '@/infrastructure/groq/groq.service.js';
+import { LlmService } from '@/infrastructure/providers/llm.service.js';
+import {
+  GraphState,
+  ClassifyResult,
+  INTENTS,
+} from '@/infrastructure/langgraph/langgraph.types.js';
 import { ConversationStage } from '@/generated/prisma/client.js';
 
 const logger = new Logger('LangGraphNodes');
@@ -14,7 +19,7 @@ const logger = new Logger('LangGraphNodes');
 
 export async function classifyNode(
   state: GraphState,
-  groq: GroqService,
+  llm: LlmService,
 ): Promise<Partial<GraphState>> {
   const prompt = `Analizá este mensaje de un cliente y devolvé SOLO un JSON con esta estructura exacta:
 {
@@ -31,23 +36,27 @@ export async function classifyNode(
 }
 
 Stage actual: ${state.currentStage}
-Historial reciente: ${state.history.slice(-3).map(h => `${h.role}: ${h.content}`).join('\n')}
+Historial reciente: ${state.history
+    .slice(-3)
+    .map((h) => `${h.role}: ${h.content}`)
+    .join('\n')}
 Mensaje nuevo: "${state.incomingMessage}"
 
 Keywords de escalado: ${state.humanTakeoverKeywords.join(', ')}`;
 
   try {
-    const result = await groq.chatJson<ClassifyResult>([
-      { role: 'user', content: prompt },
-    ], {
-      model: GROQ_MODELS.GPT_OSS_20B,
-      temperature: 0.1,
-      maxTokens: 256,
-    });
+    const result = await llm.chatJson<ClassifyResult>(
+      [{ role: 'user', content: prompt }],
+      {
+        model: GROQ_MODELS.GPT_OSS_20B,
+        temperature: 0.1,
+        maxTokens: 256,
+      },
+    );
 
     // Verificar si alguna keyword de takeover está en el mensaje
     const msgLower = state.incomingMessage.toLowerCase();
-    const hasKeyword = state.humanTakeoverKeywords.some(kw =>
+    const hasKeyword = state.humanTakeoverKeywords.some((kw) =>
       msgLower.includes(kw.toLowerCase()),
     );
 
@@ -71,7 +80,13 @@ Keywords de escalado: ${state.humanTakeoverKeywords.join(', ')}`;
 export function retrieveContextNode(state: GraphState): Partial<GraphState> {
   // Si hay un nextStage sugerido por classify, aplicarlo
   const stageOrder: ConversationStage[] = [
-    'INITIAL', 'QUALIFYING', 'INFORMED', 'NEGOTIATING', 'CLOSING', 'FOLLOW_UP', 'HUMAN',
+    'INITIAL',
+    'QUALIFYING',
+    'INFORMED',
+    'NEGOTIATING',
+    'CLOSING',
+    'FOLLOW_UP',
+    'HUMAN',
   ];
 
   let currentStage = state.currentStage;
@@ -95,22 +110,25 @@ export function retrieveContextNode(state: GraphState): Partial<GraphState> {
 
 export async function generateNode(
   state: GraphState,
-  groq: GroqService,
+  llm: LlmService,
 ): Promise<Partial<GraphState>> {
   const systemPrompt = buildSystemPrompt(state);
 
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+  const messages: Array<{
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+  }> = [
     { role: 'system', content: systemPrompt },
-    ...state.history.map(h => ({
-      role: h.role as 'user' | 'assistant',
+    ...state.history.map((h) => ({
+      role: h.role,
       content: h.content,
     })),
     { role: 'user', content: state.incomingMessage },
   ];
 
   try {
-    const result = await groq.chat(messages, {
-      model: state.groqModel as GroqModel,
+    const result = await llm.chat(messages, {
+      model: state.groqModel,
       temperature: state.temperature,
       maxTokens: state.maxTokens,
     });
@@ -124,7 +142,8 @@ export async function generateNode(
   } catch (err) {
     logger.error('generateNode error', err);
     return {
-      responseText: '¡Disculpá! Tuve un problema técnico. ¿Podés repetir tu consulta?',
+      responseText:
+        '¡Disculpá! Tuve un problema técnico. ¿Podés repetir tu consulta?',
       error: String(err),
     };
   }
@@ -137,7 +156,7 @@ export async function generateNode(
 
 export async function validateNode(
   state: GraphState,
-  groq: GroqService,
+  llm: LlmService,
 ): Promise<Partial<GraphState>> {
   if (!state.responseText) return {};
 
@@ -157,7 +176,7 @@ Criterios para NO válida:
 Respuesta a validar: "${state.responseText}"`;
 
   try {
-    const result = await groq.chatJson<{
+    const result = await llm.chatJson<{
       isValid: boolean;
       reason: string | null;
       correctedResponse: string | null;
@@ -184,7 +203,7 @@ Respuesta a validar: "${state.responseText}"`;
 // Se ejecuta cuando shouldEscalate = true.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function humanTakeoverNode(state: GraphState): Partial<GraphState> {
+export function humanTakeoverNode(_state: GraphState): Partial<GraphState> {
   return {
     responseText:
       `¡Entendido! Voy a conectarte con un asesor de nuestro equipo para ayudarte mejor. ` +
@@ -201,9 +220,12 @@ export function humanTakeoverNode(state: GraphState): Partial<GraphState> {
 function buildSystemPrompt(state: GraphState): string {
   const stageContext: Record<ConversationStage, string> = {
     INITIAL: 'Es el primer contacto. Saludá y preguntá en qué podés ayudar.',
-    QUALIFYING: 'Recopilá información: zona, presupuesto, tipo de propiedad, ambientes.',
-    INFORMED: 'El cliente recibió información. Respondé sus dudas y propone una visita.',
-    NEGOTIATING: 'El cliente quiere negociar. Sé empático pero no des precios finales.',
+    QUALIFYING:
+      'Recopilá información: zona, presupuesto, tipo de propiedad, ambientes.',
+    INFORMED:
+      'El cliente recibió información. Respondé sus dudas y propone una visita.',
+    NEGOTIATING:
+      'El cliente quiere negociar. Sé empático pero no des precios finales.',
     CLOSING: 'El cliente quiere visitar o reservar. Coordiná fecha y hora.',
     FOLLOW_UP: 'Contacto de seguimiento. Preguntá si llegó a una decisión.',
     HUMAN: 'Un agente humano tomó el control. No respondas automáticamente.',
@@ -222,5 +244,4 @@ Instrucción para este stage: ${stageContext[state.currentStage]}
 ${entities ? `Datos del cliente: ${entities}` : ''}
 
 Respondé en español, de forma conversacional y breve (máximo 3 oraciones).`.trim();
-
 }

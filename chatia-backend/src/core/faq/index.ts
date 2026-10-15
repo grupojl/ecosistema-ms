@@ -1,1 +1,1 @@
-export { FaqModule } from "@/core/faq/faq.module.js";
+export { FaqModule } from '@/core/faq/faq.module.js';

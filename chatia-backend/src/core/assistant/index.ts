@@ -1,1 +1,1 @@
-export { AssistantModule } from "@/core/assistant/assistant.module.js";
+export { AssistantModule } from '@/core/assistant/assistant.module.js';

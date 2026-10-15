@@ -1,28 +1,62 @@
-// chatia-backend/src/agents/domain/agent.entity.ts
-// ADR-011 Sprint 2
+// chatia-backend/src/core/agents/domain/agent.entity.ts
+// Entidad de dominio pura — sin imports de NestJS ni Prisma. Refleja el modelo Agent real.
+import {
+  AgentForbiddenError,
+  AgentIdentityMismatchError,
+} from '@/core/agents/domain/agent.errors.js';
 
-import { AgentOfflineError, AgentAtCapacityError } from '@/core/agents/domain/agent.errors.js';
-
-export type AgentStatus = 'ONLINE' | 'OFFLINE' | 'BUSY';
+export type AgentRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
 
 export interface Agent {
-  readonly id:                  string;
-  readonly ecosystemId:         string;
-  readonly organizationId:      string;
-  readonly userId:              string;
-  readonly displayName:         string;
-  readonly status:              AgentStatus;
-  readonly maxConcurrentChats:  number;
-  readonly activeChats:         number;
-  readonly createdAt:           Date;
+  readonly id: string;
+  readonly organizationId: string;
+  readonly firebaseUid: string;
+  readonly name: string;
+  readonly email: string;
+  readonly avatarUrl: string | null;
+  readonly role: string;
+  readonly isActive: boolean;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
 }
 
-/** Invariante: un agente OFFLINE no puede recibir nuevas conversaciones */
-export function assertAgentAvailable(agent: Agent): void {
-  if (agent.status === 'OFFLINE') {
-    throw new AgentOfflineError(agent.id);
+/** Campos que solo un OWNER/ADMIN puede cambiar (afectan la asignación y los permisos). */
+const ADMIN_ONLY_FIELDS = ['isActive', 'role'] as const;
+
+const isAdmin = (role: string): boolean => role === 'OWNER' || role === 'ADMIN';
+
+/**
+ * Invariante: un miembro solo edita SU PROPIO perfil (nombre/avatar). Activar/desactivar agentes o cambiar
+ * roles, y editar a otros, es de OWNER/ADMIN.
+ */
+export function assertCanUpdateAgent(
+  actor: { role: string; firebaseUid: string },
+  target: { firebaseUid: string },
+  changedFields: readonly string[],
+): void {
+  if (isAdmin(actor.role)) return;
+  if (actor.firebaseUid !== target.firebaseUid) {
+    throw new AgentForbiddenError(
+      'Solo un OWNER/ADMIN puede editar a otros agentes',
+    );
   }
-  if (agent.activeChats >= agent.maxConcurrentChats) {
-    throw new AgentAtCapacityError(agent.id, agent.maxConcurrentChats);
+  const restricted = changedFields.filter((f) =>
+    (ADMIN_ONLY_FIELDS as readonly string[]).includes(f),
+  );
+  if (restricted.length > 0) {
+    throw new AgentForbiddenError(
+      `Solo un OWNER/ADMIN puede cambiar: ${restricted.join(', ')}`,
+    );
   }
+}
+
+/** El registro se hace con la identidad del TOKEN: el body no puede apuntar a otro usuario u organización. */
+export function assertRegistrationMatchesToken(
+  token: { firebaseUid: string; organizationId: string },
+  body: { firebaseUid: string; organizationId?: string },
+): void {
+  if (body.firebaseUid !== token.firebaseUid)
+    throw new AgentIdentityMismatchError('firebaseUid');
+  if (body.organizationId && body.organizationId !== token.organizationId)
+    throw new AgentIdentityMismatchError('organizationId');
 }

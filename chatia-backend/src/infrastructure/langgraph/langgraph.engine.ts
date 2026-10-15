@@ -1,7 +1,7 @@
-// src/langgraph/langgraph.engine.ts
+// src/infrastructure/langgraph/langgraph.engine.ts
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
-import { GroqService } from '@/infrastructure/groq/groq.service.js';
+import { LlmService } from '@/infrastructure/providers/llm.service.js';
 import { GraphState } from '@/infrastructure/langgraph/langgraph.types.js';
 import {
   classifyNode,
@@ -45,7 +45,7 @@ export class LangGraphEngine {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly groq: GroqService,
+    private readonly llm: LlmService,
   ) {}
 
   async run(input: RunGraphInput): Promise<RunGraphOutput> {
@@ -57,12 +57,11 @@ export class LangGraphEngine {
       select: { direction: true, content: true },
     });
 
-    const history = recentMessages
-      .reverse()
-      .map(m => ({
-        role: m.direction === 'INBOUND' ? 'user' as const : 'assistant' as const,
-        content: m.content,
-      }));
+    const history = recentMessages.reverse().map((m) => ({
+      role:
+        m.direction === 'INBOUND' ? ('user' as const) : ('assistant' as const),
+      content: m.content,
+    }));
 
     // Estado inicial del grafo
     let state: GraphState = {
@@ -89,12 +88,16 @@ export class LangGraphEngine {
       error: null,
     };
 
-    this.logger.debug(`[${input.conversationId}] Iniciando grafo — stage: ${state.currentStage}`);
+    this.logger.debug(
+      `[${input.conversationId}] Iniciando grafo — stage: ${state.currentStage}`,
+    );
 
     // ── Nodo 1: classify ──────────────────────────────────────────────────────
-    const classified = await classifyNode(state, this.groq);
+    const classified = await classifyNode(state, this.llm);
     state = { ...state, ...classified };
-    this.logger.debug(`[${input.conversationId}] classify → intent: ${state.intent}, escalate: ${state.shouldEscalate}`);
+    this.logger.debug(
+      `[${input.conversationId}] classify → intent: ${state.intent}, escalate: ${state.shouldEscalate}`,
+    );
 
     // ── Nodo 2: retrieve_context ──────────────────────────────────────────────
     const retrieved = retrieveContextNode(state);
@@ -106,21 +109,24 @@ export class LangGraphEngine {
       state = { ...state, ...takeover };
     } else {
       // ── Nodo 3: generate ────────────────────────────────────────────────────
-      const generated = await generateNode(state, this.groq);
+      const generated = await generateNode(state, this.llm);
       state = { ...state, ...generated };
 
       // ── Nodo 4: validate ────────────────────────────────────────────────────
-      const validated = await validateNode(state, this.groq);
+      const validated = await validateNode(state, this.llm);
       state = { ...state, ...validated };
     }
 
-    this.logger.debug(`[${input.conversationId}] Grafo completo — stage final: ${state.currentStage}`);
+    this.logger.debug(
+      `[${input.conversationId}] Grafo completo — stage final: ${state.currentStage}`,
+    );
 
     // Persistir el estado del agente
     await this.persistState(state);
 
     return {
-      responseText: state.responseText ?? 'Disculpá, hubo un error. Por favor reintentá.',
+      responseText:
+        state.responseText ?? 'Disculpá, hubo un error. Por favor reintentá.',
       tokensUsed: state.tokensUsed,
       modelUsed: state.modelUsed ?? state.groqModel,
       nextStage: state.currentStage,
@@ -154,5 +160,4 @@ export class LangGraphEngine {
       },
     });
   }
-
 }

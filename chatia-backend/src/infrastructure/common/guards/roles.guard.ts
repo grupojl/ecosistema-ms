@@ -1,13 +1,19 @@
-// src/common/guards/roles.guard.ts
+// src/infrastructure/common/guards/roles.guard.ts
 import {
-  Injectable, CanActivate, ExecutionContext, ForbiddenException,
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '@/infrastructure/common/decorators/roles.decorator.js';
 import type { TenantContext } from '@/infrastructure/common/types/tenant-context.js';
 
 const ROLE_HIERARCHY: Record<string, number> = {
-  VIEWER: 0, MEMBER: 1, ADMIN: 2, OWNER: 3,
+  VIEWER: 0,
+  MEMBER: 1,
+  ADMIN: 2,
+  OWNER: 3,
 };
 
 @Injectable()
@@ -22,15 +28,19 @@ export class RolesGuard implements CanActivate {
 
     if (!required?.length) return true;
 
-    const request = context.switchToHttp().getRequest();
-    const tenant: TenantContext | undefined = request.tenant;
+    const request = context
+      .switchToHttp()
+      .getRequest<{ tenant?: TenantContext }>();
+    const tenant = request.tenant;
 
     if (!tenant?.role) {
       throw new ForbiddenException('Sin contexto de tenant');
     }
 
-    const tenantLevel  = ROLE_HIERARCHY[tenant.role.toUpperCase()] ?? -1;
-    const minRequired  = Math.min(...required.map(r => ROLE_HIERARCHY[r.toUpperCase()] ?? 99));
+    const tenantLevel = ROLE_HIERARCHY[tenant.role.toUpperCase()] ?? -1;
+    const minRequired = Math.min(
+      ...required.map((r) => ROLE_HIERARCHY[r.toUpperCase()] ?? 99),
+    );
 
     if (tenantLevel < minRequired) {
       throw new ForbiddenException(

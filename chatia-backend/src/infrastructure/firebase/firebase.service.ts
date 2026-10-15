@@ -9,14 +9,14 @@ export class FirebaseService implements OnModuleInit {
   private app: App | null = null;
 
   onModuleInit() {
-    const projectId   = process.env.FIREBASE_PROJECT_ID;
+    const projectId = process.env.FIREBASE_PROJECT_ID;
     const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey  = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
 
     if (!projectId || !clientEmail || !privateKey) {
       this.logger.warn(
         'Firebase Admin no configurado — FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL y ' +
-        'FIREBASE_PRIVATE_KEY son requeridas. El TenantGuard fallará si se usa Firebase auth.',
+          'FIREBASE_PRIVATE_KEY son requeridas. El TenantGuard fallará si se usa Firebase auth.',
       );
       return;
     }

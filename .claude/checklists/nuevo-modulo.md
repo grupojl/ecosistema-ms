@@ -13,7 +13,7 @@
 
 ## Estructura de archivos
 
-- [ ] Controller en `{servicio}/src/{dominio}/{dominio}.controller.ts`
+- [ ] Controller en `{servicio}/src/modules/common/{dominio}/{dominio}.controller.ts` (endpoint común a todos los ecosistemas) o en `modules/{eco}/` (exclusivo de uno). **Nunca en `core/`** (ADR-022)
       — nunca en carpeta de otro dominio
       (ver 🔴 `controller-localidad` en `architecture/03-reglas-duras.md`)
 - [ ] `domain/{entidad}.entity.ts` — tipos puros TypeScript, sin NestJS ni Prisma
@@ -21,9 +21,9 @@
 - [ ] `repository/{dominio}.repository.interface.ts` — símbolo TOKEN + interface
 - [ ] `repository/prisma-{dominio}.repository.ts` — único archivo con PrismaService + toEntity()
 - [ ] `types/{dominio}.types.ts` — tipos de salida del service (nunca tipo Prisma crudo)
-- [ ] `schemas.ts` — Zod inline, colocalizados con el controller
+- [ ] `schemas.ts` — Zod inline, en `core/{dominio}/schemas.ts` (los servicios usan sus tipos; el controller de `modules/` los importa)
 - [ ] `{dominio}.service.ts` — lógica de dominio, inyecta IRepository via `@Inject(TOKEN)`
-- [ ] `{dominio}.controller.ts` — surface HTTP únicamente, sin lógica de negocio
+- [ ] `modules/common/{dominio}/{dominio}.controller.ts` — surface HTTP únicamente, sin lógica de negocio
 - [ ] `{dominio}.module.ts` — binding `{ provide: TOKEN, useClass: PrismaRepo }`
 - [ ] `index.ts` — exporta Module, Service y tipos públicos; internals quedan privados
 - [ ] Módulo registrado en `app.module.ts`

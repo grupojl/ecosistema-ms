@@ -1,4 +1,4 @@
-// chatia-backend/src/conversations/domain/conversation.errors.ts
+// chatia-backend/src/core/conversations/domain/conversation.errors.ts
 // Errores de dominio tipados — sin imports de NestJS.
 // El Service los captura y los convierte a NotFoundException, BadRequestException, etc.
 
@@ -11,7 +11,9 @@ export class ConversationNotFoundError extends Error {
 
 export class ConversationAccessDeniedError extends Error {
   constructor(conversationId: string, organizationId: string) {
-    super(`Conversation ${conversationId} does not belong to org ${organizationId}`);
+    super(
+      `Conversation ${conversationId} does not belong to org ${organizationId}`,
+    );
     this.name = 'ConversationAccessDeniedError';
   }
 }

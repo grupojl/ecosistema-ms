@@ -1,26 +1,28 @@
-// Declaración complementaria de tipos para opossum
-// Generada por x.sh — ADR-007: tipos explícitos en todos los boundaries
-// opossum tiene tipos parciales; esta declaración cubre los métodos internos
-// que usamos en los circuit-breaker services del ecosistema.
-//
-// Ref: https://nodeshift.dev/opossum/
-// Cuando @types/opossum cubra estos métodos, eliminar este archivo.
+// Tipos de `opossum` (v10). La librería no trae tipos propios y @types/opossum no está en el catálogo del
+// monorepo, así que se declara aquí lo que usan los circuit breakers del servicio (CircuitBreakerService).
+// Si se agrega @types/opossum al catálogo, eliminar este archivo.
+declare module 'opossum' {
+  export interface Options {
+    /** ms antes de considerar que una llamada falló por timeout. */
+    timeout?: number;
+    /** % de fallos (sobre el volumen mínimo) que abre el circuito. */
+    errorThresholdPercentage?: number;
+    /** ms con el circuito abierto antes de probar de nuevo (half-open). */
+    resetTimeout?: number;
+    /** Llamadas mínimas en la ventana antes de evaluar el umbral. */
+    volumeThreshold?: number;
+  }
 
-import CircuitBreaker from "opossum";
-
-declare module "opossum" {
-  interface CircuitBreaker<TI extends unknown[] = unknown[], TR = unknown> {
-    /**
-     * Reemplaza la función de acción del circuit breaker en runtime.
-     * Usado en el patrón de re-wrapping de CircuitBreakerService.
-     * @internal — no documentado en la API pública de opossum
-     */
-    action: (...args: TI) => Promise<TR>;
-
-    /**
-     * Retorna el estado de todos los circuit breakers registrados.
-     * @internal — disponible en opossum >= 6.0
-     */
-    getStates?(): Promise<Record<string, string>>;
+  export default class CircuitBreaker<
+    TI extends unknown[] = unknown[],
+    TR = unknown,
+  > {
+    constructor(action: (...args: TI) => Promise<TR>, options?: Options);
+    fire(...args: TI): Promise<TR>;
+    shutdown(): void;
+    on(event: string, listener: (...args: unknown[]) => void): this;
+    readonly opened: boolean;
+    readonly halfOpen: boolean;
+    readonly closed: boolean;
   }
 }

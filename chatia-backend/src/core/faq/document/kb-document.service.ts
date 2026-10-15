@@ -1,89 +1,117 @@
-// src/faq/document/kb-document.service.ts
-import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
-import { InjectQueue }  from '@nestjs/bullmq';
-import { Queue }        from 'bullmq';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+// src/core/faq/document/kb-document.service.ts
+import { addWithTimeout } from '@/infrastructure/queue/add-with-timeout.js';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import {
+  KNOWLEDGE_REPOSITORY,
+  type IKnowledgeRepository,
+} from '@/core/faq/repository/knowledge.repository.interface.js';
+import type { KbDocumentStatus } from '@/generated/prisma/client.js';
 import type { CreateKbDocumentInput } from '@/core/faq/schemas.js';
-import { QUEUES, JOBS } from '@/queue/queue.constants.js';
+import { QUEUES, JOBS } from '@/infrastructure/queue/queue.constants.js';
 
-export interface IngestJobData { documentId: string; organizationId: string; }
+export interface IngestJobData {
+  documentId: string;
+  organizationId: string;
+}
 
 @Injectable()
 export class KbDocumentService {
   private readonly logger = new Logger(KbDocumentService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
-    @Optional() @InjectQueue(QUEUES.FAQ_INGEST) private readonly ingestQueue: Queue<IngestJobData> | null,
+    @Inject(KNOWLEDGE_REPOSITORY) private readonly repo: IKnowledgeRepository,
+    @Optional()
+    @InjectQueue(QUEUES.FAQ_INGEST)
+    private readonly ingestQueue: Queue<IngestJobData> | null,
   ) {}
 
-  async create(kbId: string, organizationId: string, dto: CreateKbDocumentInput) {
-    const kb = await this.prisma.knowledgeBase.findFirst({
-      where: { id: kbId, organizationId },
-    });
+  async create(
+    kbId: string,
+    organizationId: string,
+    dto: CreateKbDocumentInput,
+  ) {
+    const kb = await this.repo.findKnowledgeBase(kbId, organizationId);
     if (!kb) throw new NotFoundException('Knowledge base no encontrada');
 
-    const doc = await this.prisma.kbDocument.create({
-      data: { ...dto, knowledgeBaseId: kbId, organizationId, status: 'PENDING' },
+    const doc = await this.repo.createDocument({
+      ...dto,
+      knowledgeBaseId: kbId,
+      organizationId,
     });
 
     await this.enqueueIngest(doc.id, organizationId);
-    this.logger.log(`Documento creado${this.ingestQueue ? ' y encolado' : ' (ingesta deshabilitada sin Redis)'}: ${doc.id}`);
+    this.logger.log(
+      `Documento creado${this.ingestQueue ? ' y encolado' : ' (ingesta deshabilitada sin Redis)'}: ${doc.id}`,
+    );
     return { success: true, data: doc };
   }
 
   async findAll(kbId: string, organizationId: string, status?: string) {
-    const docs = await this.prisma.kbDocument.findMany({
-      where: {
-        knowledgeBaseId: kbId,
-        organizationId,
-        ...(status ? { status: status as import("@/generated/prisma/client.js").KbDocumentStatus } : {}),
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const docs = await this.repo.listDocuments(
+      kbId,
+      organizationId,
+      status as KbDocumentStatus | undefined,
+    );
     return { success: true, data: docs };
   }
 
   async reindex(documentId: string, organizationId: string) {
-    const doc = await this.prisma.kbDocument.findFirst({
-      where: { id: documentId, organizationId },
-    });
+    const doc = await this.repo.findDocument(documentId, organizationId);
     if (!doc) throw new NotFoundException('Documento no encontrado');
 
-    await this.prisma.kbChunk.deleteMany({ where: { documentId } });
-
-    await this.prisma.kbDocument.update({
-      where: { id: documentId },
-      data: { status: 'PENDING', chunkCount: 0, errorMessage: null, indexedAt: null },
-    });
+    await this.repo.resetDocumentForReindex(documentId);
 
     await this.enqueueIngest(documentId, organizationId);
-    return { success: true, message: this.ingestQueue ? 'Re-indexación encolada' : 'Re-indexación no disponible sin Redis' };
+    return {
+      success: true,
+      message: this.ingestQueue
+        ? 'Re-indexación encolada'
+        : 'Re-indexación no disponible sin Redis',
+    };
   }
 
   async remove(documentId: string, organizationId: string) {
-    const doc = await this.prisma.kbDocument.findFirst({
-      where: { id: documentId, organizationId },
-    });
+    const doc = await this.repo.findDocument(documentId, organizationId);
     if (!doc) throw new NotFoundException('Documento no encontrado');
 
-    await this.prisma.kbDocument.delete({ where: { id: documentId } });
+    await this.repo.deleteDocument(documentId);
     return { success: true, message: 'Documento eliminado' };
   }
 
-  private async enqueueIngest(documentId: string, organizationId: string): Promise<void> {
+  private async enqueueIngest(
+    documentId: string,
+    organizationId: string,
+  ): Promise<void> {
     if (!this.ingestQueue) {
-      this.logger.debug(`[no-op] ingesta ignorada (Redis deshabilitado): ${documentId}`);
+      this.logger.debug(
+        `[no-op] ingesta ignorada (Redis deshabilitado): ${documentId}`,
+      );
       return;
     }
-    await this.ingestQueue.add(
-      JOBS.FAQ_INGEST_DOCUMENT,
-      { documentId, organizationId },
-      {
-        jobId:    `ingest:${documentId}`,
-        attempts: 3,
-        backoff:  { type: 'exponential', delay: 3000 },
-      },
+    const ingestQueue = this.ingestQueue;
+    await addWithTimeout(
+      () =>
+        ingestQueue.add(
+          JOBS.FAQ_INGEST_DOCUMENT,
+          { documentId, organizationId },
+          {
+            // jobId único por solicitud: con uno fijo, reindexar se ignoraba si el job anterior seguía guardado en Redis
+            jobId: `ingest:${documentId}:${Date.now()}`,
+            attempts: 3,
+            backoff: { type: 'exponential', delay: 3000 },
+            removeOnComplete: 100,
+            removeOnFail: 200,
+          },
+        ),
+      QUEUES.FAQ_INGEST,
     );
   }
 }

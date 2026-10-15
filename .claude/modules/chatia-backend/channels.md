@@ -11,7 +11,7 @@ Define el patrón Strategy para canales de comunicación (WhatsApp, Email, etc.)
 
 ## Cómo agregar un nuevo canal
 
-1. Crear carpeta `src/channels/<nombre-canal>/`
+1. Crear carpeta `src/infrastructure/channels/<nombre-canal>/`
 2. Implementar la interface `IChannel`
 3. Registrar en `channel.module.ts`
 4. **No modificar la interface** — si el nuevo canal necesita algo que la interface
@@ -19,7 +19,7 @@ Define el patrón Strategy para canales de comunicación (WhatsApp, Email, etc.)
 
 ## Canales implementados
 
-Verificar en `src/channels/` — documentar aquí cuando se conozcan.
+Verificar en `src/infrastructure/channels/` — documentar aquí cuando se conozcan.
 
 ---
 

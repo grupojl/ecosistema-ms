@@ -1,12 +1,12 @@
-// chatia-backend/src/conversations/schemas.ts
+// chatia-backend/src/core/conversations/schemas.ts
 import { z } from 'zod';
 
 export const ListConversationsSchema = z.object({
-  status:           z.enum(['OPEN', 'HUMAN_TAKEOVER', 'RESOLVED', 'EXPIRED']).optional(),
+  status: z.enum(['OPEN', 'HUMAN_TAKEOVER', 'RESOLVED', 'EXPIRED']).optional(),
   channelAccountId: z.string().optional(),
-  tag:              z.string().optional(),
-  archived:         z.coerce.boolean().optional(),
-  page:             z.coerce.number().int().positive().default(1),
+  tag: z.string().optional(),
+  archived: z.coerce.boolean().optional(),
+  page: z.coerce.number().int().positive().default(1),
 });
 
 export const SendMessageSchema = z.object({
@@ -22,6 +22,6 @@ export const AddTagSchema = z.object({
 });
 
 export type ListConversationsInput = z.infer<typeof ListConversationsSchema>;
-export type SendMessageInput       = z.infer<typeof SendMessageSchema>;
-export type TakeoverInput          = z.infer<typeof TakeoverSchema>;
-export type AddTagInput            = z.infer<typeof AddTagSchema>;
+export type SendMessageInput = z.infer<typeof SendMessageSchema>;
+export type TakeoverInput = z.infer<typeof TakeoverSchema>;
+export type AddTagInput = z.infer<typeof AddTagSchema>;

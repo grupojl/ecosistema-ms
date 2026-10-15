@@ -13,7 +13,10 @@ import {
   type ListContactsFilter,
 } from '@/core/contacts/repository/contacts.repository.interface.js';
 import { assertNoDuplicateTags } from '@/core/contacts/domain/contact.entity.js';
-import { ContactInvalidTagsError, ContactNotFoundError } from '@/core/contacts/domain/contact.errors.js';
+import {
+  ContactInvalidTagsError,
+  ContactNotFoundError,
+} from '@/core/contacts/domain/contact.errors.js';
 import type { UpdateContactInput } from '@/core/contacts/schemas.js';
 
 @Injectable()
@@ -23,9 +26,16 @@ export class ContactsService {
     private readonly contactsRepository: IContactsRepository,
   ) {}
 
-  async list(organizationId: string, ecosystemId: string, filters?: ListContactsFilter) {
-    const { data, total, page, limit } =
-      await this.contactsRepository.list(organizationId, ecosystemId, filters);
+  async list(
+    organizationId: string,
+    ecosystemId: string,
+    filters?: ListContactsFilter,
+  ) {
+    const { data, total, page, limit } = await this.contactsRepository.list(
+      organizationId,
+      ecosystemId,
+      filters,
+    );
     return {
       success: true,
       data,
@@ -33,19 +43,29 @@ export class ContactsService {
     };
   }
 
-  async findOne(contactId: string, organizationId: string, ecosystemId: string) {
-    const contact = await this.contactsRepository.findOne(contactId, organizationId, ecosystemId);
+  async findOne(
+    contactId: string,
+    organizationId: string,
+    ecosystemId: string,
+  ) {
+    const contact = await this.contactsRepository.findOne(
+      contactId,
+      organizationId,
+      ecosystemId,
+    );
     if (!contact) {
-      throw new NotFoundException(new ContactNotFoundError(contactId, organizationId).message);
+      throw new NotFoundException(
+        new ContactNotFoundError(contactId, organizationId).message,
+      );
     }
     return { success: true, data: contact };
   }
 
   async update(
-    contactId:      string,
+    contactId: string,
     organizationId: string,
-    ecosystemId:    string,
-    dto:            UpdateContactInput,
+    ecosystemId: string,
+    dto: UpdateContactInput,
   ) {
     if (dto.tags) {
       try {
@@ -58,15 +78,25 @@ export class ContactsService {
       }
     }
 
-    const updated = await this.contactsRepository.update(contactId, organizationId, ecosystemId, dto);
+    const updated = await this.contactsRepository.update(
+      contactId,
+      organizationId,
+      ecosystemId,
+      dto,
+    );
     if (!updated) {
-      throw new NotFoundException(new ContactNotFoundError(contactId, organizationId).message);
+      throw new NotFoundException(
+        new ContactNotFoundError(contactId, organizationId).message,
+      );
     }
     return { success: true, data: updated };
   }
 
   async getStats(organizationId: string, ecosystemId: string) {
-    const stats = await this.contactsRepository.getStats(organizationId, ecosystemId);
+    const stats = await this.contactsRepository.getStats(
+      organizationId,
+      ecosystemId,
+    );
     return { success: true, data: stats };
   }
 }

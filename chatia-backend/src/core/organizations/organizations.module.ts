@@ -1,4 +1,4 @@
-// src/organizations/organizations.module.ts
+// src/core/organizations/organizations.module.ts
 import { Global, Module } from '@nestjs/common';
 import { OrganizationsService } from '@/core/organizations/organizations.service.js';
 

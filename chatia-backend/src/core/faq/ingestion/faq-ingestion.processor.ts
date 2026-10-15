@@ -1,24 +1,51 @@
-// chatia-backend/src/faq/ingestion/faq-ingestion.processor.ts
+// chatia-backend/src/core/faq/ingestion/faq-ingestion.processor.ts
 //
-// ADR-003 W-1.3 — ELIMINADO en semana 7.
-// El procesamiento de FAQ fue movido a workers-backend/FaqIngestProcessor.
-//
-// Este archivo existe solo para evitar errores de importación si hay
-// referencias residuales. Puede eliminarse en el próximo cleanup.
-//
-// El producer es: chatia-backend/src/faq/ingestion/faq-ingestion.service.ts
-// El consumer es: workers-backend/src/jobs/processors/faq-ingest.processor.ts
+// Consumidor de la cola `faq-ingest` (la que llena KbDocumentService al crear/reindexar un documento).
+// Antes este archivo estaba vacío y los documentos quedaban en PENDING para siempre.
+// Solo se registra con REDIS_ENABLED=true (ver FaqModule).
+import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
+import { Logger } from '@nestjs/common';
+import type { Job } from 'bullmq';
+import { QUEUES } from '@/infrastructure/queue/queue.constants.js';
+import { FaqIndexerService } from '@/core/faq/ingestion/faq-indexer.service.js';
+import type { IngestJobData } from '@/core/faq/document/kb-document.service.js';
 
-import { Injectable, Logger } from '@nestjs/common';
-
-@Injectable()
-export class FaqIngestionProcessor {
+@Processor(QUEUES.FAQ_INGEST, {
+  concurrency: Number(process.env['FAQ_INGEST_CONCURRENCY'] ?? 2),
+})
+export class FaqIngestionProcessor extends WorkerHost {
   private readonly logger = new Logger(FaqIngestionProcessor.name);
 
-  constructor() {
-    this.logger.warn(
-      'FaqIngestionProcessor está vacío — ADR-003 W-1.3. ' +
-      'El procesamiento ocurre en workers-backend.',
+  constructor(private readonly indexer: FaqIndexerService) {
+    super();
+  }
+
+  async process(job: Job<IngestJobData>): Promise<{ chunks: number }> {
+    return this.indexer.indexDocument(
+      job.data.documentId,
+      job.data.organizationId,
     );
+  }
+
+  /** Solo cuando se agotan los reintentos el documento pasa a FAILED (antes sigue en PROCESSING reintentando). */
+  @OnWorkerEvent('failed')
+  async onFailed(
+    job: Job<IngestJobData> | undefined,
+    error: Error,
+  ): Promise<void> {
+    if (!job) return;
+    const finalAttempt = job.attemptsMade >= (job.opts.attempts ?? 1);
+    this.logger.error(
+      `[job:${job.id}] intento ${job.attemptsMade}/${job.opts.attempts ?? 1} falló: ${error.message}`,
+    );
+    if (finalAttempt) {
+      await this.indexer
+        .markFailed(job.data.documentId, job.data.organizationId, error.message)
+        .catch((err: unknown) =>
+          this.logger.error(
+            `No se pudo marcar FAILED ${job.data.documentId}: ${String(err)}`,
+          ),
+        );
+    }
   }
 }

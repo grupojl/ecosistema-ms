@@ -2,7 +2,8 @@
 
 ## Diseño
 - [ ] ¿El job es idempotente? (misma ejecución N veces = mismo resultado)
-- [ ] `jobId` determinista definido (no UUID aleatorio para jobs críticos)
+- [ ] `jobId` determinista definido (no UUID aleatorio para jobs críticos) y **sin `:`** (usar `_`; BullMQ lo rechaza salvo con 3 partes)
+- [ ] Probado contra Redis real (`TEST_REDIS_URL`): un mock de la cola no valida los `jobId`
 - [ ] Política de reintentos definida (`attempts` + `backoff`)
 - [ ] ¿Necesita DLQ? (jobs de pago, notificaciones críticas → sí)
 

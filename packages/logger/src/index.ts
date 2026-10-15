@@ -11,11 +11,24 @@ const pinoParams: Params = {
     transport: isDev
       ? { target: 'pino-pretty', options: { colorize: true, singleLine: false } }
       : undefined,
+    // Datos sensibles nunca deben llegar a los logs (si algún día se serializan headers o cuerpos)
+    redact: {
+      paths: [
+        'req.headers.authorization', 'req.headers.cookie',
+        'req.headers["x-hub-signature-256"]', 'req.headers["x-tiktok-signature"]',
+        'req.headers["x-widget-token"]', 'req.headers["x-internal-api-key"]',
+        'req.headers["x-platform-admin-key"]', 'req.headers["x-api-key"]',
+        'res.headers["set-cookie"]',
+        '*.password', '*.accessToken', '*.apiKey', '*.privateKey', '*.token',
+      ],
+      censor: '[REDACTED]',
+    },
     serializers: {
       req(req: IncomingMessage & { id?: unknown }) {
         return {
           method:    req.method,
-          url:       req.url,
+          // Sin query string: puede traer hub.verify_token u otros secretos
+          url:       req.url?.split('?')[0],
           requestId: req.id,
         };
       },

@@ -36,7 +36,7 @@ La lógica de conversación, RAG y escalación no cambia.
 ## Interface de adapters multimodales
 
 ```typescript
-// src/channels/adapters/multimodal.interface.ts
+// src/infrastructure/channels/adapters/multimodal.interface.ts
 //
 // Contrato que todos los adapters de entrada multimodal implementan.
 // Recibe el mensaje raw del canal, devuelve texto para el LLM.
@@ -187,7 +187,7 @@ Fallback Fase 1: cuando llega un video →
 ## Estructura de carpetas en chatia-backend
 
 ```
-src/channels/
+src/infrastructure/channels/
   channel.interface.ts          ← BLOQUEANTE — no modificar sin ADR
   adapters/
     multimodal.interface.ts     ← interface de todos los adapters (NUEVA)
@@ -206,7 +206,7 @@ src/channels/
 ## MultimodalService — orquestador
 
 ```typescript
-// src/channels/multimodal.service.ts
+// src/infrastructure/channels/multimodal.service.ts
 //
 // Recibe un IncomingMessage del canal y normaliza su contenido a texto.
 // Es el único punto donde se decide qué adapter usar.
@@ -314,7 +314,7 @@ Sprint 4 — Fase 2
 
 ## Referencia
 
-- `src/channels/channel.interface.ts` — BLOQUEANTE, ya soporta todos los tipos
-- `src/faq/ingestion/` — reutilizar para DocumentToTextAdapter
-- `src/groq/groq.service.ts` — extender para Whisper endpoint
+- `src/infrastructure/channels/channel.interface.ts` — BLOQUEANTE, ya soporta todos los tipos
+- `src/core/faq/ingestion/` — reutilizar para DocumentToTextAdapter
+- `src/infrastructure/groq/groq.service.ts` — extender para Whisper endpoint
 - `.claude/decisions/ADR-005-circuit-breaker-opossum.md` — CB pattern

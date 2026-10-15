@@ -1,4 +1,4 @@
-// src/common/interfaces/dashboard-user.interface.ts
+// src/infrastructure/common/interfaces/dashboard-user.interface.ts
 
 export interface ProductPermission {
   canRead: boolean;

@@ -1,40 +1,51 @@
 // chatia-backend/src/core/strategies/project-strategy.interface.ts
 // REGLA DURA: enrich* y after* NUNCA lanzan. Capturan, loguean, retornan neutro.
 
-import type { ProjectContext, OrganizationProfile } from '@/core/strategies/project-context.interface.js';
+import type {
+  ProjectContext,
+  OrganizationProfile,
+} from '@/core/strategies/project-context.interface.js';
 
 export enum ProjectType {
-  WELVER  = 'welver',
+  WELVER = 'welver',
   MANZANA = 'manzana',
-  MEXUS   = 'mexus',
+  MEXUS = 'mexus',
   GENERIC = 'generic',
 }
 
 export interface ConversationEnrichInput {
-  conversationId:  string;
-  organizationId:  string;
-  ecosystemId:     string;
-  channel:         string;
-  userMessage:     string;
-  extra?:          Record<string, unknown>;
+  conversationId: string;
+  organizationId: string;
+  ecosystemId: string;
+  channel: string;
+  userMessage: string;
+  extra?: Record<string, unknown>;
 }
 
 export interface ConversationResult {
-  conversationId:   string;
-  organizationId:   string;
-  ecosystemId:      string;
+  conversationId: string;
+  organizationId: string;
+  ecosystemId: string;
   assistantMessage: string;
-  newStage:         string;
-  escalated:        boolean;
-  metadata:         Record<string, unknown>;
+  newStage: string;
+  escalated: boolean;
+  metadata: Record<string, unknown>;
 }
 
 export interface ProjectStrategy {
   /** NUNCA lanza — retorna contexto con defaults si falla */
-  enrichConversationContext(input: ConversationEnrichInput): Promise<ProjectContext>;
+  enrichConversationContext(
+    input: ConversationEnrichInput,
+  ): Promise<ProjectContext>;
   /** NUNCA lanza — solo loguea si falla */
-  afterConversationResult(result: ConversationResult, context: ProjectContext): Promise<void>;
+  afterConversationResult(
+    result: ConversationResult,
+    context: ProjectContext,
+  ): Promise<void>;
   getProjectType(): ProjectType;
   /** NUNCA lanza — retorna DEFAULT_ORG_PROFILE si falla */
-  resolveOrgProfile(ecosystemId: string, organizationId: string): Promise<OrganizationProfile>;
+  resolveOrgProfile(
+    ecosystemId: string,
+    organizationId: string,
+  ): Promise<OrganizationProfile>;
 }

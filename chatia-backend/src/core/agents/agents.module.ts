@@ -1,8 +1,10 @@
-// src/agents/agents.module.ts
+// chatia-backend/src/core/agents/agents.module.ts
+// El binding AGENTS_REPOSITORY → implementación Prisma vive en infrastructure/prisma/prisma.module.ts.
 import { Module } from '@nestjs/common';
-import { AgentsController } from '@/core/agents/agents.controller.js';
+import { AgentsService } from '@/core/agents/agents.service.js';
 
 @Module({
-  controllers: [AgentsController],
+  providers: [AgentsService],
+  exports: [AgentsService],
 })
 export class AgentsModule {}

@@ -1,9 +1,13 @@
-// chatia-backend/src/common/filters/all-exceptions.filter.ts
+// chatia-backend/src/infrastructure/common/filters/all-exceptions.filter.ts
 // Filtro global que captura ZodError + HttpException.
 // Registrar en main.ts: app.useGlobalFilters(new AllExceptionsFilter());
 import {
-  ExceptionFilter, Catch, ArgumentsHost,
-  HttpException, HttpStatus, Logger,
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
 } from '@nestjs/common';
 import { ZodError } from 'zod';
 import type { Response } from 'express';
@@ -13,8 +17,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
 
   catch(exception: unknown, host: ArgumentsHost): void {
-    const ctx  = host.switchToHttp();
-    const res  = ctx.getResponse<Response>();
+    const ctx = host.switchToHttp();
+    const res = ctx.getResponse<Response>();
 
     if (exception instanceof ZodError) {
       const formatted: Record<string, string[]> = {};
@@ -23,7 +27,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
         if (!formatted[path]) formatted[path] = [];
         formatted[path].push(issue.message);
       }
-      res.status(400).json({ statusCode: 400, message: 'Validation failed', errors: formatted });
+      res.status(400).json({
+        statusCode: 400,
+        message: 'Validation failed',
+        errors: formatted,
+      });
       return;
     }
 
@@ -35,7 +43,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     this.logger.error(exception);
     res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({
       statusCode: 500,
-      message:    'Internal server error',
+      message: 'Internal server error',
     });
   }
 }

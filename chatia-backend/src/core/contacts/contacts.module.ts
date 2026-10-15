@@ -1,17 +1,11 @@
-// chatia-backend/src/contacts/contacts.module.ts
-import { Module }                    from "@nestjs/common";
-import { ContactsController }        from "@/core/contacts/contacts.controller.js";
-import { ContactsService }           from "@/core/contacts/contacts.service.js";
-import { PrismaContactsRepository }  from "@/core/contacts/repository/prisma-contacts.repository.js";
-import { CONTACTS_REPOSITORY }       from "@/core/contacts/repository/contacts.repository.interface.js";
+// chatia-backend/src/core/contacts/contacts.module.ts
+import { Module } from '@nestjs/common';
+import { PrivacyModule } from '@/core/privacy/privacy.module.js';
+import { ContactsService } from '@/core/contacts/contacts.service.js';
 
 @Module({
-  controllers: [ContactsController],
-  providers: [
-    ContactsService,
-    PrismaContactsRepository,
-    { provide: CONTACTS_REPOSITORY, useClass: PrismaContactsRepository },
-  ],
+  imports: [PrivacyModule],
+  providers: [ContactsService],
   exports: [ContactsService],
 })
 export class ContactsModule {}

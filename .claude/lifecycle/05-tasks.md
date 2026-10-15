@@ -28,7 +28,7 @@ y cómo saber que está hecho. En orden de ejecución dentro de cada fase.
 - [ ] **[E1-05]** Eliminar `class-validator` y `class-transformer` de todos los `package.json`
   → Done cuando: `grep -r "class-validator" */package.json` → 0 resultados
 
-- [ ] **[E1-06]** Crear MOLDE VIVO: migrar `chatia-backend/conversations/` a Domain + Repository
+- [ ] **[E1-06]** Crear MOLDE VIVO: migrar `chatia-backend/src/core/conversations/` a Domain + Repository
   → Crear: `domain/conversation.entity.ts`, `domain/conversation.errors.ts`
   → Crear: `repository/conversations.repository.interface.ts`, `repository/prisma-conversations.repository.ts` con `toEntity()`
   → Done cuando: `conversations.service.ts` no importa `PrismaService`
@@ -36,9 +36,9 @@ y cómo saber que está hecho. En orden de ejecución dentro de cada fase.
 - [ ] **[E1-07]** Migrar `pasarelapagos-backend/modules/payments/` a Domain + Repository
   → Done cuando: `payments.service.ts` no importa `PrismaService`
 
-- [ ] **[E1-08]** Migrar `chatia-backend/contacts/` a Domain + Repository (usar MOLDE VIVO)
-- [ ] **[E1-09]** Migrar `chatia-backend/projects/` a Domain + Repository
-- [ ] **[E1-10]** Migrar `chatia-backend/agents/` a Domain + Repository
+- [ ] **[E1-08]** Migrar `chatia-backend/src/core/contacts/` a Domain + Repository (usar MOLDE VIVO)
+- [ ] **[E1-09]** Migrar `chatia-backend/src/core/projects/` a Domain + Repository
+- [ ] **[E1-10]** Migrar `chatia-backend/src/core/agents/` a Domain + Repository
 - [ ] **[E1-11]** Migrar `workers-backend/campaigns/` a Domain + Repository
 - [ ] **[E1-12]** Migrar `notificaciones-backend/notifications/` a Domain + Repository
 

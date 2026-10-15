@@ -13,34 +13,40 @@ export type ContactRecord = Prisma.ContactGetPayload<{
 export type ContactWithConversations = Prisma.ContactGetPayload<{
   include: {
     conversations: {
-      select: { id: true; status: true; stage: true; lastMessageAt: true; createdAt: true };
+      select: {
+        id: true;
+        status: true;
+        stage: true;
+        lastMessageAt: true;
+        createdAt: true;
+      };
     };
   };
 }>;
 
 export interface ListContactsFilter {
-  status?:   ContactStatus;
-  search?:   string;
+  status?: ContactStatus;
+  search?: string;
   optedOut?: boolean;
-  tag?:      string;
-  page?:     number;
-  limit?:    number;
+  tag?: string;
+  page?: number;
+  limit?: number;
 }
 
 export interface UpdateContactPatch {
-  name?:      string;
-  email?:     string;
-  phone?:     string;
-  username?:  string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  username?: string;
   avatarUrl?: string;
-  status?:    ContactStatus;
-  optedOut?:  boolean;
-  tags?:      string[];
-  metadata?:  Record<string, unknown>;
+  status?: ContactStatus;
+  optedOut?: boolean;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
 }
 
 export interface ContactStats {
-  total:    number;
+  total: number;
   optedOut: number;
   byStatus: Record<string, number>;
 }
@@ -48,22 +54,27 @@ export interface ContactStats {
 export interface IContactsRepository {
   list(
     organizationId: string,
-    ecosystemId:    string,
-    filters?:       ListContactsFilter,
-  ): Promise<{ data: ContactRecord[]; total: number; page: number; limit: number }>;
+    ecosystemId: string,
+    filters?: ListContactsFilter,
+  ): Promise<{
+    data: ContactRecord[];
+    total: number;
+    page: number;
+    limit: number;
+  }>;
 
   findOne(
-    contactId:      string,
+    contactId: string,
     organizationId: string,
-    ecosystemId:    string,
+    ecosystemId: string,
   ): Promise<ContactWithConversations | null>;
 
   /** Devuelve null si el contacto no existe en la org/ecosistema. */
   update(
-    contactId:      string,
+    contactId: string,
     organizationId: string,
-    ecosystemId:    string,
-    patch:          UpdateContactPatch,
+    ecosystemId: string,
+    patch: UpdateContactPatch,
   ): Promise<ContactRecord | null>;
 
   getStats(organizationId: string, ecosystemId: string): Promise<ContactStats>;

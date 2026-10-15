@@ -3,39 +3,51 @@
 // Un solo import de módulos de negocio: ChatiaModulesModule
 import { createLoggerModule } from '@ecosistema-ms/logger';
 import {
-  Module, type NestModule, type MiddlewareConsumer, RequestMethod,
+  Module,
+  type NestModule,
+  type MiddlewareConsumer,
+  RequestMethod,
 } from '@nestjs/common';
-import { ConfigModule }    from '@nestjs/config';
-import { BullModule }      from '@nestjs/bullmq';
-import { CacheModule }     from '@nestjs/cache-manager';
-import { ScheduleModule }  from '@nestjs/schedule';
+import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { HttpThrottlerGuard } from '@/infrastructure/security/http-throttler.guard.js';
+import { BullModule } from '@nestjs/bullmq';
+import { CacheModule } from '@nestjs/cache-manager';
+import { ScheduleModule } from '@nestjs/schedule';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 
 // ── Infraestructura ────────────────────────────────────────────────────────
-import { PrismaModule }    from '@/infrastructure/prisma/prisma.module.js';
-import { FirebaseModule }  from '@/infrastructure/firebase/firebase.module.js';
-import { GroqModule }      from '@/infrastructure/groq/groq.module.js';
+import { GroqModule } from '@/infrastructure/groq/groq.module.js';
+import { PrismaModule } from '@/infrastructure/prisma/prisma.module.js';
+import { FirebaseModule } from '@/infrastructure/firebase/firebase.module.js';
 import { LangGraphModule } from '@/infrastructure/langgraph/langgraph.module.js';
-import { CommonModule }    from '@/infrastructure/common/common.module.js';
+import { CommonModule } from '@/infrastructure/common/common.module.js';
+import { SecurityModule } from '@/infrastructure/security/security.module.js';
 import { RequestIdMiddleware } from '@/infrastructure/common/middleware/request-id.middleware.js';
-import { appConfig }       from '@/infrastructure/config/app.config.js';
-import { validateEnv }     from '@/infrastructure/config/validation.schema.js';
+import { appConfig } from '@/infrastructure/config/app.config.js';
+import { validateEnv } from '@/infrastructure/config/validation.schema.js';
 
 // ── Core (bounded contexts sin controllers) ────────────────────────────────
 import { OrganizationConfigModule } from '@/core/organization-config/organization-config.module.js';
-import { EcosystemModule }          from '@/core/ecosystem/ecosystem.module.js';
-import { AnalyticsEventsModule }    from '@/core/analytics-events/analytics-events.module.js';
+import { EcosystemModule } from '@/core/ecosystem/ecosystem.module.js';
+import { AnalyticsEventsModule } from '@/core/analytics-events/analytics-events.module.js';
 
 // ── Entry points ──────────────────────────────────────────────────────────
-import { WebhooksModule }        from '@/webhooks/webhooks.module.js';
-import { WidgetModule }          from '@/widget/widget.module.js';
-import { ChannelsModule }        from '@/channels/channel.module.js';
-import { QueueModule }           from '@/queue/queue.module.js';
-import { EventsModule }          from '@/events/events.module.js';
-import { HealthModule }          from '@/health/health.module.js';
-import { InternalModule }        from '@/internal/internal.module.js';
-import { ChannelAccountsModule } from '@/channel-accounts/channel-accounts.module.js';
-import { AgentNotificationsModule } from '@/agent-notifications/agent-notifications.module.js';
+import { ChannelsModule } from '@/infrastructure/channels/channel.module.js';
+import { QueueModule } from '@/infrastructure/queue/queue.module.js';
+import { EventsModule } from '@/infrastructure/events/events.module.js';
+import { HealthModule } from '@/infrastructure/transport/health/health.module.js';
+import { InternalModule } from '@/infrastructure/transport/internal/internal.module.js';
+import { ChatiaServerGrpcModule } from '@/infrastructure/transport/grpc/chatia-grpc.module.js';
+
+// ── API REST del dashboard (antes NO estaban montados: sus endpoints daban 404) ──
+import { ContactsModule } from '@/core/contacts/contacts.module.js';
+import { ProjectsModule } from '@/core/projects/projects.module.js';
+import { AiConfigModule } from '@/core/ai-config/ai-config.module.js';
+import { MessagesModule } from '@/core/messages/messages.module.js';
+import { DlqModule } from '@/infrastructure/queue/dlq/dlq.module.js';
+import { PrivacyModule } from '@/core/privacy/privacy.module.js';
 
 // ── Módulos de ecosistema — un solo import ─────────────────────────────────
 import { ChatiaModulesModule } from '@/modules/index.js';
@@ -43,10 +55,11 @@ import { ChatiaModulesModule } from '@/modules/index.js';
 const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
+  providers: [{ provide: APP_GUARD, useClass: HttpThrottlerGuard }],
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load:     [appConfig],
+      load: [appConfig],
       validate: validateEnv,
     }),
     createLoggerModule(),
@@ -54,13 +67,21 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     BullModule.forRoot({ connection: { url: REDIS_URL } }),
     CacheModule.register({ isGlobal: true, ttl: 300_000 }),
     PrometheusModule.register(),
+    // Límite base por IP para toda la API (los endpoints sensibles tienen límites propios más estrictos)
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60_000,
+        limit: Number(process.env['THROTTLE_LIMIT_PER_MIN'] ?? 300),
+      },
+    ]),
 
     // Infraestructura
     PrismaModule,
-    FirebaseModule,
     GroqModule,
+    FirebaseModule,
     LangGraphModule,
     CommonModule,
+    SecurityModule,
 
     // Core transversal
     OrganizationConfigModule,
@@ -68,15 +89,20 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     AnalyticsEventsModule,
 
     // Entry points
-    WebhooksModule,
-    WidgetModule,
     ChannelsModule,
     QueueModule,
     EventsModule,
     HealthModule,
     InternalModule,
-    ChannelAccountsModule,
-    AgentNotificationsModule,
+    ChatiaServerGrpcModule,
+
+    // API REST del dashboard
+    ContactsModule,
+    ProjectsModule,
+    AiConfigModule,
+    MessagesModule,
+    DlqModule,
+    PrivacyModule,
 
     // Todos los ecosistemas — un solo import
     ChatiaModulesModule,

@@ -22,29 +22,30 @@ REGLAS CRÍTICAS:
 {HUMAN_AGENTS_CONTEXT}
   `.trim(),
   toneByPlan: {
-    free:       'Informal y cercano',
-    starter:    'Profesional y amigable',
-    growth:     'Profesional y consultivo',
+    free: 'Informal y cercano',
+    starter: 'Profesional y amigable',
+    growth: 'Profesional y consultivo',
     enterprise: 'Sofisticado y orientado a soluciones',
   } as const,
 } as const;
 
 export function buildWelverSystemPrompt(
-  bizData:    WELVERBusinessData,
+  bizData: WELVERBusinessData,
   orgProfile: OrganizationProfile,
 ): string {
-  const marketsCtx = bizData.activeMarkets.length > 0
-    ? `Mercados activos: ${bizData.activeMarkets.join(', ')} — considerá diferencias regionales.`
-    : '';
+  const marketsCtx =
+    bizData.activeMarkets.length > 0
+      ? `Mercados activos: ${bizData.activeMarkets.join(', ')} — considerá diferencias regionales.`
+      : '';
   const humanCtx = bizData.humanAgentsOnline
     ? 'Hay agentes humanos disponibles. Escalá si el cliente lo pide o supera tu conocimiento.'
     : 'No hay agentes humanos disponibles ahora. Ofrecé dejar mensaje para contacto posterior.';
 
   return WELVER_CONFIG.systemPromptTemplate
-    .replace('{STORE_NAME}',           bizData.storeName)
-    .replace('{STORE_CATEGORY}',       bizData.storeCategory)
-    .replace('{TONE}',                 WELVER_CONFIG.toneByPlan[bizData.merchantPlan])
-    .replace('{LOCALE}',               orgProfile.locale)
-    .replace('{MARKETS_CONTEXT}',      marketsCtx)
+    .replace('{STORE_NAME}', bizData.storeName)
+    .replace('{STORE_CATEGORY}', bizData.storeCategory)
+    .replace('{TONE}', WELVER_CONFIG.toneByPlan[bizData.merchantPlan])
+    .replace('{LOCALE}', orgProfile.locale)
+    .replace('{MARKETS_CONTEXT}', marketsCtx)
     .replace('{HUMAN_AGENTS_CONTEXT}', humanCtx);
 }

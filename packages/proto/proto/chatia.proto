@@ -12,6 +12,10 @@ service ChatIaService {
   rpc GetProject (GetProjectRequest) returns (GetProjectResponse);
   // Health check inter-servicio
   rpc Ping (PingRequest) returns (PingResponse);
+  // Base de conocimiento (FAQ): workers-backend persiste los fragmentos ya vectorizados
+  rpc UpsertChunks (UpsertChunksRequest) returns (UpsertChunksResponse);
+  // Base de conocimiento (FAQ): workers-backend informa el resultado del procesamiento
+  rpc UpdateDocumentStatus (UpdateDocumentStatusRequest) returns (UpdateDocumentStatusResponse);
 }
 
 message SendMessageRequest {
@@ -45,3 +49,38 @@ message GetProjectResponse {
 
 message PingRequest  { string caller = 1; }
 message PingResponse { string status = 1; string timestamp = 2; }
+
+// ─── Base de conocimiento (FAQ) ────────────────────────────────────────────
+// Los vectores deben ser del MISMO modelo con el que chatia consulta (EMBEDDINGS_MODEL, 1024 dims por defecto).
+message ChunkInput {
+  string         content         = 1;
+  repeated float embedding       = 2;
+  int32          chunk_index     = 3;
+  int32          token_count     = 4;
+}
+
+message UpsertChunksRequest {
+  string              document_id       = 1;
+  string              organization_id   = 2;
+  string              knowledge_base_id = 3;
+  repeated ChunkInput chunks            = 4;
+}
+
+message UpsertChunksResponse {
+  bool   success       = 1;
+  int32  chunks_stored = 2;
+  string error         = 3;
+}
+
+message UpdateDocumentStatusRequest {
+  string document_id     = 1;
+  string organization_id = 2;
+  string status          = 3; // INDEXED | FAILED
+  int32  chunks_indexed  = 4;
+  string error           = 5;
+}
+
+message UpdateDocumentStatusResponse {
+  bool   success = 1;
+  string error   = 2;
+}

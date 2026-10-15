@@ -121,7 +121,7 @@ Para datos críticos (pagos, notificaciones), el patrón es diferente.
 
 | Controller | ¿Tiene lógica de negocio? | Acción requerida |
 |---|---|---|
-| `chatia-backend/src/grpc/` | ⚠️ verificar | Auditar manualmente |
+| `chatia-backend/src/infrastructure/transport/grpc/` | ⚠️ verificar | Auditar manualmente |
 | `pasarelapagos-backend/src/pagos/pagos.grpc.controller.ts` | ⚠️ verificar | Auditar manualmente |
 | `notificaciones-backend/src/grpc/notificaciones-grpc.controller.ts` | ⚠️ verificar | Auditar manualmente |
 | `analytics-backend/src/grpc/analytics-grpc.controller.ts` | ⚠️ verificar | Auditar manualmente |

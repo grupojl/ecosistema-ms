@@ -1,6 +1,13 @@
-// src/assignment/assignment.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+// src/core/assignment/assignment.service.ts
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  AGENTS_REPOSITORY,
+  type IAgentsRepository,
+} from '@/core/agents/repository/agents.repository.interface.js';
+import {
+  CONVERSATIONS_REPOSITORY,
+  type IConversationsRepository,
+} from '@/core/conversations/repository/conversations.repository.interface.js';
 
 export type AssignmentStrategy = 'round-robin' | 'least-load';
 
@@ -12,7 +19,11 @@ export class AssignmentService {
   // Solo se usa con la estrategia round-robin
   private readonly roundRobinCursors = new Map<string, number>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(AGENTS_REPOSITORY) private readonly agents: IAgentsRepository,
+    @Inject(CONVERSATIONS_REPOSITORY)
+    private readonly conversations: IConversationsRepository,
+  ) {}
 
   /**
    * Devuelve el agentId a asignar, o null si no hay agentes activos.
@@ -22,22 +33,19 @@ export class AssignmentService {
     organizationId: string,
     strategy: AssignmentStrategy = 'least-load',
   ): Promise<string | null> {
-    const agents = await this.prisma.agent.findMany({
-      where: { organizationId, isActive: true },
-      select: { id: true },
-      orderBy: { createdAt: 'asc' }, // orden estable para round-robin
-    });
+    // orden estable (más antiguo primero) para round-robin
+    const agentIds = await this.agents.listActiveIdsByCreation(organizationId);
 
-    if (!agents.length) {
+    if (!agentIds.length) {
       this.logger.debug(`No hay agentes activos en org ${organizationId}`);
       return null;
     }
 
     if (strategy === 'round-robin') {
-      return this.roundRobin(organizationId, agents.map((a) => a.id));
+      return this.roundRobin(organizationId, agentIds);
     }
 
-    return this.leastLoad(organizationId, agents.map((a) => a.id));
+    return this.leastLoad(organizationId, agentIds);
   }
 
   // ── Estrategias ───────────────────────────────────────────────────────────
@@ -54,26 +62,16 @@ export class AssignmentService {
     return assigned;
   }
 
-  private async leastLoad(organizationId: string, agentIds: string[]): Promise<string> {
+  private async leastLoad(
+    organizationId: string,
+    agentIds: string[],
+  ): Promise<string> {
     // Contar conversaciones activas (OPEN + HUMAN_TAKEOVER) por agente
-    const counts = await this.prisma.conversation.groupBy({
-      by: ['assignedAgentId'],
-      where: {
-        assignedAgentId: { in: agentIds },
-        status: { in: ['OPEN', 'HUMAN_TAKEOVER'] },
-      },
-      _count: { id: true },
-    });
+    const counts = await this.conversations.countActiveByAgents(agentIds);
 
     // Construir mapa agentId → carga
-    const loadMap = new Map<string, number>(
-      agentIds.map((id) => [id, 0]),
-    );
-    for (const row of counts) {
-      if (row.assignedAgentId) {
-        loadMap.set(row.assignedAgentId, row._count.id);
-      }
-    }
+    const loadMap = new Map<string, number>(agentIds.map((id) => [id, 0]));
+    for (const row of counts) loadMap.set(row.agentId, row.count);
 
     // Elegir el agente con menor carga (en empate, el primero en la lista)
     let minLoad = Infinity;

@@ -1,4 +1,4 @@
-// chatia-backend/src/conversations/conversations-analytics.interceptor.ts
+// chatia-backend/src/core/conversations/conversations-analytics.interceptor.ts
 //
 // ADR-003 A-1.4 — Interceptor que emite eventos analytics en operaciones de conversación.
 // Patrón: NestJS CallHandler interceptor — no modifica conversations.service.ts.
@@ -13,10 +13,14 @@
 //   - conversation.assigned  → en takeover / assign
 
 import {
-  Injectable, NestInterceptor, ExecutionContext, CallHandler, Logger,
+  Injectable,
+  NestInterceptor,
+  ExecutionContext,
+  CallHandler,
+  Logger,
 } from '@nestjs/common';
 import type { Observable } from 'rxjs';
-import { tap }             from 'rxjs/operators';
+import { tap } from 'rxjs/operators';
 import { AnalyticsEventsService } from '@/core/analytics-events/analytics-events.service.js';
 
 @Injectable()
@@ -26,14 +30,18 @@ export class ConversationsAnalyticsInterceptor implements NestInterceptor {
   constructor(private readonly analytics: AnalyticsEventsService) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
-    const req    = context.switchToHttp().getRequest<{
+    const req = context.switchToHttp().getRequest<{
       method: string;
-      url:    string;
-      body:   Record<string, unknown>;
-      user?:  { ecosystemId?: string; organizationId?: string };
+      url: string;
+      body: Record<string, unknown>;
+      user?: { ecosystemId?: string; organizationId?: string };
     }>();
 
-    const ecosystemId    = String(req.user?.ecosystemId    ?? '');
+    // Valores de la respuesta (unknown): solo se aceptan strings/números, nunca "[object Object]"
+    const str = (v: unknown): string =>
+      typeof v === 'string' || typeof v === 'number' ? String(v) : '';
+
+    const ecosystemId = String(req.user?.ecosystemId ?? '');
     const organizationId = String(req.user?.organizationId ?? '');
 
     return next.handle().pipe(
@@ -43,38 +51,52 @@ export class ConversationsAnalyticsInterceptor implements NestInterceptor {
           if (!res || !ecosystemId || !organizationId) return;
 
           // POST /conversations → conversation.created
-          if (req.method === 'POST' && req.url.includes('/conversations') && res['id']) {
+          if (
+            req.method === 'POST' &&
+            req.url.includes('/conversations') &&
+            res['id']
+          ) {
             this.analytics.trackConversationCreated({
               ecosystemId,
               organizationId,
-              conversationId: String(res['id']),
-              channel:        String(res['channel'] ?? req.body['channel'] ?? 'UNKNOWN'),
-              contactId:      String(res['contactId'] ?? ''),
+              conversationId: str(res['id']),
+              channel: str(res['channel'] ?? req.body['channel']) || 'UNKNOWN',
+              contactId: str(res['contactId']),
             });
           }
 
           // PATCH /conversations/:id/resolve → conversation.resolved
-          if (req.method === 'PATCH' && req.url.includes('/resolve') && res['id']) {
+          if (
+            req.method === 'PATCH' &&
+            req.url.includes('/resolve') &&
+            res['id']
+          ) {
             this.analytics.trackConversationResolved({
               ecosystemId,
               organizationId,
-              conversationId: String(res['id']),
-              agentId:        String(res['assignedAgentId'] ?? ''),
+              conversationId: str(res['id']),
+              agentId: str(res['assignedAgentId']),
             });
           }
 
           // PATCH /conversations/:id/takeover → conversation.assigned
-          if (req.method === 'PATCH' && req.url.includes('/takeover') && res['id']) {
+          if (
+            req.method === 'PATCH' &&
+            req.url.includes('/takeover') &&
+            res['id']
+          ) {
             this.analytics.trackConversationAssigned({
               ecosystemId,
               organizationId,
-              conversationId: String(res['id']),
-              agentId:        String(res['assignedAgentId'] ?? ''),
+              conversationId: str(res['id']),
+              agentId: str(res['assignedAgentId']),
             });
           }
         } catch (e: unknown) {
           // Nunca romper el response por analytics
-          this.logger.warn(`Analytics interceptor error (ignorado): ${String(e)}`);
+          this.logger.warn(
+            `Analytics interceptor error (ignorado): ${String(e)}`,
+          );
         }
       }),
     );

@@ -1,4 +1,4 @@
-// src/langgraph/langgraph.module.ts
+// src/infrastructure/langgraph/langgraph.module.ts
 import { Module } from '@nestjs/common';
 import { LangGraphEngine } from '@/infrastructure/langgraph/langgraph.engine.js';
 import { GroqModule } from '@/infrastructure/groq/groq.module.js';

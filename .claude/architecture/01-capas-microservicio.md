@@ -1,53 +1,64 @@
 # Capas por Microservicio — Arquitectura 10/10
 
-> Reestructurado 2026-10-02. Todos los servicios siguen este modelo.
+> Reestructurado 2026-10-02; `src/` con solo tres carpetas desde 2026-10-15 (ADR-022). **chatia-backend ya lo cumple;
+> los otros 5 servicios están pendientes** (ver `roadmap/deuda-tecnica.md`).
 
 ## Estructura canónica
 
 ```
-{servicio}-backend/src/
+{servicio}-backend/src/        ← SOLO tres carpetas + main.ts, app.module.ts y generated/ (Prisma)
 
-├── core/                          ← dominio puro — CERO controllers, CERO @Controller
+├── core/                          ← dominio — CERO controllers, CERO @Controller, no importa de modules/
 │   ├── {bounded-context}/
 │   │   ├── domain/                ← entidades, errores de dominio
-│   │   ├── repository/            ← interfaces (nunca implementaciones Prisma)
+│   │   ├── repository/            ← interfaces (las implementaciones Prisma van en infrastructure/)
 │   │   ├── types/
+│   │   ├── schemas.ts             ← Zod (los services usan sus tipos; el controller los importa)
 │   │   ├── {context}.service.ts
 │   │   ├── {context}.module.ts
-│   │   └── index.ts               ← contrato público — lo que los modules pueden consumir
+│   │   └── index.ts               ← contrato público
 │   └── index.ts
 │
-├── modules/                       ← ÚNICO lugar con controllers HTTP por ecosistema
-│   ├── welver/
-│   │   ├── welver.controller.ts   ← endpoints específicos de welver
-│   │   ├── welver.module.ts
-│   │   ├── schemas.ts             ← Zod schemas del controller
-│   │   └── index.ts
+├── modules/                       ← ÚNICO lugar con controllers HTTP de negocio
+│   ├── common/                    ← API común a todos los ecosistemas: /api/v1/...  (CommonApiModule)
+│   │   └── {dominio}/{dominio}.controller.ts
+│   ├── welver/                    ← strategy + config + tipos + endpoints EXCLUSIVOS (/api/welver/v1/...)
 │   ├── manzana/  (mismo molde)
 │   ├── mexus/    (mismo molde)
-│   └── index.ts                   ← {Servicio}ModulesModule — agrupa los tres
+│   └── index.ts                   ← {Servicio}ModulesModule — agrupa common + ecosistemas
 │
-├── infrastructure/                ← todo sin lógica de negocio
-│   ├── prisma/                    ← PrismaService, PrismaModule
-│   ├── firebase/                  ← FirebaseModule, FirebaseService
-│   ├── common/                    ← guards, decorators, pipes, filters, middleware
-│   ├── config/                    ← validación de env vars
-│   └── types/                     ← declaraciones .d.ts
-│
-├── queue/                         ← processors BullMQ + constants + module
-│   ├── processors/
-│   └── queue.constants.ts
-│
-├── {entry-point}/                 ← excepción transversal justificada
-│   ├── {entry-point}.controller.ts
-│   └── {entry-point}.module.ts
-│
-├── grpc/                          ← puerto interno inter-servicio
-├── health/                        ← Railway healthcheck
-├── internal/                      ← superadmin (x-internal-api-key)
-├── app.module.ts                  ← importa {Servicio}ModulesModule (1 import de negocio)
-└── main.ts
+└── infrastructure/                ← todo lo que no es dominio ni API de negocio
+    ├── prisma/  firebase/  groq/  providers/  langgraph/   ← clientes y adaptadores externos
+    ├── security/  common/  config/  types/                 ← guards, pipes, filters, cifrado, env
+    ├── channels/                  ← WhatsApp / Instagram / Messenger / TikTok + adapters multimodales
+    ├── events/                    ← WebSocket
+    ├── queue/                     ← processors BullMQ, constantes, DLQ
+    ├── transport/                 ← grpc/, health/, internal/ (adaptadores de transporte, sin dominio)
+    ├── maintenance/               ← CLI operativa
+    └── testing/                   ← fixtures, stubs, tests de integración y de arquitectura
 ```
+
+**Dónde va cada cosa (para no dudar):**
+
+| Si es… | Va en |
+|---|---|
+| Regla de negocio, entidad, servicio de dominio, lógica de retención/privacidad | `core/<contexto>/` |
+| Endpoint igual para todos los ecosistemas (incluye webhooks, widget, channel-accounts…) | controller en `modules/common/<dominio>/`, lógica en `core/<dominio>/` |
+| Endpoint que existe solo en un ecosistema | `modules/<eco>/` bajo `/api/<eco>/v1/...` |
+| Comportamiento distinto por ecosistema (prompt, tono, flags, límites) | `modules/<eco>/` strategy + config — nunca `if (eco === …)` en controllers |
+| Cliente de un proveedor externo, repositorio Prisma, cola, WebSocket, gRPC, health | `infrastructure/` |
+| Algo que no encaja | se discute y se registra en un ADR; no se crea una carpeta nueva en `src/` |
+
+> `architecture.spec.ts` (en `infrastructure/testing/`) hace cumplir: raíz de `src/` limpia, `core/` sin controllers y sin
+> importar de `modules/`, ecosistemas aislados entre sí, `common` sin importar de ecosistemas.
+
+### `modules/common/` (ADR-022)
+
+Los endpoints cuyo contrato es el mismo para todos los ecosistemas (`/api/v1/contacts`, `/conversations`, `/assistant`…)
+viven en `modules/common/<dominio>/<dominio>.controller.ts` y se agrupan en `CommonApiModule`. El ecosistema se
+resuelve por el token (TenantGuard), no por la URL. Lo que cambia entre ecosistemas se expresa en su strategy/config
+(`modules/<eco>/`). Un endpoint que solo existe en un ecosistema va en `modules/<eco>/` bajo `/api/<eco>/v1/...`.
+`modules/common` no importa de ningún ecosistema y los ecosistemas no se importan entre sí.
 
 ## La regla más importante
 
@@ -77,24 +88,23 @@
 - Binding de DI: `{ provide: TOKEN, useClass: PrismaImpl }` vive en el módulo de infrastructure
 - Circuit breakers, adapters de plataformas externas, clientes HTTP — todos aquí
 
-### Excepciones transversales justificadas
-Tienen controller pero viven fuera de `modules/` porque son iguales para todos los ecosistemas:
+### Entry points transversales (sin carpeta propia en `src/`)
 
-| Carpeta | Justificación |
+Ya no hay excepciones en la raíz de `src/` (ADR-022). Lo que antes eran carpetas sueltas:
+
+| Antes | Ahora |
 |---|---|
-| `webhooks/` | Entry point de canales externos — igual para todos |
-| `widget/` | Chat público embeddable — sin auth, sin tenant |
-| `channel-accounts/` | Gestión de cuentas de canal — igual para todos |
-| `agent-notifications/` | Alertas in-app para agentes — igual para todos |
-| `queue/dlq/` | Inspección y retry de jobs — operacional |
-| `health/` | Railway healthcheck |
-| `internal/` | Superadmin protegido por x-internal-api-key |
-| `grpc/` | Puerto interno inter-servicio — no es HTTP público |
-| `ad-accounts/` | OAuth de plataformas — marketing-backend |
+| `webhooks/`, `widget/`, `channel-accounts/`, `agent-notifications/` | controller en `modules/common/<x>/`, lógica en `core/<x>/` |
+| `queue/` (processors, DLQ) | `infrastructure/queue/` (la lógica queda en services de `core/`) |
+| `health/`, `internal/`, `grpc/` | `infrastructure/transport/{health,internal,grpc}/` |
+| `channels/`, `events/`, `maintenance/` | `infrastructure/{channels,events,maintenance}/` |
+| `privacy/` | `core/privacy/` |
+| `test/`, specs sueltos | `infrastructure/testing/` |
+| `ad-accounts/` (marketing) | `modules/common/ad-accounts/` + lógica en `core/` |
 
-La pregunta que decide si algo es excepción:
+La pregunta que decide dónde va un endpoint:
 > ¿El endpoint varía por ecosistema o tiene lógica distinta por cliente?
-> Si sí → `modules/{eco}/`. Si no → excepción al mismo nivel con justificación.
+> Si sí → `modules/{eco}/`. Si no → `modules/common/`.
 
 ## Reglas por capa
 

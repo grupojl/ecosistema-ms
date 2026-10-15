@@ -17,10 +17,10 @@
 ## Pendiente para 10/10
 
 ### DTOs dentro de services — DT-009 (S1 — BLOQUEANTE)
-- [ ] `chatia-backend/src/ai-config/ai-config.service.ts`
+- [ ] `chatia-backend/src/core/ai-config/ai-config.service.ts`
   Mover `UpdateAiConfigDto` a `ai-config/dto/update-ai-config.dto.ts`
   (ya existe el archivo — el DTO esta duplicado)
-- [ ] `chatia-backend/src/contacts/contacts.service.ts`
+- [ ] `chatia-backend/src/core/contacts/contacts.service.ts`
   Mover `UpdateContactDto` y `ListContactsDto` a `contacts/dto/`
 - [ ] Verificar si hay mas services con DTOs inline:
   `grep -rn "export class.*Dto" */src/**/*.service.ts`

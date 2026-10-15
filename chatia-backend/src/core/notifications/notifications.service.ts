@@ -1,9 +1,11 @@
-// src/notifications/notifications.service.ts
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
-import { EventsGateway } from '@/events/events.gateway.js';
+// src/core/notifications/notifications.service.ts
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { EventsGateway } from '@/infrastructure/events/events.gateway.js';
 import { NotificationType } from '@/generated/prisma/client.js';
-import { randomUUID } from 'crypto';
+import {
+  NOTIFICATIONS_REPOSITORY,
+  type INotificationsRepository,
+} from '@/core/notifications/repository/notifications.repository.interface.js';
 
 export interface CreateNotificationInput {
   organizationId: string;
@@ -19,23 +21,21 @@ export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
 
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject(NOTIFICATIONS_REPOSITORY)
+    private readonly repo: INotificationsRepository,
     private readonly events: EventsGateway,
   ) {}
 
   // ── Crear notificación y emitir por WebSocket ─────────────────────────────
 
   async create(input: CreateNotificationInput) {
-    const notification = await this.prisma.notification.create({
-      data: {
-        id: randomUUID(),
-        organizationId: input.organizationId,
-        agentId: input.agentId,
-        conversationId: input.conversationId ?? null,
-        type: input.type,
-        title: input.title,
-        body: input.body,
-      },
+    const notification = await this.repo.create({
+      organizationId: input.organizationId,
+      agentId: input.agentId,
+      conversationId: input.conversationId ?? null,
+      type: input.type,
+      title: input.title,
+      body: input.body,
     });
 
     // Emitir en tiempo real al agente específico
@@ -102,27 +102,16 @@ export class NotificationsService {
   // ── Listado ───────────────────────────────────────────────────────────────
 
   async list(agentId: string, onlyUnread = false, page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
-
-    const where: import("@/generated/prisma/client.js").Prisma.NotificationWhereInput = {
+    const { rows, total, unreadCount } = await this.repo.listForAgent(
       agentId,
-      ...(onlyUnread && { isRead: false }),
-    };
-
-    const [notifications, total, unreadCount] = await Promise.all([
-      this.prisma.notification.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      this.prisma.notification.count({ where }),
-      this.prisma.notification.count({ where: { agentId, isRead: false } }),
-    ]);
+      onlyUnread,
+      (page - 1) * limit,
+      limit,
+    );
 
     return {
       success: true,
-      data: notifications,
+      data: rows,
       unreadCount,
       pagination: { page, limit, total, pages: Math.ceil(total / limit) },
     };
@@ -131,18 +120,12 @@ export class NotificationsService {
   // ── Marcar como leída ─────────────────────────────────────────────────────
 
   async markRead(notificationId: string, agentId: string) {
-    const updated = await this.prisma.notification.updateMany({
-      where: { id: notificationId, agentId },
-      data: { isRead: true },
-    });
-    return { success: true, updated: updated.count };
+    const updated = await this.repo.markRead(notificationId, agentId);
+    return { success: true, updated };
   }
 
   async markAllRead(agentId: string) {
-    const updated = await this.prisma.notification.updateMany({
-      where: { agentId, isRead: false },
-      data: { isRead: true },
-    });
-    return { success: true, updated: updated.count };
+    const updated = await this.repo.markAllRead(agentId);
+    return { success: true, updated };
   }
 }

@@ -47,7 +47,7 @@ Sin tests unitarios de AssignmentService.
 
 ## Integración con superadmin (2026-09-19)
 
-chatia-backend ya tiene `src/internal/` con `InternalApiKeyGuard`.
+chatia-backend ya tiene `src/infrastructure/transport/internal/` con `InternalApiKeyGuard`.
 Hay que agregar los endpoints de conversaciones escaladas al `InternalController`.
 
 ### Query de conversaciones escaladas

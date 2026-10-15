@@ -1,9 +1,12 @@
-// src/assistant/processors/assistant-chat.processor.ts
+// src/core/assistant/processors/assistant-chat.processor.ts
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { QUEUES } from '@/queue/queue.constants.js';
-import { AssistantChatService, ChatInput } from '@/core/assistant/chat/assistant-chat.service.js';
+import { QUEUES } from '@/infrastructure/queue/queue.constants.js';
+import {
+  AssistantChatService,
+  ChatInput,
+} from '@/core/assistant/chat/assistant-chat.service.js';
 
 export type AssistantChatJobData = ChatInput;
 
@@ -31,6 +34,8 @@ export class AssistantChatProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job<AssistantChatJobData>): void {
-    this.logger.debug(`[job:${job.id}] Completado — usuario: ${job.data.userId}`);
+    this.logger.debug(
+      `[job:${job.id}] Completado — usuario: ${job.data.userId}`,
+    );
   }
 }

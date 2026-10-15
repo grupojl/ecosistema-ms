@@ -61,7 +61,7 @@ El domain es lógica pura — si necesita NestJS para testearse, la separación 
 → Estado: no aplica aún — Domain pendiente
 
 ### 🟡 Circuit-breaker debe tener timeout y fallback documentados
-El `CircuitBreakerService` en `chatia-backend/common/` opera en memoria.
+El `CircuitBreakerService` en `chatia-backend/src/infrastructure/common/` opera en memoria.
 Con más de 1 réplica en Railway, el circuit-breaker pierde estado entre réplicas.
 Documentar el comportamiento esperado con múltiples réplicas antes de escalar.
 → Estado: pendiente de decisión antes de escalar
@@ -152,15 +152,20 @@ Un `@types/*` en `dependencies` termina en la imagen de producción.
 
 ### 🔴 Un controller HTTP vive exclusivamente en el módulo al que pertenece su dominio.
 
+> **Actualizado 2026-10-15 (ADR-022):** en los servicios con estructura `core/ + modules/ + infrastructure/`, **ningún
+> controller vive en `core/`**. Los endpoints comunes a todos los ecosistemas van en `modules/common/<dominio>/`
+> y los exclusivos de un ecosistema en `modules/<eco>/`. Los ejemplos de abajo (`src/contacts/...`) son del esquema
+> anterior. Lo verifica `src/architecture.spec.ts` en chatia-backend.
+
 Un controller que expone rutas de un dominio ajeno, o que está ubicado fuera
 de la carpeta del módulo al que pertenece, es un **bug de arquitectura**.
 
 **Correcto — controller colocado en su módulo:**
 
 ```
-src/payments/payments.controller.ts    → @Controller('payments')
-src/webhooks/webhooks.controller.ts    → @Controller('webhooks')
-src/contacts/contacts.controller.ts    → @Controller('contacts')
+src/modules/common/payments/payments.controller.ts  → @Controller("api/v1/payments")
+src/modules/common/webhooks/webhooks.controller.ts  → @Controller("webhooks")
+src/modules/common/contacts/contacts.controller.ts  → @Controller("api/v1/contacts")
 ```
 
 **Incorrecto — rutas del dominio A definidas en un módulo B:**
@@ -179,10 +184,10 @@ src/contacts/contacts.controller.ts    → @Controller('contacts')
 
 | Controller | Motivo |
 |---|---|
-| `health/health.controller.ts` | Infraestructura — Railway healthcheck |
-| `internal/internal.controller.ts` | API interna superadmin — transversal por definición |
-| `grpc/{servicio}-grpc.controller.ts` | Adaptador de transporte — no es un módulo de dominio |
-| `widget/widget.controller.ts` | Entry point de canal externo — scope propio |
+| `infrastructure/transport/health/health.controller.ts` | Infraestructura — Railway healthcheck |
+| `infrastructure/transport/internal/internal.controller.ts` | API interna superadmin — transversal por definición |
+| `infrastructure/transport/grpc/{servicio}-grpc.controller.ts` | Adaptador de transporte — no es un módulo de dominio |
+| `modules/common/widget/widget.controller.ts` | Entry point de canal externo — scope propio |
 
 **Verificación rápida:**
 

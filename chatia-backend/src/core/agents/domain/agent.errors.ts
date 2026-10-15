@@ -1,14 +1,21 @@
-// chatia-backend/src/agents/domain/agent.errors.ts
-export class AgentOfflineError extends Error {
+// chatia-backend/src/core/agents/domain/agent.errors.ts — errores de dominio, sin NestJS.
+export class AgentNotFoundError extends Error {
   constructor(agentId: string) {
-    super(`Agent ${agentId} is OFFLINE and cannot receive conversations`);
-    this.name = 'AgentOfflineError';
+    super(`Agente ${agentId} no encontrado`);
+    this.name = 'AgentNotFoundError';
   }
 }
 
-export class AgentAtCapacityError extends Error {
-  constructor(agentId: string, maxChats: number) {
-    super(`Agent ${agentId} is at capacity (${maxChats} concurrent chats)`);
-    this.name = 'AgentAtCapacityError';
+export class AgentForbiddenError extends Error {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'AgentForbiddenError';
+  }
+}
+
+export class AgentIdentityMismatchError extends Error {
+  constructor(field: 'firebaseUid' | 'organizationId') {
+    super(`${field} del body no coincide con el del token`);
+    this.name = 'AgentIdentityMismatchError';
   }
 }

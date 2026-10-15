@@ -5,9 +5,9 @@ import { ManzanaController } from '@/modules/manzana/manzana.controller.js';
 import { ManzanaStrategy } from '@/modules/manzana/manzana.strategy.js';
 
 @Module({
-  imports:     [ProjectStrategyModule],
+  imports: [ProjectStrategyModule],
   controllers: [ManzanaController],
   providers: [ManzanaStrategy],
-  exports:   [ManzanaStrategy],
+  exports: [ManzanaStrategy],
 })
 export class ManzanaModule {}

@@ -3,12 +3,15 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ProjectStrategyRegistry } from '@/core/strategies/project-strategy.registry.js';
 import {
-  ProjectType, type ProjectStrategy,
-  type ConversationEnrichInput, type ConversationResult,
+  ProjectType,
+  type ProjectStrategy,
+  type ConversationEnrichInput,
+  type ConversationResult,
 } from '@/core/strategies/project-strategy.interface.js';
 import {
   DEFAULT_ORG_PROFILE,
-  type ProjectContext, type OrganizationProfile,
+  type ProjectContext,
+  type OrganizationProfile,
 } from '@/core/strategies/project-context.interface.js';
 
 @Injectable()
@@ -23,25 +26,45 @@ export class GenericStrategy implements ProjectStrategy, OnModuleInit {
     this.logger.log('GenericStrategy registrada');
   }
 
-  getProjectType(): ProjectType { return ProjectType.GENERIC; }
-
-  async enrichConversationContext(input: ConversationEnrichInput): Promise<ProjectContext> {
-    this.logger.debug(`GenericStrategy — ecosystemId=${input.ecosystemId} org=${input.organizationId}`);
-    return {
-      systemPrompt:   'Eres un asistente útil y amable.',
-      defaultStage:   'INITIAL',
-      preferredModel: 'openai/gpt-oss-120b',
-      useFaqFallback: false,
-      orgProfile:     { ...DEFAULT_ORG_PROFILE, organizationId: input.organizationId, ecosystemId: input.ecosystemId },
-      businessData:   {},
-    };
+  getProjectType(): ProjectType {
+    return ProjectType.GENERIC;
   }
 
-  async afterConversationResult(_r: ConversationResult, _c: ProjectContext): Promise<void> {
+  enrichConversationContext(
+    input: ConversationEnrichInput,
+  ): Promise<ProjectContext> {
+    this.logger.debug(
+      `GenericStrategy — ecosystemId=${input.ecosystemId} org=${input.organizationId}`,
+    );
+    return Promise.resolve({
+      systemPrompt: 'Eres un asistente útil y amable.',
+      defaultStage: 'INITIAL',
+      preferredModel: 'openai/gpt-oss-120b',
+      useFaqFallback: false,
+      orgProfile: {
+        ...DEFAULT_ORG_PROFILE,
+        organizationId: input.organizationId,
+        ecosystemId: input.ecosystemId,
+      },
+      businessData: {},
+    });
+  }
+
+  async afterConversationResult(
+    _r: ConversationResult,
+    _c: ProjectContext,
+  ): Promise<void> {
     // no-op
   }
 
-  async resolveOrgProfile(ecosystemId: string, organizationId: string): Promise<OrganizationProfile> {
-    return { ...DEFAULT_ORG_PROFILE, organizationId, ecosystemId };
+  resolveOrgProfile(
+    ecosystemId: string,
+    organizationId: string,
+  ): Promise<OrganizationProfile> {
+    return Promise.resolve({
+      ...DEFAULT_ORG_PROFILE,
+      organizationId,
+      ecosystemId,
+    });
   }
 }

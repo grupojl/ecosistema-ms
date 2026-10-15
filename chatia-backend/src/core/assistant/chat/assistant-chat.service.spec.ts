@@ -1,130 +1,230 @@
-// src/assistant/chat/assistant-chat.service.spec.ts
-import { Test, TestingModule } from '@nestjs/testing';
 import { AssistantChatService } from '@/core/assistant/chat/assistant-chat.service.js';
-import { AssistantConfigService } from '@/core/assistant/config/assistant-config.service.js';
-import { AssistantSessionService } from '@/core/assistant/session/assistant-session.service.js';
-import { GroqService } from '@/infrastructure/groq/groq.service.js';
-import { EventsGateway } from '@/events/events.gateway.js';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
+import { AllProvidersFailedError } from '@/infrastructure/providers/provider-chain.service.js';
 
 const mockConfig = {
-  id: 'config-1', projectId: 'proj-1', organizationId: 'org-1', ecosystemId: 'eco-1',
-  personaName: 'Sofía', systemPrompt: 'Sos un asistente de prueba.',
-  groqModel: 'llama-3.3-70b-versatile', temperature: 0.7, maxTokens: 1024,
-  contextWindow: 10, welcomeMessage: null,
+  id: 'config-1',
+  projectId: 'proj-1',
+  organizationId: 'org-1',
+  ecosystemId: 'eco-1',
+  personaName: 'Sofía',
+  systemPrompt: 'Sos un asistente de prueba.',
+  groqModel: 'openai/gpt-oss-120b',
+  temperature: 0.7,
+  maxTokens: 1024,
+  contextWindow: 10,
+  welcomeMessage: null,
   fallbackMessage: 'No puedo responder en este momento.',
-  useFaqFallback: false, faqKbId: null, isEnabled: true,
-  createdAt: new Date(), updatedAt: new Date(),
+  useFaqFallback: false,
+  faqKbId: null,
+  isEnabled: true,
 };
 
-const mockSession = {
-  id: 'session-1', assistantConfigId: 'config-1', organizationId: 'org-1', ecosystemId: 'eco-1',
-  externalUserId: 'user-123', channel: 'api', history: [], metadata: {},
-  createdAt: new Date(), updatedAt: new Date(), lastMessageAt: null,
-};
+const mockSession = { id: 'session-1', organizationId: 'org-1' };
+
+const projectCtx = (overrides: Record<string, unknown> = {}) => ({
+  systemPrompt: '',
+  preferredModel: 'openai/gpt-oss-120b',
+  useFaqFallback: true,
+  orgProfile: { featureFlags: { aiAssistantEnabled: true, faqEnabled: true } },
+  ...overrides,
+});
 
 describe('AssistantChatService', () => {
+  const ecosystems = { findById: jest.fn() };
+  const llm = { chat: jest.fn() };
+  const events = { emitToAgent: jest.fn() };
+  const configSvc = {
+    findByProjectSlug: jest.fn(),
+    findDefaultForOrg: jest.fn(),
+  };
+  const sessionSvc = {
+    getOrCreate: jest.fn(),
+    appendMessage: jest.fn(),
+    getHistory: jest.fn(),
+  };
+  const strategy = {
+    enrichConversationContext: jest.fn(),
+    afterConversationResult: jest.fn(),
+  };
+  const registry = { get: jest.fn() };
+  const rag = { answer: jest.fn() };
   let service: AssistantChatService;
 
-  const mockConfigSvc = {
-    findByProjectSlug: jest.fn().mockResolvedValue(mockConfig),
+  const input = {
+    projectSlug: 'shopbot',
+    organizationId: 'org-1',
+    ecosystemId: 'eco-1',
+    userId: 'user-123',
+    message: 'Hola',
+    channel: 'api',
   };
-  const mockSessionSvc = {
-    getOrCreate: jest.fn().mockResolvedValue(mockSession),
-    appendMessage: jest.fn().mockResolvedValue({}),
-    getHistory: jest.fn().mockResolvedValue([]),
-    findByUser: jest.fn(),
-    deleteByUser: jest.fn(),
-  };
-  const mockGroq = {
-    chat: jest.fn().mockResolvedValue({
-      content: 'Hola, soy Sofía. ¿En qué puedo ayudarte?',
-      tokensUsed: 42,
-      model: 'llama-3.3-70b-versatile',
-    }),
-  };
-  const mockEvents = { emitToAgent: jest.fn() };
 
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AssistantChatService,
-        { provide: AssistantConfigService, useValue: mockConfigSvc },
-        { provide: AssistantSessionService, useValue: mockSessionSvc },
-        { provide: GroqService, useValue: mockGroq },
-        { provide: EventsGateway, useValue: mockEvents },
-        { provide: PrismaService, useValue: {} },
-      ],
-    }).compile();
-
-    service = module.get<AssistantChatService>(AssistantChatService);
+  beforeEach(() => {
     jest.clearAllMocks();
-    mockConfigSvc.findByProjectSlug.mockResolvedValue(mockConfig);
-    mockSessionSvc.getOrCreate.mockResolvedValue(mockSession);
-    mockSessionSvc.getHistory.mockResolvedValue([]);
-    mockGroq.chat.mockResolvedValue({
-      content: 'Hola, soy Sofía. ¿En qué puedo ayudarte?',
-      tokensUsed: 42, model: 'llama-3.3-70b-versatile',
+    delete process.env['GROQ_MODEL'];
+    ecosystems.findById.mockResolvedValue({
+      config: { projectType: 'welver' },
     });
-  });
-
-  it('debe estar definido', () => {
-    expect(service).toBeDefined();
-  });
-
-  it('retorna respuesta de Groq correctamente', async () => {
-    const result = await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
-      userId: 'user-123', message: 'Hola', channel: 'api',
+    configSvc.findByProjectSlug.mockResolvedValue(mockConfig);
+    sessionSvc.getOrCreate.mockResolvedValue(mockSession);
+    sessionSvc.getHistory.mockResolvedValue([]);
+    sessionSvc.appendMessage.mockResolvedValue({});
+    strategy.enrichConversationContext.mockResolvedValue(projectCtx());
+    registry.get.mockReturnValue(strategy);
+    llm.chat.mockResolvedValue({
+      content: 'Hola, soy Sofía.',
+      tokensUsed: 42,
+      model: 'openai/gpt-oss-120b',
+      provider: 'groq',
     });
-    expect(result.response).toBe('Hola, soy Sofía. ¿En qué puedo ayudarte?');
-    expect(result.tokensUsed).toBe(42);
-    expect(result.sessionId).toBe('session-1');
-    expect(result.usedFaqFallback).toBe(false);
-  });
 
-  it('crea sesión nueva cuando no existe', async () => {
-    await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
-      userId: 'new-user', message: 'Hola',
-    });
-    expect(mockSessionSvc.getOrCreate).toHaveBeenCalledWith(
-      'config-1', 'org-1', 'new-user', 'api',
+    service = new AssistantChatService(
+      ecosystems as never,
+      llm as never,
+      events as never,
+      configSvc as never,
+      sessionSvc as never,
+      registry as never,
+      rag,
     );
   });
 
-  it('respeta contextWindow al armar historial', async () => {
-    await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
-      userId: 'user-123', message: 'test',
+  it('devuelve la respuesta del LLM y la guarda en la sesión', async () => {
+    const result = await service.chat(input);
+    expect(result).toMatchObject({
+      response: 'Hola, soy Sofía.',
+      tokensUsed: 42,
+      sessionId: 'session-1',
+      usedFaqFallback: false,
     });
-    expect(mockSessionSvc.getHistory).toHaveBeenCalledWith('session-1', 10);
+    expect(sessionSvc.appendMessage).toHaveBeenCalledWith(
+      'session-1',
+      'assistant',
+      'Hola, soy Sofía.',
+    );
   });
 
-  it('devuelve fallbackMessage cuando el asistente está deshabilitado', async () => {
-    mockConfigSvc.findByProjectSlug.mockResolvedValue({
-      ...mockConfig, isEnabled: false, fallbackMessage: 'Fuera de servicio',
+  it('crea/recupera la sesión del usuario y respeta contextWindow', async () => {
+    await service.chat(input);
+    expect(sessionSvc.getOrCreate).toHaveBeenCalledWith(
+      'config-1',
+      'org-1',
+      'user-123',
+      'api',
+    );
+    expect(sessionSvc.getHistory).toHaveBeenCalledWith('session-1', 10);
+  });
+
+  it('asistente deshabilitado → fallbackMessage sin llamar al LLM', async () => {
+    configSvc.findByProjectSlug.mockResolvedValue({
+      ...mockConfig,
+      isEnabled: false,
+      fallbackMessage: 'Fuera de servicio',
     });
-    const result = await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
-      userId: 'user-123', message: 'Hola',
-    });
+    const result = await service.chat(input);
     expect(result.response).toBe('Fuera de servicio');
-    expect(mockGroq.chat).not.toHaveBeenCalled();
+    expect(llm.chat).not.toHaveBeenCalled();
   });
 
-  it('marca usedFaqFallback cuando hay baja confianza y useFaqFallback=true', async () => {
-    mockConfigSvc.findByProjectSlug.mockResolvedValue({
-      ...mockConfig, useFaqFallback: true,
+  it('feature flag apagado en la org → no usa el LLM', async () => {
+    strategy.enrichConversationContext.mockResolvedValue(
+      projectCtx({
+        orgProfile: {
+          featureFlags: { aiAssistantEnabled: false, faqEnabled: false },
+        },
+      }),
+    );
+    const result = await service.chat(input);
+    expect(result.response).toContain('no está disponible');
+    expect(llm.chat).not.toHaveBeenCalled();
+  });
+
+  it('GROQ_MODEL (env) manda sobre la config del proyecto', async () => {
+    process.env['GROQ_MODEL'] = 'openai/gpt-oss-20b';
+    await service.chat(input);
+    expect(llm.chat).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ model: 'openai/gpt-oss-20b' }),
+    );
+  });
+
+  it('si caen TODOS los proveedores pide reintentar, NO escala a un humano y lo registra', async () => {
+    llm.chat.mockRejectedValue(
+      new AllProvidersFailedError('llm', [
+        { provider: 'groq', reason: 'timeout' },
+        { provider: 'siliconflow', reason: 'no configurado' },
+      ]),
+    );
+    const result = await service.chat(input);
+    expect(result.modelUsed).toBe('fallback');
+    expect(result.response).toContain('Probá de nuevo');
+    expect(result.response).not.toContain('agente');
+    expect(events.emitToAgent).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'assistant:escalate',
+      expect.anything(),
+    );
+    expect(strategy.afterConversationResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        escalated: false,
+        metadata: expect.objectContaining({ providerFailed: true }),
+      }),
+      expect.anything(),
+    );
+  });
+
+  it('un error cualquiera del LLM usa el fallbackMessage de la organización', async () => {
+    llm.chat.mockRejectedValue(new Error('boom'));
+    const result = await service.chat(input);
+    expect(result.response).toBe('No puedo responder en este momento.');
+  });
+
+  it('baja confianza + FAQ habilitada → responde con RAG y marca usedFaqFallback', async () => {
+    configSvc.findByProjectSlug.mockResolvedValue({
+      ...mockConfig,
+      useFaqFallback: true,
+      faqKbId: 'kb-1',
     });
-    mockGroq.chat.mockResolvedValue({
-      content: 'No tengo esa información.',
-      tokensUsed: 10, model: 'llama-3.3-70b-versatile',
+    llm.chat.mockResolvedValue({
+      content: 'No tengo información sobre eso.',
+      tokensUsed: 10,
+      model: 'm',
+      provider: 'groq',
+    });
+    rag.answer.mockResolvedValue({
+      answer: 'Según la FAQ: ...',
+      sources: [{ documentId: 'd1' }],
     });
     const result = await service.chat({
-      projectSlug: 'shopbot', organizationId: 'org-1', ecosystemId: 'eco-1',
-      userId: 'user-123', message: '¿Precio del depto?',
+      ...input,
+      message: '¿Precio del depto?',
     });
     expect(result.usedFaqFallback).toBe(true);
+    expect(result.response).toBe('Según la FAQ: ...');
+    expect(result.faqSources).toHaveLength(1);
+  });
+
+  it('si el RAG falla, conserva la respuesta del LLM', async () => {
+    configSvc.findByProjectSlug.mockResolvedValue({
+      ...mockConfig,
+      useFaqFallback: true,
+      faqKbId: 'kb-1',
+    });
+    llm.chat.mockResolvedValue({
+      content: 'No sé.',
+      tokensUsed: 1,
+      model: 'm',
+      provider: 'groq',
+    });
+    rag.answer.mockRejectedValue(new Error('rag down'));
+    const result = await service.chat(input);
+    expect(result.usedFaqFallback).toBe(false);
+    expect(result.response).toBe('No sé.');
+  });
+
+  it('sin projectSlug usa el proyecto por defecto de la organización', async () => {
+    configSvc.findDefaultForOrg.mockResolvedValue(mockConfig);
+    await service.chat({ ...input, projectSlug: undefined });
+    expect(configSvc.findDefaultForOrg).toHaveBeenCalledWith('org-1');
   });
 });

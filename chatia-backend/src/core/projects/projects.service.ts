@@ -1,72 +1,70 @@
-// chatia-backend/src/projects/projects.service.ts
+// chatia-backend/src/core/projects/projects.service.ts
 import {
-  Injectable, NotFoundException, ConflictException, Logger,
+  Inject,
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  Logger,
 } from '@nestjs/common';
-import { PrismaService } from '@/infrastructure/prisma/prisma.service.js';
-import type { CreateProjectInput, UpdateProjectInput } from '@/core/projects/schemas.js';
+import {
+  PROJECTS_REPOSITORY,
+  type IProjectsRepository,
+} from '@/core/projects/repository/projects.repository.interface.js';
+import type {
+  CreateProjectInput,
+  UpdateProjectInput,
+} from '@/core/projects/schemas.js';
 
 @Injectable()
 export class ProjectsService {
   private readonly logger = new Logger(ProjectsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    @Inject(PROJECTS_REPOSITORY) private readonly repo: IProjectsRepository,
+  ) {}
 
   async create(organizationId: string, dto: CreateProjectInput) {
     // Generar slug desde name si no viene en el DTO
-    const slug = dto.slug ?? dto.name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '')
-      .substring(0, 60);
+    const slug =
+      dto.slug ??
+      dto.name
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .substring(0, 60);
 
-    const existing = await this.prisma.project.findUnique({
-      where: { organizationId_slug: { organizationId, slug } },
-    });
+    const existing = await this.repo.findBySlug(organizationId, slug);
     if (existing) {
-      throw new ConflictException(`Ya existe un proyecto con el slug "${slug}"`);
+      throw new ConflictException(
+        `Ya existe un proyecto con el slug "${slug}"`,
+      );
     }
 
-    const project = await this.prisma.project.create({
-      data: { ...dto, slug, organizationId },
+    const project = await this.repo.create({
+      ...dto,
+      slug,
+      organizationId,
     });
     this.logger.log(`Proyecto creado: ${project.id} (${project.slug})`);
     return { success: true, data: project };
   }
 
   async findAll(organizationId: string) {
-    const projects = await this.prisma.project.findMany({
-      where: { organizationId },
-      include: {
-        _count: { select: { assistantConfigs: true, knowledgeBases: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    const projects = await this.repo.listWithCounts(organizationId);
     return { success: true, data: projects };
   }
 
   async findOne(slug: string, organizationId: string) {
-    const project = await this.prisma.project.findUnique({
-      where: { organizationId_slug: { organizationId, slug } },
-      include: {
-        assistantConfigs: {
-          select: { id: true, personaName: true, isEnabled: true, groqModel: true },
-        },
-        knowledgeBases: {
-          select: { id: true, name: true, isActive: true },
-          where: { isActive: true },
-        },
-      },
-    });
-    if (!project) throw new NotFoundException(`Proyecto "${slug}" no encontrado`);
+    const project = await this.repo.findDetailedBySlug(organizationId, slug);
+    if (!project)
+      throw new NotFoundException(`Proyecto "${slug}" no encontrado`);
     return { success: true, data: project };
   }
 
   async findOneById(id: string, organizationId: string) {
-    const project = await this.prisma.project.findFirst({
-      where: { id, organizationId },
-    });
+    const project = await this.repo.findByIdInOrganization(id, organizationId);
     if (!project) throw new NotFoundException('Proyecto no encontrado');
     return project;
   }
@@ -74,25 +72,20 @@ export class ProjectsService {
   async update(slug: string, organizationId: string, dto: UpdateProjectInput) {
     await this.findOne(slug, organizationId);
     if (dto.slug && dto.slug !== slug) {
-      const conflict = await this.prisma.project.findUnique({
-        where: { organizationId_slug: { organizationId, slug: dto.slug } },
-      });
+      const conflict = await this.repo.findBySlug(organizationId, dto.slug);
       if (conflict) {
-        throw new ConflictException(`Ya existe un proyecto con el slug "${dto.slug}"`);
+        throw new ConflictException(
+          `Ya existe un proyecto con el slug "${dto.slug}"`,
+        );
       }
     }
-    const updated = await this.prisma.project.update({
-      where: { organizationId_slug: { organizationId, slug } },
-      data: dto,
-    });
+    const updated = await this.repo.update(organizationId, slug, dto);
     return { success: true, data: updated };
   }
 
   async remove(slug: string, organizationId: string) {
     await this.findOne(slug, organizationId);
-    await this.prisma.project.delete({
-      where: { organizationId_slug: { organizationId, slug } },
-    });
+    await this.repo.remove(organizationId, slug);
     return { success: true, message: `Proyecto "${slug}" eliminado` };
   }
 }

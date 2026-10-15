@@ -1,10 +1,12 @@
-// src/config/app.config.ts
+// src/infrastructure/config/app.config.ts
 import { registerAs } from '@nestjs/config';
 
 export const appConfig = registerAs('app', () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: parseInt(process.env.PORT ?? '3010', 10),
-  allowedOrigins: (process.env.ALLOWED_ORIGINS ?? '').split(',').filter(Boolean),
+  allowedOrigins: (process.env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .filter(Boolean),
   appUrl: process.env.APP_URL ?? 'http://localhost:3010',
 }));
 
