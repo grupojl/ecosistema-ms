@@ -23,10 +23,13 @@ export interface GrpcMetadataOptions {
 
 /**
  * Crea un objeto Metadata gRPC con los campos de correlación.
- * Si no se pasan valores, la metadata queda vacía (backward compatible).
+ * Adjunta además `x-internal-api-key` (desde INTERNAL_API_KEY, la misma en todos los MS): es lo que
+ * exige el servidor con GRPC_AUTH_ENFORCED=true. Si la variable no está, no se envía (backward compatible).
  */
 export function grpcMetadata(opts: GrpcMetadataOptions = {}): Metadata {
   const meta = new Metadata();
+  const internalKey = process.env['INTERNAL_API_KEY'];
+  if (internalKey) meta.set('x-internal-api-key', internalKey);
   if (opts.requestId)      meta.set('x-request-id',      opts.requestId);
   if (opts.ecosystemId)    meta.set('x-ecosystem-id',    opts.ecosystemId);
   if (opts.organizationId) meta.set('x-organization-id', opts.organizationId);

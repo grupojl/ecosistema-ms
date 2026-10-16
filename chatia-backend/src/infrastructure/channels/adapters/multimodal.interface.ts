@@ -6,6 +6,7 @@
 
 export interface MultimodalInput {
   mediaUrl?: string; // URL del archivo en CDN del canal
+  mediaHeaders?: Record<string, string>; // autenticación para descargar mediaUrl (WhatsApp exige Bearer)
   content: string; // texto adicional (caption, descripción)
   raw: Record<string, unknown>; // payload completo del canal
   organizationId: string; // para config por org

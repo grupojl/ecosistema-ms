@@ -33,7 +33,22 @@ export interface OutgoingMessage {
   mediaUrl?: string;
 }
 
+/** Medio listo para descargar: URL temporal + cabeceras de autenticación del canal. */
+export interface ResolvedMedia {
+  url: string;
+  headers?: Record<string, string>;
+}
+
 export interface IChannel {
+  /**
+   * Convierte la referencia de medio que guarda el parseo (en WhatsApp, un media-id) en una URL descargable.
+   * Solo los canales cuyo webhook no trae la URL lo implementan; el resto usa `mediaUrl` tal cual.
+   */
+  resolveMedia?(
+    mediaRef: string,
+    accountConfig: ChannelAccountConfig,
+  ): Promise<ResolvedMedia>;
+
   /**
    * Parsea el payload entrante del webhook y devuelve mensajes normalizados.
    * Devuelve null si el payload no contiene mensajes (ej: status updates).

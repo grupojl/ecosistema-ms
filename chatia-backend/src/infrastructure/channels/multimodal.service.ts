@@ -14,7 +14,10 @@ import { DocumentToTextAdapter } from '@/infrastructure/channels/adapters/docume
 import { LocationToTextAdapter } from '@/infrastructure/channels/adapters/location-to-text.adapter.js';
 import { VideoToTextAdapter } from '@/infrastructure/channels/adapters/video-to-text.adapter.js';
 import { TextToSpeechAdapter } from '@/infrastructure/channels/adapters/text-to-speech.adapter.js';
-import type { IncomingMessage } from '@/infrastructure/channels/channel.interface.js';
+import type {
+  IncomingMessage,
+  ResolvedMedia,
+} from '@/infrastructure/channels/channel.interface.js';
 import type { TtsResult } from '@/infrastructure/channels/adapters/text-to-speech.adapter.js';
 
 export interface NormalizedMessage {
@@ -41,9 +44,11 @@ export class MultimodalService {
   async normalize(
     msg: IncomingMessage,
     organizationId: string,
+    media?: ResolvedMedia,
   ): Promise<NormalizedMessage> {
     const input = {
-      mediaUrl: msg.mediaUrl,
+      mediaUrl: media?.url ?? msg.mediaUrl,
+      mediaHeaders: media?.headers,
       content: msg.content,
       raw: msg.raw,
       organizationId,

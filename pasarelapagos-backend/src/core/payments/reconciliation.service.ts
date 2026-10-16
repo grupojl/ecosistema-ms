@@ -71,7 +71,7 @@ export class ReconciliationService {
       name: JOB_RECONCILE_PAYMENT,
       data: { paymentId: id },
       opts: {
-        jobId:    `reconcile:${id}`,
+        jobId:    `reconcile_${id}`,
         attempts: 3,
         backoff:  { type: 'exponential' as const, delay: 5_000 },
       },

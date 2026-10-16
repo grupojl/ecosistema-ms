@@ -77,7 +77,7 @@ export class WebhooksController {
       JOB_PROCESS_WEBHOOK,
       { webhookInboundId: inbound.id, event, enqueuedAt: Date.now() },
       {
-        jobId:    `webhook:${providerId}:${event.externalId}`,
+        jobId:    `webhook_${providerId}_${event.externalId.replace(/:/g, "_")}`,
         attempts: 5,
         backoff:  { type: 'exponential', delay: 2_000 },
       },

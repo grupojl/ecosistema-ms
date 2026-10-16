@@ -47,7 +47,7 @@
 
 ## Reglas duras (nunca romper)
 
-- `jobId` de BullMQ **nunca con `:`** (usar `_`): BullMQ lo rechaza salvo 3 partes exactas. Pendiente en pasarela, workers y marketing — ver `roadmap/deuda-tecnica.md`
+- `jobId` de BullMQ **nunca con `:`** (usar `_`): BullMQ lo rechaza salvo 3 partes exactas. Corregido en los 6 servicios (2026-10-16); falta probarlo con Redis real — ver `roadmap/deuda-tecnica.md`
 
 - `src/` solo tiene `core/`, `infrastructure/`, `modules/` (+ `main.ts`, `app.module.ts`, `generated/`) — ADR-022. `@Controller` solo en `modules/` (comunes en `modules/common/`, exclusivos en `modules/<eco>/`) o en `infrastructure/transport/`; nunca en `core/`. Lo fuerza `architecture.spec.ts` (chatia ya cumple; los otros 5 servicios pendientes)
 

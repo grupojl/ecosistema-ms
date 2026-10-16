@@ -126,9 +126,15 @@ describeRedis('colas con Redis + Postgres reales', () => {
       { emitEscalation: jest.fn() } as never,
       outQ,
     );
-    const incomingProc = new IncomingMessageProcessor(conversations, {
-      normalize: (m: IncomingMessage) => Promise.resolve({ text: m.content }),
-    } as never);
+    const incomingProc = new IncomingMessageProcessor(
+      conversations,
+      {
+        normalize: (m: IncomingMessage) => Promise.resolve({ text: m.content }),
+      } as never,
+      {
+        resolve: () => Promise.resolve({ organizationId: '' }),
+      } as never,
+    );
     const replyProc = new AutoReplyProcessor(autoReply);
     const outgoingProc = new OutgoingMessageProcessor(
       { get: () => ({ sendMessage }) } as never,

@@ -23,15 +23,26 @@ describe('IncomingMessageProcessor', () => {
     const multimodal = {
       normalize: jest.fn().mockResolvedValue({ text: 'texto transcripto' }),
     };
+    const media = {
+      url: 'https://cdn/x',
+      headers: { Authorization: 'Bearer t' },
+    };
+    const channelMedia = {
+      resolve: jest.fn().mockResolvedValue({ organizationId: 'org1', media }),
+    };
     const p = new IncomingMessageProcessor(
       conversations as never,
       multimodal as never,
+      channelMedia as never,
     );
     const msg = { externalId: 'w1', content: '[audio]', type: 'audio' };
 
     await p.process(
       job({ channelAccountId: 'ca1', channelType: 'WHATSAPP', msg }) as never,
     );
+
+    expect(channelMedia.resolve).toHaveBeenCalledWith('ca1', 'WHATSAPP', msg);
+    expect(multimodal.normalize).toHaveBeenCalledWith(msg, 'org1', media);
 
     expect(conversations.handleIncomingMessage).toHaveBeenCalledWith(
       'ca1',
@@ -48,6 +59,9 @@ describe('IncomingMessageProcessor', () => {
       conversations as never,
       {
         normalize: jest.fn().mockResolvedValue({ text: 'x' }),
+      } as never,
+      {
+        resolve: jest.fn().mockResolvedValue({ organizationId: 'org1' }),
       } as never,
     );
     const j = job({

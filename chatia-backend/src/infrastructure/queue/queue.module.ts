@@ -1,6 +1,7 @@
 // src/infrastructure/queue/queue.module.ts
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
+import { bullConnection } from '@/infrastructure/queue/bull-connection.js';
 import { QUEUES } from '@/infrastructure/queue/queue.constants.js';
 import { IncomingMessageProcessor } from '@/infrastructure/queue/processors/incoming-message.processor.js';
 import { OutgoingMessageProcessor } from '@/infrastructure/queue/processors/outgoing-message.processor.js';
@@ -11,13 +12,12 @@ import { ConversationsModule } from '@/core/conversations/conversations.module.j
 import { EventsModule } from '@/infrastructure/events/events.module.js';
 
 const REDIS_ENABLED = process.env['REDIS_ENABLED'] === 'true';
-const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
 
 @Module({
   imports: [
     ...(REDIS_ENABLED
       ? [
-          BullModule.forRoot({ connection: { url: REDIS_URL } }),
+          BullModule.forRoot({ connection: bullConnection() }),
           BullModule.registerQueue(
             {
               name: QUEUES.INCOMING_MESSAGE,

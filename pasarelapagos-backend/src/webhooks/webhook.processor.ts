@@ -87,7 +87,7 @@ export class WebhookProcessor extends WorkerHost {
             occurredAt:     new Date().toISOString(),
           },
           {
-            jobId:    `attribution:${payment.id}`,
+            jobId:    `attribution_${payment.id}`,
             attempts: 3,
             backoff:  { type: 'exponential' as const, delay: 5_000 },
           },

@@ -6,6 +6,7 @@ import {
   IncomingMessage,
   OutgoingMessage,
   ChannelAccountConfig,
+  ResolvedMedia,
   WhatsAppMessage,
   WhatsAppWebhookPayload,
 } from '@/infrastructure/channels/channel.interface.js';
@@ -105,6 +106,29 @@ export class WhatsAppChannel implements IChannel {
       const error = await res.text();
       throw new Error(`WhatsApp send failed: ${error}`);
     }
+  }
+
+  /**
+   * El webhook de WhatsApp trae solo el id del medio. `GET /{media-id}` devuelve una URL temporal
+   * (~5 min) que se descarga con el mismo token de la cuenta.
+   */
+  async resolveMedia(
+    mediaId: string,
+    config: ChannelAccountConfig,
+  ): Promise<ResolvedMedia> {
+    const headers = { Authorization: `Bearer ${config.accessToken}` };
+    const res = await fetch(`${this.API_URL}/${encodeURIComponent(mediaId)}`, {
+      headers,
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!res.ok) {
+      throw new Error(`WhatsApp media lookup failed: ${res.status}`);
+    }
+    const data = (await res.json()) as { url?: string };
+    if (!data.url || !data.url.startsWith('https://')) {
+      throw new Error('WhatsApp media lookup: respuesta sin URL https');
+    }
+    return { url: data.url, headers };
   }
 
   private mapMessageType(type: string): IncomingMessage['type'] {

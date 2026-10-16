@@ -24,7 +24,7 @@ export class CampaignScheduler {
     });
     for (const org of orgs) {
       await this.syncQueue.add('sync-platform-metrics', org,
-        { jobId: `sync:${org.ecosystemId}:${org.organizationId}:${Date.now()}`, attempts: 2, backoff: { type: 'exponential', delay: 30_000 } },
+        { jobId: `sync_${org.ecosystemId}_${org.organizationId}_${Date.now()}`, attempts: 2, backoff: { type: 'exponential', delay: 30_000 } },
       ).catch(e => this.logger.warn(`[Scheduler] sync enqueue failed: ${e.message}`));
     }
     if (orgs.length) this.logger.log(`[Scheduler] Enqueued sync for ${orgs.length} orgs`);
@@ -38,7 +38,7 @@ export class CampaignScheduler {
     const uniqueOrgs = new Map(rules.map(r => [`${r.campaign.ecosystemId}:${r.campaign.organizationId}`, r.campaign]));
     for (const org of uniqueOrgs.values()) {
       await this.autoQueue.add('check-automation-rules', org,
-        { jobId: `automation:${org.ecosystemId}:${org.organizationId}:${Date.now()}`, attempts: 2, backoff: { type: 'exponential', delay: 60_000 } },
+        { jobId: `automation_${org.ecosystemId}_${org.organizationId}_${Date.now()}`, attempts: 2, backoff: { type: 'exponential', delay: 60_000 } },
       ).catch(e => this.logger.warn(`[Scheduler] automation enqueue failed: ${e.message}`));
     }
     if (uniqueOrgs.size) this.logger.log(`[Scheduler] Enqueued automation for ${uniqueOrgs.size} orgs`);

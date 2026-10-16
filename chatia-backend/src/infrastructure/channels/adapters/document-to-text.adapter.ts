@@ -25,7 +25,7 @@ export class DocumentToTextAdapter implements IMultimodalAdapter {
     }
 
     try {
-      const text = await this.extractText(input.mediaUrl);
+      const text = await this.extractText(input.mediaUrl, input.mediaHeaders);
       if (!text.trim()) {
         return '[El documento no contiene texto legible. ¿Podés describirme qué necesitás?]';
       }
@@ -45,8 +45,11 @@ export class DocumentToTextAdapter implements IMultimodalAdapter {
     }
   }
 
-  private async extractText(mediaUrl: string): Promise<string> {
-    const res = await fetch(mediaUrl);
+  private async extractText(
+    mediaUrl: string,
+    headers?: Record<string, string>,
+  ): Promise<string> {
+    const res = await fetch(mediaUrl, { headers });
     if (!res.ok)
       throw new Error(`No se pudo descargar el documento: ${res.status}`);
 

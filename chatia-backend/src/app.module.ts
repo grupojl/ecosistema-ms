@@ -52,7 +52,7 @@ import { PrivacyModule } from '@/core/privacy/privacy.module.js';
 // ── Módulos de ecosistema — un solo import ─────────────────────────────────
 import { ChatiaModulesModule } from '@/modules/index.js';
 
-const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
+import { bullConnection } from '@/infrastructure/queue/bull-connection.js';
 
 @Module({
   providers: [{ provide: APP_GUARD, useClass: HttpThrottlerGuard }],
@@ -64,7 +64,7 @@ const REDIS_URL = process.env['REDIS_URL'] ?? 'redis://localhost:6379';
     }),
     createLoggerModule(),
     ScheduleModule.forRoot(),
-    BullModule.forRoot({ connection: { url: REDIS_URL } }),
+    BullModule.forRoot({ connection: bullConnection() }),
     CacheModule.register({ isGlobal: true, ttl: 300_000 }),
     PrometheusModule.register(),
     // Límite base por IP para toda la API (los endpoints sensibles tienen límites propios más estrictos)

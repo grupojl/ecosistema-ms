@@ -206,7 +206,7 @@ Una sesión de trabajo. Patrón documentado — solo requiere aplicarlo.
 - **Flujo:** LLM real probado (opt-in `TEST_LLM_LIVE=1`); carga concurrente 40 entregas → 1/1/1; Redis caído → 503 en 3 s (`addWithTimeout`, bug real). **Pendiente:** sandbox de Meta (requiere credenciales de prueba).
 - **Tests:** branches 80,5 % → 85,7 %; services sin spec 2 → 0; Stryker instalado (`@stryker-mutator/core` + `jest-runner` en el catálogo, `stryker.config.json`, `pnpm test:mutation`): 66,97 % → **96,55 %** en 7 archivos críticos (una corrida completa final: 419 muertos, 1 timeout, 15 sobrevivientes). Sobrevivientes: textos de log (auto-reply), 5 constantes estáticas + 2 equivalentes (webhook-signature), prefijo y regex del hex (token-cipher) y 1 de rate-limit.
 - **Para repetir mutación:** `cd chatia-backend && pnpm test:mutation` (~15 min; no correr otra carga a la vez).
-- **Código muerto detectado, sin borrar:** `src/infrastructure/transport/internal/schemas.ts` (nadie lo importa) y `LangGraphEngine` (16 branches sin cubrir; depende de la decisión AiConfig vs AssistantConfig).
+- **Código muerto detectado, sin borrar** (2026-10-16 se intentó borrar `schemas.ts` y el entorno bloqueó el `rm`; borrarlo a mano): `src/infrastructure/transport/internal/schemas.ts` (nadie lo importa) y `LangGraphEngine` (16 branches sin cubrir; depende de la decisión AiConfig vs AssistantConfig).
 
 ## ✅ Respuesta automática a canales — CONECTADA (2026-10-15)
 
@@ -263,7 +263,7 @@ P1
 - [ ] **TikTok**: confirmar formato de firma y `TIKTOK_APP_SECRET` contra su documentación.
 - [ ] **Aislamiento**: las consultas filtran por `organizationId`, que es único global, y la brecha entre ecosistemas ya está cerrada y probada; la regla dura pide además `ecosystemId` en el `where`. Decidir: dejarlo por invariante + tests, o centralizar en una extensión de Prisma / RLS de Postgres.
 - [x] Lock distribuido del cron de retención (`CacheService.tryLock`, SET NX EX; sin Redis corre igual). HECHO 2026-10-15.
-- [ ] **`BullModule.forRoot` y `HealthModule` registran colas aunque `REDIS_ENABLED=false`** → inundan el log de `ECONNREFUSED`. Solo molesta en local/CI sin Redis.
+- [x] **`BullModule.forRoot` y `HealthModule` registran colas aunque `REDIS_ENABLED=false`** (2026-10-16): conexión única en `infrastructure/queue/bull-connection.ts`; con Redis deshabilitado es `lazyConnect` + `retryStrategy: () => null` (sin reintentos ni spam de `ECONNREFUSED`; un `add()` falla rápido). Los módulos siguen registrando sus colas. Verificar el log arrancando sin Redis.
 - [x] CI chatia: Trivy fijado a `0.28.0` y la imagen se carga localmente en PRs (`load: true`) para poder escanearla. Los otros 5 workflows siguen con `@master`. Pendiente: `Dockerfile` usa `shamefully-hoist`, lo que ocultó las dependencias fantasma.
 
 P2
@@ -272,7 +272,7 @@ P2
 - [ ] Cola de salida con recuperación de webhooks perdidos (reconciliación contra la API de Meta) y monitoreo de calidad/límites del número de Meta con alerta técnica.
 - [ ] Destino de las alertas técnicas (hoy: log `[ALERTA TÉCNICA]` + métrica `provider_chain_exhausted_total`). Definir Slack/PagerDuty/email.
 - [ ] `manzana` / `mexus`: plantillas con `TODO`; completar o quitar.
-- [ ] `SETUP.md`/`README.md` desactualizados (mencionan `GROQ_MODELS.LLAMA_70B`).
+- [x] `SETUP.md` actualizado 2026-10-16 (cadenas de proveedores, cifrado de tokens, firma obligatoria) y se quitó un `curl` con un JWT pegado. `README.md` sin revisar.
 - [ ] F4: pruebas de carga (k6), backups de Postgres con prueba de restauración, RTO/RPO, runbooks, branch protection en `main`.
 
 ## Estructura core / infrastructure / modules (ADR-022) — 2026-10-15
@@ -289,15 +289,15 @@ P2
 - [x] **Etapas de conversación**: el tipo de dominio declaraba `INTERESTED`/`CLOSED_WON`/`CLOSED_LOST`, que no existen en el enum de la base (`INFORMED`, `CLOSING`, `FOLLOW_UP`, `HUMAN`). Alineado y `updateStage` rechaza etapas inválidas con error claro.
 - [x] `PATCH /ecosystems/:id/config` ahora valida con Zod (claves conocidas, `projectType` abierto, máx. 16 KB).
 - [x] Cobertura 78 % → 92 %: specs para analytics-events, rag, ingesta FAQ, strategies, circuit-breaker, firebase, groq, multimodal, adaptadores de documento/ubicación, organizaciones, widget-config, controller de ecosistemas (clave de plataforma) y la descarga SSRF-safe (redirecciones, 2 MB, timeout).
-- [ ] **P0 funcional — medios de WhatsApp**: `WhatsAppChannel` guarda en `mediaUrl` el **id** del medio (no una URL) y los adaptadores de audio, imagen y documento hacen `fetch(mediaUrl)`, que falla. Hay que resolver `GET /{media-id}` (Graph API, con el token de la cuenta) → URL temporal → descarga con `Authorization`. Hasta entonces, notas de voz, fotos y documentos por WhatsApp degradan a "no pude leerlo". Sin test que lo detecte porque los adaptadores se probaban con URLs.
+- [x] **P0 funcional — medios de WhatsApp** (2026-10-16): `WhatsAppChannel.resolveMedia` hace `GET /{media-id}` con el token de la cuenta → URL https temporal + `Authorization`. `ChannelMediaService` (infrastructure/channels) lo invoca desde `IncomingMessageProcessor` (token descifrado en el worker, nunca viaja por Redis) y `MultimodalService.normalize` recibe `media` con URL + cabeceras; los adaptadores de audio, imagen y documento descargan con esas cabeceras. Si el lookup falla, degrada al texto de respaldo sin reintentar todo el mensaje. De paso `normalize` ahora recibe el `organizationId` real (antes `''`). Tests: `channel-media.spec.ts` + `processors.spec.ts`. **Pendiente:** probarlo con una cuenta real de WhatsApp (Graph API real).
 - [ ] `GroqService` sigue vivo solo porque lo usa `LangGraphEngine` (legacy, sin invocar): cae junto con la decisión `AiConfig` vs `AssistantConfig`.
 - [ ] Sin spec propio: `prisma.service` (arranque) y `multimodal.service` (cubierto en `multimodal.spec.ts`, el script de métricas lo marca por el nombre).
 
 ## Detectado fuera de chatia (no se tocó)
-- [ ] **P0 — `jobId` con `:` en otros servicios** (mismo bug que tenía chatia; BullMQ lo rechaza salvo 3 partes exactas, así que estos `queue.add` lanzan error): pasarelapagos `reconcile:${id}` (reconciliation.service.ts:74) y `attribution:${payment.id}` (webhook.processor.ts:90); workers `campaign:${campaignId}` (campaigns.service.ts:158); marketing `sync:…:…:${Date.now()}` y `automation:…` (campaigns.scheduler.ts:27,41; 4 partes). `webhook:${providerId}:${externalId}` de pasarela anda solo mientras `externalId` no tenga `:`. Cambiar a `_` y probar con Redis real (`TEST_REDIS_URL`).
+- [x] **`jobId` con `:` en otros servicios** (2026-10-16): cambiados a `_` en pasarelapagos (`reconcile_`, `attribution_`, `webhook_` con `externalId` saneado), workers (`campaign_`) y marketing (`sync_`, `automation_`); `tsc` limpio en los tres. **Pendiente:** probar con Redis real (`TEST_REDIS_URL`). Ojo: jobs ya encolados con el id viejo no se deduplican contra el nuevo.
 - [ ] **workers-backend** — `FaqIngestProcessor` es un stub (`TODO Sprint W-2`) y `VectorIndexProcessor` usa `nomic-embed-text` por Groq (el endpoint de embeddings de Groq no está verificado). Chatia indexa por su cuenta, pero si se reactiva el flujo de workers debe usar el MISMO modelo que chatia (`EMBEDDINGS_MODEL`).
 - [ ] **workers-backend** — su controller gRPC responde con campos `snake_case`, pero el cargador de proto trabaja en camelCase: los campos se pierden. Revisar también el de otros servicios.
-- [ ] **packages/grpc-client** — `grpcMetadata()` no envía `x-internal-api-key`. Hasta que lo haga, no se puede activar `GRPC_AUTH_ENFORCED=true` en chatia.
+- [ ] **packages/grpc-client** — `grpcMetadata()` ya envía `x-internal-api-key` (desde `INTERNAL_API_KEY`, 2026-10-16, `dist/` reconstruido). **Falta** que los callers lo usen: ninguno llama a `grpcMetadata()` (workers: analytics-export, campaign-email, vector-index; notificaciones: dlq-monitor). Hasta adoptarlo ahí no se puede activar `GRPC_AUTH_ENFORCED=true` en chatia.
 - [ ] **packages/logger** — se agregó redacción de secretos y se recorta el query string de las URLs; afecta a los 6 servicios y hay que reconstruir `dist/`.
 - [ ] **pnpm-lock.yaml** — cambió (37 líneas, solo entradas de chatia). Revisar antes de commitear.
 - [ ] **packages/proto/proto/chatia.proto** — se agregaron `UpsertChunks` y `UpdateDocumentStatus` (cambio compatible).

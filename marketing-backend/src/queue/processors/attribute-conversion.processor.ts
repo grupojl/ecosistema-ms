@@ -1,6 +1,6 @@
 // Queue: marketing-attribution | Productor: pasarelapagos-backend (fire-forget)
 // Norte Northbeam: campaignId nullable = revenue no atribuido (honesto).
-// jobId determinista attribution:{paymentId} → un pago, un AttributionEvent.
+// jobId determinista attribution_{paymentId} → un pago, un AttributionEvent.
 // Ref: .claude/contracts/marketing-integration.md
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
 import { Logger }                               from '@nestjs/common';

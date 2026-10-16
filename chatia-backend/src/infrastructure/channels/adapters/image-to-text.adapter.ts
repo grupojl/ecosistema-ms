@@ -57,7 +57,7 @@ export class ImageToTextAdapter implements IMultimodalAdapter {
     }
 
     try {
-      const image = await this.download(input.mediaUrl);
+      const image = await this.download(input.mediaUrl, input.mediaHeaders);
       const prompt = input.content
         ? `${DEFAULT_PROMPT}\n\nEl usuario agregó este caption: "${input.content}"`
         : DEFAULT_PROMPT;
@@ -78,8 +78,14 @@ export class ImageToTextAdapter implements IMultimodalAdapter {
     }
   }
 
-  private async download(mediaUrl: string): Promise<DownloadedImage> {
-    const res = await fetch(mediaUrl, { signal: AbortSignal.timeout(15_000) });
+  private async download(
+    mediaUrl: string,
+    headers?: Record<string, string>,
+  ): Promise<DownloadedImage> {
+    const res = await fetch(mediaUrl, {
+      headers,
+      signal: AbortSignal.timeout(15_000),
+    });
     if (!res.ok)
       throw new Error(`No se pudo descargar la imagen: ${res.status}`);
 

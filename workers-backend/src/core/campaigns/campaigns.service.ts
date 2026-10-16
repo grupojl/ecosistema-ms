@@ -155,7 +155,7 @@ export class CampaignsService {
         recipientCount: recipients.length,
       },
       {
-        jobId:            `campaign:${campaignId}`,
+        jobId:            `campaign_${campaignId}`,
         attempts:         3,
         backoff:          { type: 'exponential', delay: 5_000 },
         removeOnComplete: { count: 50 },

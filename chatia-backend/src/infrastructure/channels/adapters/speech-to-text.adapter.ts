@@ -47,6 +47,7 @@ export class SpeechToTextAdapter implements IMultimodalAdapter {
     try {
       // Descargar una sola vez el audio del CDN del canal (expira en ~5 min)
       const audioRes = await fetch(input.mediaUrl, {
+        headers: input.mediaHeaders,
         signal: AbortSignal.timeout(15_000),
       });
       if (!audioRes.ok)
