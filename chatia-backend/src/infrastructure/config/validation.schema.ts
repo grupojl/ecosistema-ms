@@ -28,6 +28,12 @@ export const configValidationSchema = z
     INTERNAL_API_KEY: optionalString,
     CHAT_INTERNAL_API_KEY: optionalString,
     META_APP_SECRET: optionalString,
+    META_WEBHOOK_VERIFY_TOKEN: optionalString, // verify token del webhook único de la app (GET /webhooks/whatsapp)
+    META_APP_ID: optionalString, // app de la plataforma (Tech Provider): necesaria para el alta por Embedded Signup
+    META_GRAPH_VERSION: z
+      .string()
+      .regex(/^v\d+\.\d+$/, 'Formato esperado: v23.0')
+      .optional(),
     TIKTOK_APP_SECRET: optionalString,
     WIDGET_SESSION_SECRET: optionalString,
     CHANNEL_TOKEN_ENCRYPTION_KEY: optionalString, // 32 bytes base64/hex: cifra tokens de canales en la base

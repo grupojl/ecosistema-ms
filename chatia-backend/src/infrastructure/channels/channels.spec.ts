@@ -143,7 +143,7 @@ describe('WhatsAppChannel', () => {
   it('envía texto a /{phone_number_id}/messages con Bearer', async () => {
     await ch.sendMessage({ to: '549', type: 'text', content: 'hi' }, CONFIG);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v19.0/phone-1/messages');
+    expect(url).toBe('https://graph.facebook.com/v23.0/phone-1/messages');
     expect((init.headers as Record<string, string>)['Authorization']).toBe(
       'Bearer tok',
     );
@@ -153,6 +153,16 @@ describe('WhatsAppChannel', () => {
       type: 'text',
       text: { body: 'hi' },
     });
+  });
+
+  it('quita el 9 de móviles argentinos (549… → 54…) al enviar', async () => {
+    await ch.sendMessage(
+      { to: '5493835117701', type: 'text', content: 'hi' },
+      CONFIG,
+    );
+    expect(
+      JSON.parse((fetchMock.mock.calls[0][1] as RequestInit).body as string),
+    ).toMatchObject({ to: '543835117701' });
   });
 
   it('envía imagen con link y lanza si la API responde error', async () => {

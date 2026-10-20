@@ -24,6 +24,8 @@ import { ChannelAccountsModule } from '@/core/channel-accounts/channel-accounts.
 import { ProjectsModule } from '@/core/projects/projects.module.js';
 import { AgentNotificationsController } from '@/modules/common/agent-notifications/agent-notifications.controller.js';
 import { ChannelAccountsController } from '@/modules/common/channel-accounts/channel-accounts.controller.js';
+import { WhatsAppInternalController } from '@/modules/common/channel-accounts/whatsapp-internal.controller.js';
+import { WhatsAppOnboardingController } from '@/modules/common/channel-accounts/whatsapp-onboarding.controller.js';
 import { WebhooksController } from '@/modules/common/webhooks/webhooks.controller.js';
 import { WidgetController } from '@/modules/common/widget/widget.controller.js';
 import { AgentsController } from '@/modules/common/agents/agents.controller.js';
@@ -67,6 +69,8 @@ import { ProjectsController } from '@/modules/common/projects/projects.controlle
     ProjectsController,
     AgentNotificationsController,
     ChannelAccountsController,
+    WhatsAppOnboardingController,
+    WhatsAppInternalController,
     WebhooksController,
     WidgetController,
   ],

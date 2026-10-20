@@ -10,11 +10,12 @@ import {
   WhatsAppMessage,
   WhatsAppWebhookPayload,
 } from '@/infrastructure/channels/channel.interface.js';
+import { graphBaseUrl } from '@/infrastructure/channels/whatsapp/graph-api.js';
+import { normalizeWhatsAppRecipient } from '@/infrastructure/channels/whatsapp/phone-normalization.js';
 
 @Injectable()
 export class WhatsAppChannel implements IChannel {
   private readonly logger = new Logger(WhatsAppChannel.name);
-  private readonly API_URL = 'https://graph.facebook.com/v19.0';
 
   verifyWebhook(
     query: Record<string, string>,
@@ -77,12 +78,12 @@ export class WhatsAppChannel implements IChannel {
     config: ChannelAccountConfig,
   ): Promise<void> {
     const phoneNumberId = config.externalId;
-    const url = `${this.API_URL}/${phoneNumberId}/messages`;
+    const url = `${graphBaseUrl()}/${phoneNumberId}/messages`;
 
     const body: Record<string, unknown> = {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to: msg.to,
+      to: normalizeWhatsAppRecipient(msg.to),
     };
 
     if (msg.type === 'text') {
@@ -117,10 +118,13 @@ export class WhatsAppChannel implements IChannel {
     config: ChannelAccountConfig,
   ): Promise<ResolvedMedia> {
     const headers = { Authorization: `Bearer ${config.accessToken}` };
-    const res = await fetch(`${this.API_URL}/${encodeURIComponent(mediaId)}`, {
-      headers,
-      signal: AbortSignal.timeout(10_000),
-    });
+    const res = await fetch(
+      `${graphBaseUrl()}/${encodeURIComponent(mediaId)}`,
+      {
+        headers,
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
     if (!res.ok) {
       throw new Error(`WhatsApp media lookup failed: ${res.status}`);
     }

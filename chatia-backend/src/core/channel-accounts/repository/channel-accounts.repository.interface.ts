@@ -35,6 +35,7 @@ export interface UpdateChannelAccountData {
   accessToken?: string;
   extraConfig?: Record<string, unknown>;
   webhookVerifyToken?: string;
+  isActive?: boolean;
 }
 
 export interface IChannelAccountsRepository {

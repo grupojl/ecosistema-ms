@@ -35,6 +35,7 @@ import { AnalyticsEventsModule } from '@/core/analytics-events/analytics-events.
 
 // ── Entry points ──────────────────────────────────────────────────────────
 import { ChannelsModule } from '@/infrastructure/channels/channel.module.js';
+import { WhatsAppAdminModule } from '@/infrastructure/channels/whatsapp/whatsapp-admin.module.js';
 import { QueueModule } from '@/infrastructure/queue/queue.module.js';
 import { EventsModule } from '@/infrastructure/events/events.module.js';
 import { HealthModule } from '@/infrastructure/transport/health/health.module.js';
@@ -90,6 +91,7 @@ import { bullConnection } from '@/infrastructure/queue/bull-connection.js';
 
     // Entry points
     ChannelsModule,
+    WhatsAppAdminModule,
     QueueModule,
     EventsModule,
     HealthModule,

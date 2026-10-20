@@ -18,6 +18,7 @@ import { ChannelType } from '@/generated/prisma/client.js';
 import { QUEUES, JOBS } from '@/infrastructure/queue/queue.constants.js';
 import { resolveSignatureSecret } from '@/core/webhooks/webhook-signature.js';
 import { TokenCipher } from '@/infrastructure/security/token-cipher.js';
+import { safeEqual } from '@/infrastructure/security/safe-equal.js';
 import type { IncomingMessageJobData } from '@/infrastructure/queue/processors/incoming-message.processor.js';
 
 @Injectable()
@@ -50,6 +51,7 @@ export class WebhooksService {
   ) {
     const account = await this.accounts.findByChannel(channelType, externalId);
     if (!account) throw this.deny('Cuenta inexistente');
+    if (account.isActive === false) throw this.deny('Cuenta desconectada');
 
     const channel = this.channelRegistry.get(channelType);
     const challenge = channel.verifyWebhook(query, {
@@ -72,6 +74,7 @@ export class WebhooksService {
   ) {
     const account = await this.accounts.findByChannel(channelType, externalId);
     if (!account) throw this.deny('Cuenta inexistente');
+    if (account.isActive === false) throw this.deny('Cuenta desconectada');
 
     const channel = this.channelRegistry.get(channelType);
 
@@ -101,6 +104,83 @@ export class WebhooksService {
       throw this.deny('Firma inválida');
     }
 
+    return this.enqueue(account, channelType, payload);
+  }
+
+  /**
+   * Verificación (GET) del webhook ÚNICO de la app de Meta de la plataforma (Tech Provider, ADR-024).
+   * Meta registra una sola URL de callback para todos los clientes: no puede llevar el id de cada número, y el
+   * verify token es de la plataforma (META_WEBHOOK_VERIFY_TOKEN), no de una cuenta.
+   */
+  verifyPlatform(query: Record<string, string>): string {
+    const expected = process.env['META_WEBHOOK_VERIFY_TOKEN'];
+    if (!expected) throw this.deny('META_WEBHOOK_VERIFY_TOKEN sin configurar');
+    if (
+      query['hub.mode'] !== 'subscribe' ||
+      !safeEqual(query['hub.verify_token'], expected)
+    ) {
+      throw this.deny('Verify token de plataforma inválido');
+    }
+    return query['hub.challenge'] ?? '';
+  }
+
+  /**
+   * Eventos (POST) de WhatsApp en el webhook único: la firma se valida UNA vez con META_APP_SECRET sobre el cuerpo
+   * crudo, y cada cambio se enruta a la cuenta dueña del `phone_number_id` (metadata del payload). Un número que no
+   * es nuestro o está desconectado se ignora sin fallar el lote: Meta reintenta los lotes que devuelven error.
+   */
+  async handlePlatformEvent(
+    payload: unknown,
+    rawBody: Buffer | undefined,
+    signature?: string,
+  ) {
+    const secret = process.env['META_APP_SECRET'];
+    if (!secret) throw this.deny('META_APP_SECRET sin configurar');
+    if (!signature) throw this.deny('Firma ausente');
+    if (!rawBody || rawBody.length === 0)
+      throw this.deny('Cuerpo crudo no disponible');
+    const channel = this.channelRegistry.get(ChannelType.WHATSAPP);
+    if (!channel.verifySignature?.(rawBody, signature, secret)) {
+      throw this.deny('Firma inválida');
+    }
+
+    const entries =
+      (payload as { entry?: Array<{ changes?: unknown[] }> } | null)?.entry ??
+      [];
+    let processed = 0;
+    for (const entry of entries) {
+      for (const change of entry.changes ?? []) {
+        const phoneNumberId = (
+          change as { value?: { metadata?: { phone_number_id?: unknown } } }
+        ).value?.metadata?.phone_number_id;
+        if (typeof phoneNumberId !== 'string') continue;
+
+        const account = await this.accounts.findByChannel(
+          ChannelType.WHATSAPP,
+          phoneNumberId,
+        );
+        if (!account || account.isActive === false) {
+          this.logger.warn(
+            `Webhook de plataforma para un número no conectado: ${phoneNumberId}`,
+          );
+          continue;
+        }
+        await this.enqueue(account, ChannelType.WHATSAPP, {
+          ...(payload as object),
+          entry: [{ ...entry, changes: [change] }],
+        });
+        processed++;
+      }
+    }
+    return { status: processed > 0 ? 'ok' : 'ignored' };
+  }
+
+  private async enqueue(
+    account: { id: string },
+    channelType: ChannelType,
+    payload: unknown,
+  ) {
+    const channel = this.channelRegistry.get(channelType);
     const msg = channel.parseIncomingWebhook(payload);
     if (!msg || msg.length === 0) return { status: 'ignored' };
 

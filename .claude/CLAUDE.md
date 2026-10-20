@@ -68,3 +68,4 @@
 5. Domain/Repository: agents, campaigns, notifications (contacts y conversations ✅)
 6. **P0 post-reestructura:** tests (jest duplicado), smoke test con DB/Redis, imágenes Docker — ver `roadmap/deuda-tecnica.md`
 7. RTO/RPO definidos por servicio (Escalón 9)
+8. WhatsApp multi-organización: app de plataforma (Tech Provider) + Embedded Signup, cada org paga su WABA — ver ADR-024 (norte; circuito probado en local 2026-10-20, falta endpoint de alta, pantalla en dashboard y app de Meta publicada)

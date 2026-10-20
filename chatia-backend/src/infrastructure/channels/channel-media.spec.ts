@@ -30,7 +30,7 @@ describe('WhatsAppChannel.resolveMedia', () => {
     const out = await ch.resolveMedia('MEDIA 1', cfg);
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe('https://graph.facebook.com/v19.0/MEDIA%201');
+    expect(url).toBe('https://graph.facebook.com/v23.0/MEDIA%201');
     expect(init.headers).toEqual({ Authorization: 'Bearer tok' });
     expect(out).toEqual({
       url: 'https://lookaside.fbsbx.com/m/1',

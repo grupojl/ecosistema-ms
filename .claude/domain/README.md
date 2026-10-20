@@ -16,6 +16,7 @@ el dominio. Si hay contradicción entre el código y este archivo, el dominio ga
 | `welver.md` | Welver | ✅ Activo en producción |
 | `manzana.md` | Manzana | 🔲 En desarrollo |
 | `mexus.md` | Mexus | 🔲 En desarrollo |
+| `meta.md` | Meta / WhatsApp (transversal a todos los ecosistemas) | 🟡 Código listo, falta Meta (ver checklist) |
 
 ## Regla de mantenimiento
 

@@ -35,6 +35,24 @@ function parseChannelType(raw: string): ChannelType {
 export class WebhooksController {
   constructor(private readonly svc: WebhooksService) {}
 
+  // Webhook ÚNICO de la app de Meta de la plataforma (Tech Provider, ADR-024): una sola URL para todos los clientes,
+  // el número sale del payload. Va antes de la ruta con id; no colisiona (un segmento vs. dos).
+  @Get('whatsapp')
+  verifyPlatform(@Query() query: Record<string, string>, @Res() res: Response) {
+    res.send(this.svc.verifyPlatform(query));
+  }
+
+  @Post('whatsapp')
+  @HttpCode(200)
+  async handlePlatformEvent(
+    @Body() payload: unknown,
+    @Req() req: Request & { rawBody?: Buffer },
+  ) {
+    const header = req.headers['x-hub-signature-256'];
+    const sig = Array.isArray(header) ? header[0] : header;
+    return this.svc.handlePlatformEvent(payload, req.rawBody, sig);
+  }
+
   @Get(':channelType/:externalId')
   async verify(
     @Param('channelType') ct: string,
